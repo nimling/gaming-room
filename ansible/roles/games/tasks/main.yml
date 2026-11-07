@@ -1,0 +1,43 @@
+---
+# /games lives outside the player's home, so games survive every reset.
+# On btrfs it is its own subvolume, which also keeps it out of root snapshots.
+- name: Check whether /games exists
+  ansible.builtin.stat:
+    path: "{{ seat_games_root }}"
+  register: games_root
+
+- name: Check the root filesystem type
+  ansible.builtin.command: findmnt -no FSTYPE /
+  register: root_fstype
+  changed_when: false
+
+- name: Create /games as a btrfs subvolume
+  ansible.builtin.command: btrfs subvolume create {{ seat_games_root }}
+  when: not games_root.stat.exists and root_fstype.stdout == 'btrfs'
+  changed_when: true
+
+- name: Set up /games
+  ansible.builtin.file:
+    path: "{{ seat_games_root }}"
+    state: directory
+    owner: root
+    group: "{{ seat_games_group }}"
+    mode: "0755"
+
+# Steam writes here (installs, updates, shader cache), so the player owns it.
+- name: Set up the shared Steam library
+  ansible.builtin.file:
+    path: "{{ seat_steam_library }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_games_group }}"
+    mode: "2775"
+
+# Classic games are installed by Ansible and read-only for the player.
+- name: Set up the classic games folder
+  ansible.builtin.file:
+    path: "{{ seat_classic_root }}"
+    state: directory
+    owner: root
+    group: "{{ seat_games_group }}"
+    mode: "0755"

@@ -1,0 +1,47 @@
+// Managed by gaming-room Ansible.
+// The player account may power off, reboot and end its own session.
+// It may not install software, manage services or change system settings.
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "{{ seat_player_user }}") {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    var allowed = [
+        "org.freedesktop.login1.power-off",
+        "org.freedesktop.login1.power-off-multiple-sessions",
+        "org.freedesktop.login1.reboot",
+        "org.freedesktop.login1.reboot-multiple-sessions",
+        "org.freedesktop.login1.suspend",
+        "org.freedesktop.login1.suspend-multiple-sessions"
+    ];
+    if (allowed.indexOf(action.id) >= 0) {
+        return polkit.Result.YES;
+    }
+
+    // End session: the launcher and the idle watcher start seat-reset.service.
+    if (action.id === "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") === "seat-reset.service" &&
+        action.lookup("verb") === "start") {
+        return polkit.Result.YES;
+    }
+
+    var deniedPrefixes = [
+        "org.freedesktop.policykit.exec",
+        "org.freedesktop.systemd1.",
+        "org.freedesktop.packagekit.",
+        "org.freedesktop.Flatpak.",
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.udisks2.modify-device",
+        "org.freedesktop.timedate1.",
+        "org.freedesktop.hostname1.",
+        "org.freedesktop.locale1.",
+        "org.freedesktop.accounts."
+    ];
+    for (var i = 0; i < deniedPrefixes.length; i++) {
+        if (action.id.indexOf(deniedPrefixes[i]) === 0) {
+            return polkit.Result.NO;
+        }
+    }
+
+    return polkit.Result.NOT_HANDLED;
+});

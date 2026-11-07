@@ -1,0 +1,93 @@
+---
+- name: Refuse to lock people out of SSH
+  ansible.builtin.assert:
+    that: seat_admin_ssh_keys | length > 0 or seat_allow_no_admin_keys
+    fail_msg: >-
+      seat_admin_ssh_keys is empty. Password SSH logins are turned off by this
+      role, so set at least one admin key in the private inventory.
+
+- name: Install base packages
+  community.general.pacman:
+    name:
+      - btrfs-progs
+      - git
+      - networkmanager
+      - openssh
+      - pciutils
+      - polkit
+      - sudo
+    state: present
+
+- name: Create /etc/seat
+  ansible.builtin.file:
+    path: /etc/seat
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write shared seat settings for the seat-* scripts
+  ansible.builtin.template:
+    src: seat.conf.j2
+    dest: /etc/seat/seat.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Make sshd read drop-in files first
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: Include /etc/ssh/sshd_config.d/*.conf
+    insertbefore: BOF
+    state: present
+  notify: Reload sshd
+
+- name: Create sshd drop-in folder
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Harden sshd (keys only, named users only)
+  ansible.builtin.template:
+    src: sshd-gaming-room.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-gaming-room.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sshd
+
+- name: Check sshd config before any reload
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+- name: Enable sshd and time sync
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - sshd.service
+    - systemd-timesyncd.service
+  when: not seat_in_container
+
+- name: Create the NetworkManager config folder
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Turn on Wake-on-LAN (magic packet) for wired connections
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/60-wake-on-lan.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible
+      [connection]
+      ethernet.wake-on-lan=64

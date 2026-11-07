@@ -6,7 +6,7 @@ The goal: power on, type a name, and be in a game with voice in under a minute â
 
 ## Status
 
-Scoping is done; **Phase 0 (inventory and spike) is next.** The full scope is in [docs/scope.md](docs/scope.md).
+Scoping is done. **Phase 0** (inventory and spike) happens at the first dugnad. The **Phase 1** seat roles are in [`ansible/`](ansible/) and pass the container tests; they still need a run on a real seat. The full scope is in [docs/scope.md](docs/scope.md).
 
 ## What lives where
 

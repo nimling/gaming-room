@@ -1,0 +1,9 @@
+# Managed by gaming-room Ansible.
+# Started by the launcher's End session button and by the idle watcher.
+# polkit lets the player start this one unit and nothing else.
+[Unit]
+Description=End the player session and reset the player's home
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/seat-reset session

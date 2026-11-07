@@ -1,0 +1,47 @@
+---
+- name: Install seat-tier
+  ansible.builtin.copy:
+    src: seat-tier
+    dest: /usr/local/sbin/seat-tier
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install seat-tier.service (runs at every boot, before login)
+  ansible.builtin.copy:
+    src: seat-tier.service
+    dest: /etc/systemd/system/seat-tier.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set a manual tier override
+  ansible.builtin.copy:
+    dest: /etc/seat/tier.override
+    content: "{{ seat_tier_override }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: seat_tier_override | length > 0
+
+- name: Remove a stale tier override
+  ansible.builtin.file:
+    path: /etc/seat/tier.override
+    state: absent
+  when: seat_tier_override | length == 0
+
+- name: Enable seat-tier.service
+  ansible.builtin.systemd_service:
+    name: seat-tier.service
+    enabled: true
+    daemon_reload: true
+  when: not seat_in_container
+
+- name: Detect the tier now
+  ansible.builtin.command: /usr/local/sbin/seat-tier
+  register: seat_tier_run
+  changed_when: false
+
+- name: Show the detected hardware
+  ansible.builtin.debug:
+    msg: "{{ seat_tier_run.stdout }}"

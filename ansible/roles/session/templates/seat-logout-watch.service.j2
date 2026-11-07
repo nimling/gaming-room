@@ -1,0 +1,16 @@
+# Managed by gaming-room Ansible.
+# Runs while the player's user manager runs. When the player logs out of KDE
+# (instead of pressing End session), stopping it triggers a reset.
+[Unit]
+Description=Reset the player's home when the player logs out
+BindsTo=user@{{ ansible_facts.getent_passwd[seat_player_user][1] }}.service
+After=user@{{ ansible_facts.getent_passwd[seat_player_user][1] }}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/local/sbin/seat-reset logout
+
+[Install]
+WantedBy=user@{{ ansible_facts.getent_passwd[seat_player_user][1] }}.service

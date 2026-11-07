@@ -1,0 +1,10 @@
+# Managed by gaming-room Ansible. Private values for ansible-pull runs.
+# Written by a push run from the gaming server; not in the public repo.
+seat_admin_ssh_keys: {{ seat_admin_ssh_keys | to_json }}
+seat_orchestrator_ssh_keys: {{ seat_orchestrator_ssh_keys | to_json }}
+seat_orchestrator_source: {{ seat_orchestrator_source | to_json }}
+seat_extra_ssh_users: {{ seat_extra_ssh_users | to_json }}
+seat_admin_password_hash: {{ seat_admin_password_hash | default('') | to_json }}
+seat_tier_override: {{ seat_tier_override | to_json }}
+seat_update_freeze_until: {{ seat_update_freeze_until | to_json }}
+seat_config_branch: {{ seat_config_branch | to_json }}

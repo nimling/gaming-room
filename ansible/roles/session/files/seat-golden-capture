@@ -1,0 +1,57 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Makes the player's current home the new golden home.
+#
+# How to use:
+#   1. Log in as the player on the seat and set things up (start Steam once,
+#      add /games/steam as a library, set up Mumble...).
+#   2. Sign out of every account (Steam, Epic, browser).
+#   3. From SSH as admin:  sudo seat-golden-capture
+# Refuses if the home still holds logins.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+is_subvol() { btrfs subvolume show "$1" >/dev/null 2>&1; }
+
+if [[ $EUID -ne 0 ]]; then
+    echo "seat-golden-capture: run as root (sudo)" >&2
+    exit 1
+fi
+if [[ ! -d $SEAT_HOME ]]; then
+    echo "seat-golden-capture: $SEAT_HOME does not exist" >&2
+    exit 1
+fi
+if ! /usr/local/sbin/seat-token-check "$SEAT_HOME"; then
+    echo "seat-golden-capture: refusing, the home above still holds logins. Sign out and try again." >&2
+    exit 1
+fi
+
+exec 9>/run/seat-reset.lock
+flock 9
+
+restart_dm=0
+if systemctl is-active --quiet display-manager.service; then
+    systemctl stop display-manager.service
+    restart_dm=1
+fi
+loginctl terminate-user "$SEAT_PLAYER" 2>/dev/null || true
+pkill -KILL -u "$SEAT_PLAYER" || true
+
+if [[ -e $SEAT_GOLDEN ]]; then
+    if is_subvol "$SEAT_GOLDEN"; then
+        btrfs subvolume delete "$SEAT_GOLDEN" >/dev/null
+    else
+        rm -rf --one-file-system -- "$SEAT_GOLDEN"
+    fi
+fi
+if is_subvol "$SEAT_HOME"; then
+    btrfs subvolume snapshot "$SEAT_HOME" "$SEAT_GOLDEN" >/dev/null
+else
+    cp -a -- "$SEAT_HOME" "$SEAT_GOLDEN"
+fi
+
+if (( restart_dm )); then
+    systemctl start display-manager.service
+fi
+echo "seat-golden-capture: $SEAT_GOLDEN now holds the captured home"

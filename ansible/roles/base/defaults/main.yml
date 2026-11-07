@@ -1,0 +1,53 @@
+---
+# Public defaults. Real values (keys, addresses, hashes) go in the private
+# inventory's group_vars, never in this repo.
+
+seat_admin_user: admin
+seat_player_user: player
+seat_orchestrator_user: orchestrator
+seat_games_group: games
+
+# SSH public keys allowed to log in as admin / orchestrator.
+seat_admin_ssh_keys: []
+seat_orchestrator_ssh_keys: []
+
+# Address or CIDR the orchestrator may log in from (the gaming server).
+# Empty = no address restriction; set it before go-live.
+seat_orchestrator_source: ""
+
+# Extra users still allowed to SSH in, e.g. during migration.
+seat_extra_ssh_users: []
+
+# Set true only for throwaway test machines with no admin keys.
+seat_allow_no_admin_keys: false
+
+# Set true when testing inside a container: skips service enabling and
+# hardware-only steps.
+seat_in_container: false
+
+# Paths
+seat_games_root: /games
+seat_steam_library: /games/steam
+seat_classic_root: /games/classic
+
+# Session
+seat_idle_logout_enabled: true
+seat_idle_logout_minutes: 20
+seat_idle_warning_seconds: 60
+seat_sddm_session: plasma
+
+# Hardware tiers (MiB). A 16 GB machine reports ~15.5 GiB, hence the margins.
+seat_tier_a_vram_mib: 7500
+seat_tier_a_ram_mib: 15000
+seat_tier_b_vram_mib: 3500
+seat_tier_b_ram_mib: 7000
+seat_tier_override: ""
+
+# Updates
+seat_update_freeze_until: ""   # YYYY-MM-DD; no updates before this date
+seat_update_keep_snapshots: 3
+
+# ansible-pull
+seat_config_repo: https://github.com/nimling/gaming-room.git
+seat_config_branch: stable     # the canary group overrides this with main
+seat_pull_calendar: "*-*-* 03:30"

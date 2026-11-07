@@ -1,0 +1,27 @@
+# Managed by gaming-room Ansible.
+# Where launchers and browsers keep logins, relative to the player's home.
+# Format: <glob>|<optional extended regex the file must match>
+# Add a line whenever a new launcher goes on the seats.
+
+# Steam
+.local/share/Steam/config/loginusers.vdf|"AccountName"
+.local/share/Steam/config/config.vdf|ConnectCache
+.local/share/Steam/local.vdf|ConnectCache
+.steam/registry.vdf|"AutoLoginUser"[[:space:]]+"[^"]+"
+
+# Epic and GOG (Heroic / Legendary)
+.config/legendary/user.json|
+.config/heroic/gog_store/auth.json|
+
+# Discord
+.config/discord/Local Storage|
+
+# Browsers
+.mozilla/firefox/*/cookies.sqlite|
+.mozilla/firefox/*/logins.json|
+.config/chromium/*/Cookies|
+.config/google-chrome/*/Cookies|
+
+# Desktop keyrings
+.local/share/keyrings/*.keyring|
+.local/share/kwalletd/*.kwl|

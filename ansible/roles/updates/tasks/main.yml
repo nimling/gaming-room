@@ -1,0 +1,29 @@
+---
+# Seats never update themselves. Updates run from update.yml, canary first.
+- name: Install checkupdates (pacman-contrib)
+  community.general.pacman:
+    name: pacman-contrib
+    state: present
+
+- name: Install seat-update
+  ansible.builtin.copy:
+    src: seat-update
+    dest: /usr/local/sbin/seat-update
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set the update freeze date
+  ansible.builtin.copy:
+    dest: /etc/seat/update-freeze-until
+    content: "{{ seat_update_freeze_until }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: seat_update_freeze_until | length > 0
+
+- name: Clear an old update freeze
+  ansible.builtin.file:
+    path: /etc/seat/update-freeze-until
+    state: absent
+  when: seat_update_freeze_until | length == 0

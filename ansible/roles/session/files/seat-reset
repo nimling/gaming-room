@@ -1,0 +1,91 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Replaces the player's home with a fresh copy of the golden home and clears
+# what the player left outside it.
+#   seat-reset boot     at boot, before the display manager starts
+#   seat-reset session  End session: stop the display manager, reset, start it
+#   seat-reset logout   after the player logged out of KDE; skipped at shutdown
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+mode=${1:-session}
+log() { echo "seat-reset[$mode]: $*"; }
+is_subvol() { btrfs subvolume show "$1" >/dev/null 2>&1; }
+
+case $mode in
+    boot|session|logout) ;;
+    *) echo "usage: seat-reset boot|session|logout" >&2; exit 2 ;;
+esac
+
+# Never act on anything but /home/<player>.
+if [[ ! $SEAT_PLAYER =~ ^[a-z_][a-z0-9_-]*$ || $SEAT_HOME != "/home/$SEAT_PLAYER" ]]; then
+    log "refusing: unexpected player '$SEAT_PLAYER' or home '$SEAT_HOME'"
+    exit 1
+fi
+
+if [[ $mode == logout ]] && [[ $(systemctl is-system-running 2>/dev/null || true) == stopping ]]; then
+    log "system is shutting down; the boot reset will run instead"
+    exit 0
+fi
+
+# One reset at a time: End session also ends the login, which triggers the
+# logout path; whichever comes second simply exits.
+exec 9>/run/seat-reset.lock
+if ! flock -n 9; then
+    log "another reset is already running"
+    exit 0
+fi
+
+if [[ ! -d $SEAT_GOLDEN ]]; then
+    log "no golden home at $SEAT_GOLDEN; leaving $SEAT_HOME alone"
+    exit 1
+fi
+
+restart_dm=0
+if [[ $mode != boot ]] && systemctl is-active --quiet display-manager.service; then
+    systemctl stop display-manager.service
+    restart_dm=1
+fi
+
+# End everything the player still runs.
+if loginctl show-user "$SEAT_PLAYER" >/dev/null 2>&1; then
+    loginctl terminate-user "$SEAT_PLAYER" || true
+fi
+for _ in $(seq 1 10); do
+    pgrep -u "$SEAT_PLAYER" >/dev/null || break
+    sleep 1
+done
+pkill -KILL -u "$SEAT_PLAYER" || true
+
+# Replace the home.
+if [[ -e $SEAT_HOME ]]; then
+    if is_subvol "$SEAT_HOME"; then
+        btrfs subvolume delete "$SEAT_HOME" >/dev/null
+    else
+        rm -rf --one-file-system -- "$SEAT_HOME"
+    fi
+fi
+if is_subvol "$SEAT_GOLDEN"; then
+    btrfs subvolume snapshot "$SEAT_GOLDEN" "$SEAT_HOME" >/dev/null
+else
+    cp -a -- "$SEAT_GOLDEN" "$SEAT_HOME"
+    log "golden home is not a btrfs subvolume; copied it instead (slower)"
+fi
+
+# Leftovers outside the home: Proton prefixes (they hold saves and sometimes
+# logins), temp files and cron jobs.
+compatdata="$SEAT_STEAM_LIBRARY/steamapps/compatdata"
+if [[ -d $compatdata ]]; then
+    find "$compatdata" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+fi
+find /tmp /var/tmp /dev/shm -xdev -mindepth 1 -user "$SEAT_PLAYER" -delete 2>/dev/null || true
+rm -f -- "/var/spool/cron/$SEAT_PLAYER"
+
+date --iso-8601=seconds > /run/seat-last-reset
+
+if (( restart_dm )); then
+    systemctl start display-manager.service
+fi
+log "home reset from $SEAT_GOLDEN"

@@ -1,0 +1,5 @@
+# All seat roles share one variable namespace (seat_*), set in base's
+# defaults and overridden from the private inventory. Per-role prefixes would
+# split one setting across several names, so this rule is off.
+skip_list:
+  - var-naming[no-role-prefix]

@@ -1,0 +1,22 @@
+---
+# Configures a gaming seat. Two ways to run it:
+#   push, from the server:  ansible-playbook seat.yml -l canary --check --diff
+#   pull, on the seat:      seat-pull.service runs ansible-pull with -e target=localhost
+- name: Configure gaming seats
+  hosts: "{{ target | default('seats') }}"
+  become: true
+
+  pre_tasks:
+    - name: Load seat-local settings written by an earlier push run
+      ansible.builtin.include_vars:
+        file: /etc/seat/local-vars.yml
+      when: (ansible_connection | default('ssh')) == 'local' and '/etc/seat/local-vars.yml' is file
+
+  roles:
+    - base
+    - accounts
+    - tier
+    - games
+    - session
+    - updates
+    - pull

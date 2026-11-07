@@ -1,0 +1,24 @@
+---
+# Full system update, canary first:
+#   ansible-playbook update.yml -l canary
+#   (a day later, if the canary still plays)  ansible-playbook update.yml -l seats
+- name: Update gaming seats
+  hosts: "{{ target | default('canary') }}"
+  become: true
+  serial: "{{ update_serial | default(5) }}"
+
+  tasks:
+    - name: Run seat-update (snapshot, then pacman -Syu)
+      ansible.builtin.command: /usr/local/sbin/seat-update
+      register: seat_update
+      changed_when: "'no updates' not in seat_update.stdout"
+
+    - name: Check whether the running kernel's modules are still installed
+      ansible.builtin.stat:
+        path: "/usr/lib/modules/{{ ansible_kernel }}"
+      register: running_kernel_modules
+
+    - name: Reboot when the kernel was replaced
+      ansible.builtin.reboot:
+        reboot_timeout: 900
+      when: not running_kernel_modules.stat.exists

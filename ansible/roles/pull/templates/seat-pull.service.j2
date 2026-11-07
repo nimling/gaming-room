@@ -1,0 +1,9 @@
+# Managed by gaming-room Ansible.
+[Unit]
+Description=Apply the gaming-room config from git
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ansible-pull --url {{ seat_config_repo }} --checkout {{ seat_config_branch }} --directory /var/lib/seat-config --inventory localhost, --extra-vars target=localhost --connection local ansible/seat.yml
