@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ansible-playbook --check:*)",
+      "Bash(ansible-lint:*)",
+      "Bash(ansible-inventory:*)",
+      "Bash(yamllint:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Read(./.env)",
+      "Read(./secrets/**)"
+    ]
+  }
+}

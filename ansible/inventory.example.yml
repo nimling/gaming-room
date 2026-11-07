@@ -1,0 +1,24 @@
+# Copy to inventory.yml (gitignored) and fill in real hosts.
+# Placeholders only in this file: the repo is public.
+all:
+  vars:
+    ansible_user: orchestrator
+  children:
+    canary:
+      hosts:
+        seat-01:
+    seats:
+      hosts:
+        seat-01:
+        seat-02:
+        seat-03:
+        seat-04:
+        seat-05:
+        seat-06:
+        seat-07:
+        seat-08:
+        seat-09:
+        seat-10:
+    server:
+      hosts:
+        gaming-server:

@@ -1,0 +1,18 @@
+# Real inventory and secrets never go in this public repo
+ansible/inventory.yml
+ansible/host_vars/
+secrets/
+.env
+*.key
+*.pem
+
+# Ansible
+*.retry
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/

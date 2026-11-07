@@ -1,0 +1,17 @@
+# DRAFT — illustrates the manifest shape; keys and paths are confirmed in Phase 3.
+id: ut99
+name: Unreal Tournament (GOTY)
+runtime: native            # OldUnreal 469e, native Linux
+path: /games/classic/ut99
+players: 2-16
+launch:
+  direct: ["System64/ut-bin"]       # binary name to confirm
+join: "{server}:7777"
+config:                    # rendered at every launch
+  - template: ut99/User.ini.j2
+    to: "~/.utpg/System/User.ini"
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 144 }
+wrappers: [gamemoderun]
