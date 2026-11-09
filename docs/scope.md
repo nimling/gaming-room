@@ -100,6 +100,7 @@ The player's home is thrown away and recreated from a golden snapshot at every l
 
 A thin launcher of our own on top of proven runners: the launcher owns the experience; `umu-launcher` with GE-Proton, native ports, `gamescope` and `gamemode` do the running. See [launcher/README.md](../launcher/README.md) and [games/README.md](../games/README.md).
 
+- **Look and feel:** Fluent 2 design (Mica, Acrylic, the Fluent type ramp and motion). Ease of use comes first: pick a game, press Play. Works with keyboard, mouse and gamepad. See [launcher/DESIGN.md](../launcher/DESIGN.md).
 - **Direct:** intros skipped, player name set, full screen at native resolution, straight into the menu or a server.
 - **Tuned:** settings rendered from templates at launch, using the seat's tier and display.
 - **Old low-resolution games:** inside `gamescope` with integer scaling.
