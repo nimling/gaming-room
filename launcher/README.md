@@ -2,6 +2,8 @@
 
 The one screen everyone sees. Not started yet; this is the brief for Phase 3.
 
+It must look modern and follow Fluent 2. Ease of use comes first. See [DESIGN.md](DESIGN.md) and the clickable [prototype](design/prototype.html).
+
 ## Must do
 
 - Run full screen as the first window of the `player` session.
@@ -27,4 +29,4 @@ arcade end-session
 
 ## Stack
 
-Whatever the contributors know best; Python with Qt (PySide6) or Tauri both fit.
+Recommended: Tauri, with the prototype's HTML and CSS as the UI. Fallback: Qt Quick. The reasons are in [DESIGN.md](DESIGN.md).
