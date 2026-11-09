@@ -1,0 +1,9 @@
+---
+lancache_dns_image: lancachenet/lancache-dns:latest
+lancache_image: lancachenet/monolithic:latest
+# Cache on the big SSD. Keep the size about 10 % under the disk's free space.
+lancache_cache_dir: /srv/lancache/cache
+lancache_logs_dir: /srv/lancache/logs
+lancache_cache_size: 1000g
+lancache_index_size: 500m
+lancache_max_age: 3650d

@@ -1,0 +1,30 @@
+---
+- name: Create the Lancache folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ server_root }}/lancache"
+    - "{{ lancache_cache_dir }}"
+    - "{{ lancache_logs_dir }}"
+
+- name: Write the Lancache settings and compose file
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ server_root }}/lancache/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - { src: env.j2, dest: .env }
+    - { src: compose.yaml.j2, dest: compose.yaml }
+
+- name: Run Lancache and its DNS
+  community.docker.docker_compose_v2:
+    project_src: "{{ server_root }}/lancache"
+    state: present
+    pull: missing
+  when: not server_in_container

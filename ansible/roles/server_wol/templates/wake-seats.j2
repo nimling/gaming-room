@@ -1,0 +1,38 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/server_wol).
+# Wakes seats with a magic packet. MAC addresses come from seat_mac in the
+# private inventory.
+#   wake-seats            wake every seat
+#   wake-seats seat-03    wake one seat
+set -euo pipefail
+
+declare -A macs=(
+{% for host in groups['seats'] | default([]) %}
+{% if hostvars[host].seat_mac is defined %}
+    [{{ host }}]="{{ hostvars[host].seat_mac }}"
+{% endif %}
+{% endfor %}
+)
+broadcast="{{ ansible_default_ipv4.broadcast | default('255.255.255.255') }}"
+{% raw %}
+
+if [[ $# -gt 0 ]]; then
+    targets=("$@")
+else
+    targets=("${!macs[@]}")
+fi
+if [[ ${#targets[@]} -eq 0 ]]; then
+    echo "wake-seats: no seat has seat_mac in the inventory" >&2
+    exit 1
+fi
+
+for seat in "${targets[@]}"; do
+    mac=${macs[$seat]:-}
+    if [[ -z $mac ]]; then
+        echo "wake-seats: no MAC address for $seat" >&2
+        continue
+    fi
+    wakeonlan -i "$broadcast" "$mac" >/dev/null
+    echo "woke $seat"
+done
+{% endraw %}

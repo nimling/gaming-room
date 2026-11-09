@@ -19,7 +19,7 @@ cp -a /repo /work
 cd /work
 
 step "Lint"
-mapfile -t scripts < <(grep -rl '^#!/bin/bash' ansible/roles tests)
+mapfile -t scripts < <(grep -rl --exclude='*.j2' '^#!/bin/bash' ansible/roles tests bootstrap)
 shellcheck "${scripts[@]}"
 ok "shellcheck"
 yamllint ansible games

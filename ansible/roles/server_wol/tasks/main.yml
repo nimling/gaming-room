@@ -1,0 +1,8 @@
+---
+- name: Install wake-seats (Wake-on-LAN for the seats in the inventory)
+  ansible.builtin.template:
+    src: wake-seats.j2
+    dest: /usr/local/bin/wake-seats
+    owner: root
+    group: root
+    mode: "0755"

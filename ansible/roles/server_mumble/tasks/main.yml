@@ -1,0 +1,26 @@
+---
+- name: Create the Mumble folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ server_root }}/mumble", owner: "0", mode: "0755" }
+    - { path: "{{ server_root }}/mumble/data", owner: "{{ mumble_uid }}", mode: "0750" }
+
+- name: Write the Mumble compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ server_root }}/mumble/compose.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Run Mumble
+  community.docker.docker_compose_v2:
+    project_src: "{{ server_root }}/mumble"
+    state: present
+    pull: missing
+  when: not server_in_container

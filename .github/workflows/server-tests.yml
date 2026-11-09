@@ -1,0 +1,30 @@
+name: Server tests
+
+on:
+  pull_request:
+    paths:
+      - "ansible/server.yml"
+      - "ansible/roles/server_*/**"
+      - "bootstrap/**"
+      - "tests/container/*server*"
+      - "tests/gates/server-services.sh"
+      - ".github/workflows/server-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ansible/server.yml"
+      - "ansible/roles/server_*/**"
+      - "bootstrap/**"
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    name: Server playbook in Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests/container/run-server.sh
+        run: tests/container/run-server.sh

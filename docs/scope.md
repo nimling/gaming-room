@@ -137,8 +137,8 @@ Only the central server must run Windows, but Valve's documentation does not say
 
 Open source, no license or slot limits, client in the CachyOS repos, Opus codec, and `mumble://` links drop a seat straight into a channel.
 
-- Official `mumble-server` container. Channels: Lobby, Team 1, Team 2. Server password.
-- After the nickname step, the launcher starts Mumble with `mumble://<nickname>@<server>/Lobby`.
+- Official `mumble-server` container. The root channel is called Lobby; Team channels are added with the SuperUser account. No server password by default, because the VLAN is closed; one can be set in the private inventory.
+- After the nickname step, the launcher starts Mumble with `mumble://<nickname>@<server>/`.
 - Golden config: Opus, 10 ms per packet, push-to-talk on one agreed key, noise suppression, audio wizard done.
 - One headset per seat, same model if possible.
 

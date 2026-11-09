@@ -21,6 +21,9 @@ all:
     seats:
       hosts:
         seat-01:
+          # Real address and MAC go in inventory.yml only.
+          # ansible_host: 192.0.2.21
+          # seat_mac: "00:00:5e:00:53:01"   # for wake-seats
         seat-02:
         seat-03:
         seat-04:
@@ -31,5 +34,9 @@ all:
         seat-09:
         seat-10:
     server:
+      vars:
+        # The account the Ubuntu installer made (keys imported from GitHub).
+        ansible_user: replace-me
       hosts:
         gaming-server:
+          ansible_host: 192.0.2.10
