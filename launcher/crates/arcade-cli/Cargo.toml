@@ -1,0 +1,16 @@
+[package]
+name = "arcade-cli"
+description = "The arcade command: start games from the terminal, for people, Claude and CI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "arcade"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+arcade-core = { path = "../arcade-core" }
+clap.workspace = true
+serde_json.workspace = true

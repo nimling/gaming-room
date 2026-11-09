@@ -1,0 +1,11 @@
+# Steam itself. People sign in with their own account; the seat reset
+# signs them out. Steam games keep their own settings.
+id: steam
+name: Steam
+subtitle: Your own library, on this seat
+group: steam
+runtime: steam
+engine: Proton for Windows games
+launch:
+  command: ["steam"]
+art: { hue: 222, glow: 200, motif: dots }

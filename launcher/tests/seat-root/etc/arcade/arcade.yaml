@@ -1,0 +1,4 @@
+# Test fixture: seat settings as Ansible writes them
+games_dir: ../games
+voice:
+  server: gaming-server

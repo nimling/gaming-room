@@ -377,6 +377,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast .ico { color: var(--good); }
 
+.live .tag, .live [data-action="first-start"], .live #fly-seat .fly-sep, .live #fly-seat .label,
+.live .seg, .live .seg + .fine, .live #people, .live #talker { display: none; }
+
 @media (max-width: 900px) {
   .keys, .brand small, .tag { display: none; }
 }
@@ -406,7 +409,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     </div>
     <button class="chip" data-fly="seat" aria-haspopup="dialog" title="This seat">
       <svg class="ico s16" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1.5"/><path d="M8 2.5V5M12 2.5V5M8 15v2.5M12 15v2.5M2.5 8H5M2.5 12H5M15 8h2.5M15 12h2.5"/></svg>
-      <span class="seat-label">Seat 04 · Tier <span id="tier-label">B</span></span>
+      <span class="seat-label"><span id="seat-short">Seat 04</span> · Tier <span id="tier-label">B</span></span>
     </button>
     <span class="tag" title="Sample data, nothing runs">Prototype</span>
     <span class="spacer"></span>
@@ -442,7 +445,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       <span id="mic-ico"></span><span id="mic-label">Hold <kbd>V</kbd> to talk</span>
     </button>
     <button class="voice" data-fly="voice" aria-haspopup="dialog">
-      <i class="dot"></i><span>Lobby · <b id="voice-n">7</b> people</span><span class="talker" id="talker"></span>
+      <i class="dot"></i><span id="voice-text">Lobby · <b id="voice-n">7</b> people</span><span class="talker" id="talker"></span>
     </button>
     <div class="keys" aria-hidden="true">
       <kbd>←</kbd><kbd>→</kbd><span>Move</span><kbd>Enter</kbd><span>Play</span><kbd>Esc</kbd><span>Back</span>
@@ -457,12 +460,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 
 <!-- Flyouts -->
 <div class="flyout" id="fly-seat" role="dialog" aria-label="This seat" data-modal="false" hidden>
-  <div class="fly-title">Seat 04</div>
+  <div class="fly-title" id="seat-name">Seat 04</div>
   <div class="fly-sub">Gaming VLAN · managed by Ansible</div>
   <dl class="specs">
     <dt>Tier</dt><dd id="spec-tier">B</dd>
-    <dt>Graphics</dt><dd>Radeon RX 6600 · 8 GB</dd>
-    <dt>Display</dt><dd>2560×1440 · 144 Hz</dd>
+    <dt>Graphics</dt><dd id="spec-gpu">Radeon RX 6600 · 8 GB</dd>
+    <dt>Display</dt><dd id="spec-display">2560×1440 · 144 Hz</dd>
     <dt>Last reset</dt><dd id="spec-reset">--:--</dd>
   </dl>
   <div class="fly-sep"></div>
@@ -502,7 +505,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 <div class="layer mica-layer" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wl-title" data-modal="true" hidden>
   <form class="welcome-card" id="wl-form" novalidate autocomplete="off">
     <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5 22.5 12 12 22.5 1.5 12z" opacity=".35"/><path fill="currentColor" d="M12 6l6 6-6 6-6-6z"/></svg>
-    <p class="kicker">Seat 04 · Nimtech Arcade</p>
+    <p class="kicker" id="wl-kicker">Seat 04 · Nimtech Arcade</p>
     <h2 class="display" id="wl-title">Who's playing?</h2>
     <div class="field" id="nick-field">
       <label for="nick-in">Nickname</label>
@@ -590,13 +593,18 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   const RING = '<svg class="ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>';
   const CHK = '<svg class="chk" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#60cdff"/><path d="M6 10.4 8.7 13 14 7.4" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  /* Sample data. On a seat it comes from games/*.yaml, /etc/seat and the gaming server. */
+  /* In the Tauri app, invoke() reaches the Rust core and real seat data replaces the samples.
+     In a plain browser the page is the clickable prototype with the sample data below. */
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  const LIVE = typeof invoke === 'function';
+
+  /* Sample data for the prototype. */
   const TIERS = {
     A: 'native resolution · fps capped at refresh rate',
     B: 'native resolution · 144 fps cap',
     C: '1920×1080 · 144 fps cap',
   };
-  const GAMES = [
+  let GAMES = [
     { id: 'ut99', name: 'Unreal Tournament', sub: 'Deathmatch, CTF, Assault, Domination', group: 'classic', runtime: 'Native', engine: 'OldUnreal 469e', players: '2–16', max: 16, start: 'native', file: 'User.ini', map: 'DM-Morpheus', art: { a: 252, b: 18, motif: 'rings' } },
     { id: 'ut2004', name: 'Unreal Tournament 2004', sub: 'Onslaught, CTF, Deathmatch', group: 'classic', runtime: 'Proton', engine: 'GE-Proton, pinned', players: '2–32', max: 32, start: 'proton', file: 'UT2004.ini', map: 'ONS-Torlan', art: { a: 214, b: 186, motif: 'streaks' } },
     { id: 'cnc', name: 'Command & Conquer', sub: 'Tiberian Dawn, on the OpenRA engine', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 88, b: 48, motif: 'grid' } },
@@ -604,20 +612,20 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     { id: 'wargus', name: 'Warcraft II', sub: 'Tides of Darkness, on the Wargus engine', group: 'classic', runtime: 'Native', engine: 'Wargus', players: '1–8', max: 8, start: 'gamescope', file: 'preferences.lua', map: 'Random map', art: { a: 150, b: 44, motif: 'contour' } },
     { id: 'steam', name: 'Steam', sub: 'Your own library, on this seat', group: 'steam', runtime: 'Steam', engine: 'Proton for Windows games', players: 'Per game', art: { a: 222, b: 200, motif: 'dots' } },
   ];
-  const LAN = {
+  let LAN = {
     ut99: [
       { host: 'Kaptein', name: "Kaptein's DM", map: 'DM-Deck16][', n: 6, max: 16, ping: 1 },
       { host: 'Lyn', name: 'CTF night', map: 'CTF-Face', n: 9, max: 12, ping: 2 },
     ],
     ra: [{ host: 'Mora', name: '2v2, no rush 10', map: 'Random map', n: 3, max: 4, ping: 1 }],
   };
-  const PEOPLE = ['Kaptein', 'Lyn', 'Mora', 'Pixel', 'Ola', 'Tuva'];
+  let PEOPLE = ['Kaptein', 'Lyn', 'Mora', 'Pixel', 'Ola', 'Tuva'];
 
   const state = { nick: 'Nima', tier: 'B', filter: 'all', sel: 'ut99', running: null, muted: false, talker: null, lastReset: new Date(Date.now() - 47 * 60000) };
   const game = id => GAMES.find(g => g.id === id);
   const servers = id => (LAN[id] || []).slice().sort((a, b) => (b.mine ? -1 : 0) - (a.mine ? -1 : 0) || b.n - a.n);
   const joinable = id => servers(id).filter(s => !s.mine && s.n < s.max);
-  const tuned = g => g.start === 'gamescope' ? '640×480, integer-scaled in gamescope' : TIERS[state.tier];
+  const tuned = g => g.tuned || (g.start === 'gamescope' ? '640×480, integer-scaled in gamescope' : TIERS[state.tier]);
   const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
   const avatar = (name, cls = '') => `<span class="avatar ${cls}" style="--av:hsl(${hue(name)},42%,40%)">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
   const hhmm = d => d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
@@ -711,6 +719,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   }
   const paintHero = swap => {
     const hero = $('#hero');
+    if (!game(state.sel)) return;
     crossPaint('#hero-a', '#hero-b', game(state.sel), { w: hero.clientWidth, h: hero.clientHeight }, swap);
     crossPaint('#bd-a', '#bd-b', game(state.sel), { w: 64, h: 36, dpr: 1, plain: true }, swap);
   };
@@ -744,6 +753,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   }
   function renderHero(swap) {
     const g = game(state.sel), box = $('#hero-content');
+    if (!g) {
+      box.innerHTML = `<div style="min-width:0"><h1 class="hero-title">No games yet</h1><p class="hero-sub">This seat has no installed games that fit Tier ${state.tier}.</p></div>`;
+      return;
+    }
     const run = state.running && state.running.id === g.id;
     let main, side;
     if (g.id === 'steam') {
@@ -775,8 +788,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
           ? `<button class="btn accent lg" data-action="play" id="act-play">${ico('play')} Resume</button>
              <button class="btn glass lg" data-action="quit">${ico('quit')} Quit game</button>`
           : `<button class="btn accent lg" data-action="play" id="act-play">${ico('play')} Play</button>
-             <button class="btn glass lg" data-action="host">${ico('host')} Host LAN game</button>
-             <button class="btn glass lg" data-action="join" ${first ? '' : 'disabled title="Nobody is hosting this game right now"'}>${ico('join')} ${first ? `Join ${esc(first.host)}` : 'Join'}${open.length > 1 ? `<span class="n">+${open.length - 1}</span>` : ''}</button>`}
+             ${g.can_host === false ? '' : `<button class="btn glass lg" data-action="host">${ico('host')} Host LAN game</button>`}
+             ${g.can_join === false ? '' : `<button class="btn glass lg" data-action="join" ${first ? '' : 'disabled title="Nobody is hosting this game right now"'}>${ico('join')} ${first ? `Join ${esc(first.host)}` : 'Join'}${open.length > 1 ? `<span class="n">+${open.length - 1}</span>` : ''}</button>`}`}
         </div>`;
       side = `<aside class="side"><div class="side-head"><span>On the LAN now</span><span>${list.length ? `${list.length} ${list.length === 1 ? 'game' : 'games'}` : ''}</span></div>
         ${list.length ? `<ul class="servers">${list.map(s => `
@@ -803,7 +816,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   }
   function renderPeople() {
     const all = [...PEOPLE, state.nick].filter(Boolean);
-    $('#voice-n').textContent = String(all.length);
+    const vn = $('#voice-n'); if (vn) vn.textContent = String(all.length);
     $('#people').innerHTML = all.map(p => `<li class="person ${p === state.talker ? 'talking' : ''}">${avatar(p)}<span>${esc(p)}</span>${p === state.nick ? `<span class="you">${state.muted ? 'You · muted' : 'You'}</span>` : ''}</li>`).join('');
     $('#talker').textContent = state.talker ? `· ${state.talker} is talking` : '';
   }
@@ -936,7 +949,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#ln-title').textContent = g.name;
     $('#ln-eyebrow').textContent = g.id === 'steam' ? 'Opening' : mode === 'join' ? 'Joining' : mode === 'host' ? 'Hosting' : 'Starting';
     $('#ln-timer-label').textContent = 'since you pressed ' + (g.id === 'steam' ? 'Open Steam' : mode === 'join' ? 'Join' : mode === 'host' ? 'Host' : 'Play');
-    const steps = buildSteps(g, mode, srv);
+    let steps;
+    if (LIVE) {
+      try {
+        const p = await invoke('launch', { id: g.id, mode, server: srv ? (srv.address || srv.name) : null });
+        steps = p.steps.map(st => ({ t: st.title, d: st.detail, ms: 220 }));
+      } catch (err) { toast(`${esc(g.name)} did not start: ${esc(err)}`); return; }
+    } else {
+      steps = buildSteps(g, mode, srv);
+    }
     $('#ln-steps').innerHTML = steps.map(s => `<li class="step" data-s="pending"><span class="step-ico">${RING}${CHK}</span><span><b>${esc(s.t)}</b><small>${esc(s.d)}</small></span></li>`).join('');
     $('#ln-running').hidden = true; $('#ln-timer').textContent = '0.0 s';
     L.hidden = false; paintArt($('#ln-art'), g, { w: innerWidth, h: innerHeight });
@@ -978,6 +999,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   }
   function quit(silent) {
     if (!state.running) return;
+    if (LIVE) invoke('quit').catch(() => {});
     const g = game(state.running.id);
     if (state.running.mode === 'host' && LAN[g.id]) { LAN[g.id] = LAN[g.id].filter(s => !s.mine); if (!LAN[g.id].length) delete LAN[g.id]; }
     if (state.running.mode === 'join' && state.running.server) { const s = (LAN[g.id] || []).find(x => x.name === state.running.server); if (s) s.n = Math.max(1, s.n - 1); }
@@ -1013,12 +1035,16 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       $('#nick-in').focus(); return;
     }
     const first = $('#nick-cancel').hidden;
+    if (LIVE) invoke('set_nickname', { name: v }).catch(err => toast(`Voice did not connect: ${esc(err)}`));
     state.nick = v; renderMe();
     closeLayer($('#welcome'), false); focusSelected();
     toast(first ? `Welcome, ${esc(v)}. You're in the Lobby voice channel.` : `You're ${esc(v)} from the next game you start`);
   }
 
   async function endSession() {
+    if (LIVE) {
+      try { await invoke('end_session'); } catch (err) { closeLayer(); toast(`Reset did not start: ${esc(err)}`); return; }
+    }
     while (layers.length) closeLayer(layers[layers.length - 1], false);
     if (state.running) quit(true);
     const R = $('#reset');
@@ -1109,6 +1135,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 
   /* Live room: someone talks now and then */
   setInterval(() => {
+    if (!PEOPLE.length) return;
     const r = Math.random();
     state.talker = r < .35 ? null : PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
     renderPeople();
@@ -1130,8 +1157,26 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     } catch (err) { /* noise is decoration */ }
   }
 
-  function start(saved) {
-    if (saved && typeof saved === 'object') {
+  async function boot() {
+    const b = await invoke('bootstrap');
+    GAMES = b.games; LAN = {}; PEOPLE = [];
+    state.tier = b.tier; state.nick = b.nickname || '';
+    state.sel = GAMES.length ? GAMES[0].id : null;
+    document.documentElement.classList.add('live');
+    $('#seat-short').textContent = b.seat_name; $('#seat-name').textContent = b.seat_name;
+    $('#spec-gpu').textContent = b.gpu; $('#spec-display').textContent = b.display;
+    $('#wl-kicker').textContent = `${b.seat_name} · Nimtech Arcade`;
+    $('#voice-text').textContent = b.voice ? `Voice · ${b.voice}` : 'Voice not set up';
+    setInterval(async () => {
+      if (!state.running) return;
+      try { if (!(await invoke('running'))) quit(true); } catch (err) { /* keep state */ }
+    }, 2000);
+  }
+
+  async function start(saved) {
+    if (LIVE) {
+      try { await boot(); } catch (err) { toast(`Could not read this seat: ${esc(err)}`); }
+    } else if (saved && typeof saved === 'object') {
       if (typeof saved.nick === 'string') state.nick = saved.nick;
       if (saved.tier in TIERS) state.tier = saved.tier;
       if (saved.sel && game(saved.sel)) state.sel = saved.sel;

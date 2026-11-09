@@ -1,6 +1,6 @@
 # Launcher design
 
-The launcher follows **Fluent 2**. It must look modern and be easy to use with keyboard, mouse or gamepad. The clickable prototype is [`design/prototype.html`](design/prototype.html). Open it in a browser. It runs on sample data and starts nothing.
+The launcher follows **Fluent 2**. It must look modern and be easy to use with keyboard, mouse or gamepad. The screen is [`app/ui/index.html`](app/ui/index.html). Open it in a browser and it is a clickable prototype on sample data; inside the app it shows the real seat.
 
 ## Ease of use comes first
 

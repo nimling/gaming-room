@@ -1,0 +1,24 @@
+# Red Alert on the OpenRA engine (native, free). Installed as the CachyOS
+# openra package, so there is no path. OpenRA takes settings as arguments.
+# Not yet tested on a seat.
+id: openra-ra
+name: Red Alert
+subtitle: Allies against Soviets, on OpenRA
+group: classic
+runtime: native
+engine: OpenRA
+players: { min: 1, max: 8 }
+launch:
+  command: ["openra-ra"]
+  args:
+    - "Player.Name={{ nickname }}"
+    - "Graphics.Mode=Fullscreen"
+    - "Graphics.CapFramerate=True"
+    - "Graphics.MaxFramerate={{ fps_cap }}"
+join:
+  args: ["Launch.Connect={{ server }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: native, fps_cap: 60 }
+art: { hue: 352, glow: 8, motif: hex }
