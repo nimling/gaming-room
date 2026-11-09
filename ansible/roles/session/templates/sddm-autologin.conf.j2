@@ -1,0 +1,7 @@
+# Managed by gaming-room Ansible.
+# Relogin is off on purpose: after a KDE log out, seat-logout-watch resets the
+# home and restarts SDDM, which then logs the player in again.
+[Autologin]
+User={{ seat_player_user }}
+Session={{ seat_sddm_session }}
+Relogin=false

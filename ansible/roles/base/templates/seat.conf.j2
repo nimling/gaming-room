@@ -1,0 +1,17 @@
+# Managed by gaming-room Ansible. Read by the seat-* scripts.
+SEAT_PLAYER={{ seat_player_user }}
+SEAT_HOME=/home/{{ seat_player_user }}
+SEAT_GOLDEN=/home/.golden/{{ seat_player_user }}
+SEAT_STEAM_LIBRARY={{ seat_steam_library }}
+SEAT_TOKEN_PATHS=/usr/local/share/seat/token-paths
+
+SEAT_IDLE_LOGOUT_ENABLED={{ seat_idle_logout_enabled | ternary('1', '0') }}
+SEAT_IDLE_SECONDS={{ (seat_idle_logout_minutes | int) * 60 }}
+SEAT_IDLE_WARNING_SECONDS={{ seat_idle_warning_seconds }}
+
+SEAT_TIER_A_VRAM_MIB={{ seat_tier_a_vram_mib }}
+SEAT_TIER_A_RAM_MIB={{ seat_tier_a_ram_mib }}
+SEAT_TIER_B_VRAM_MIB={{ seat_tier_b_vram_mib }}
+SEAT_TIER_B_RAM_MIB={{ seat_tier_b_ram_mib }}
+
+SEAT_UPDATE_KEEP_SNAPSHOTS={{ seat_update_keep_snapshots }}

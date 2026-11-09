@@ -1,0 +1,36 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Looks for login tokens in a home folder. Prints each one found.
+# Exit 0 = clean, 1 = tokens found.
+#   seat-token-check [home]   (default: the player's home)
+set -uo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+home=${1:-$SEAT_HOME}
+list=${SEAT_TOKEN_PATHS:-/usr/local/share/seat/token-paths}
+found=0
+shopt -s nullglob dotglob
+
+# Each line: <glob relative to home>|<optional extended regex>
+# No regex: the path existing counts as a token. With a regex: the file must match.
+while IFS='|' read -r pattern regex; do
+    [[ -z $pattern || $pattern == \#* ]] && continue
+    IFS=$'\n'
+    # shellcheck disable=SC2206  # the glob must expand; IFS keeps spaces intact
+    matches=( "$home"/$pattern )
+    unset IFS
+    for f in "${matches[@]}"; do
+        [[ -e $f ]] || continue
+        if [[ -z $regex ]] || { [[ -f $f ]] && grep -qE -- "$regex" "$f"; }; then
+            echo "token: $f"
+            found=1
+        fi
+    done
+done < "$list"
+
+if (( found )); then
+    exit 1
+fi
+echo "clean: no tokens in $home"

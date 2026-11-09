@@ -1,0 +1,63 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Detects GPU memory and RAM, picks a hardware tier (A, B or C) and writes it
+# to /etc/seat/tier. The launcher picks game settings by tier.
+# /etc/seat/tier.override, if present, wins.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+out=/etc/seat
+
+ram_mib=$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1024 ))
+
+gpu_vendor=unknown
+vram_mib=0
+
+# NVIDIA (proprietary driver)
+if command -v nvidia-smi >/dev/null 2>&1; then
+    if nv=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | sort -n | tail -n1) && [[ -n $nv ]]; then
+        gpu_vendor=nvidia
+        vram_mib=${nv%%.*}
+    fi
+fi
+
+# AMD (amdgpu exposes VRAM size in sysfs)
+for f in /sys/class/drm/card*/device/mem_info_vram_total; do
+    [[ -r $f ]] || continue
+    v=$(( $(cat "$f") / 1048576 ))
+    if (( v > vram_mib )); then
+        vram_mib=$v
+        gpu_vendor=amd
+    fi
+done
+
+# Intel and anything else: no reliable VRAM figure, treat as integrated.
+if [[ $gpu_vendor == unknown ]] && command -v lspci >/dev/null 2>&1; then
+    if lspci | grep -iE 'vga|3d|display' | grep -qi intel; then
+        gpu_vendor=intel
+    fi
+fi
+
+tier=C
+if (( vram_mib >= SEAT_TIER_A_VRAM_MIB && ram_mib >= SEAT_TIER_A_RAM_MIB )); then
+    tier=A
+elif (( vram_mib >= SEAT_TIER_B_VRAM_MIB && ram_mib >= SEAT_TIER_B_RAM_MIB )); then
+    tier=B
+fi
+
+source_of_tier=detected
+if [[ -s $out/tier.override ]]; then
+    tier=$(tr -d '[:space:]' < "$out/tier.override")
+    source_of_tier=override
+fi
+
+case $tier in
+    A|B|C) ;;
+    *) echo "seat-tier: invalid tier '$tier'" >&2; exit 1 ;;
+esac
+
+mkdir -p "$out"
+echo "$tier" > "$out/tier"
+printf '{"tier":"%s","source":"%s","gpu_vendor":"%s","vram_mib":%d,"ram_mib":%d}\n' \
+    "$tier" "$source_of_tier" "$gpu_vendor" "$vram_mib" "$ram_mib" | tee "$out/hardware.json"

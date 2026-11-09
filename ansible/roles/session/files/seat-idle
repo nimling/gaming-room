@@ -1,0 +1,19 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Runs inside the player's desktop session. Warns after a period without
+# input, then ends the session. Needs a compositor with ext-idle-notify-v1.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+if [[ ${SEAT_IDLE_LOGOUT_ENABLED:-0} != 1 ]]; then
+    exit 0
+fi
+
+warn_after=$(( SEAT_IDLE_SECONDS - SEAT_IDLE_WARNING_SECONDS ))
+warn_ms=$(( SEAT_IDLE_WARNING_SECONDS * 1000 ))
+
+exec swayidle -w \
+    timeout "$warn_after" "notify-send --urgency=critical --expire-time=$warn_ms 'Session ends soon' 'No input for a while. Move the mouse to keep playing.'" \
+    timeout "$SEAT_IDLE_SECONDS" /usr/local/libexec/seat-idle-action

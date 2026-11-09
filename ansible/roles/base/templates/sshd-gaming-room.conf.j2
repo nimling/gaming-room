@@ -1,0 +1,6 @@
+# Managed by gaming-room Ansible
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowUsers {{ seat_admin_user }} {{ seat_orchestrator_user }}{% if seat_orchestrator_source %}@{{ seat_orchestrator_source }}{% endif %}{% for user in seat_extra_ssh_users %} {{ user }}{% endfor %}
+

@@ -1,0 +1,209 @@
+---
+- name: Install session packages
+  community.general.pacman:
+    name:
+      - libnotify
+      - swayidle
+    state: present
+
+- name: Create /usr/local/share/seat and /usr/local/libexec
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /usr/local/share/seat
+    - /usr/local/libexec
+    - /etc/systemd/logind.conf.d
+
+- name: Install the list of login token paths
+  ansible.builtin.copy:
+    src: token-paths
+    dest: /usr/local/share/seat/token-paths
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install session scripts
+  ansible.builtin.copy:
+    src: "{{ item.name }}"
+    dest: "{{ item.dir }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - { name: seat-reset, dir: /usr/local/sbin }
+    - { name: seat-token-check, dir: /usr/local/sbin }
+    - { name: seat-golden-capture, dir: /usr/local/sbin }
+    - { name: seat-idle, dir: /usr/local/bin }
+    - { name: seat-idle-action, dir: /usr/local/libexec }
+
+# --- Golden home ---------------------------------------------------------
+
+- name: Check the /home filesystem type
+  ansible.builtin.command: findmnt -no FSTYPE -T /home
+  register: home_fstype
+  changed_when: false
+
+- name: Create /home/.golden
+  ansible.builtin.file:
+    path: /home/.golden
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Check for the golden home
+  ansible.builtin.stat:
+    path: "/home/.golden/{{ seat_player_user }}"
+  register: golden_home
+
+- name: Create the golden home as a btrfs subvolume
+  ansible.builtin.command: btrfs subvolume create /home/.golden/{{ seat_player_user }}
+  when: not golden_home.stat.exists and home_fstype.stdout == 'btrfs'
+  changed_when: true
+
+- name: Create the golden home as a folder (not btrfs; resets will copy, slower)
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}"
+    state: directory
+    mode: "0700"
+  when: not golden_home.stat.exists and home_fstype.stdout != 'btrfs'
+
+- name: Seed a new golden home from /etc/skel
+  ansible.builtin.command: cp -a /etc/skel/. /home/.golden/{{ seat_player_user }}/
+  when: not golden_home.stat.exists
+  changed_when: true
+
+- name: Give the golden home to the player
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0700"
+    recurse: "{{ not golden_home.stat.exists }}"
+
+- name: Create config folders in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/.config"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+
+- name: Turn off the screen lock for the player (no password to unlock with)
+  ansible.builtin.copy:
+    dest: "/home/.golden/{{ seat_player_user }}/.config/kscreenlockerrc"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+    content: |
+      [Daemon]
+      Autolock=false
+      LockOnResume=false
+
+# --- Reset services --------------------------------------------------------
+
+- name: Install seat-reset units
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - seat-reset.service
+    - seat-reset-boot.service
+
+- name: Look up the player's uid
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ seat_player_user }}"
+
+- name: Install the logout watcher (resets after a KDE log out)
+  ansible.builtin.template:
+    src: seat-logout-watch.service.j2
+    dest: /etc/systemd/system/seat-logout-watch.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: End all player processes at logout, and stop the user manager at once
+  ansible.builtin.copy:
+    dest: /etc/systemd/logind.conf.d/60-gaming-room.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible. Takes effect after a reboot.
+      [Login]
+      KillUserProcesses=yes
+      KillOnlyUsers={{ seat_player_user }}
+      UserStopDelaySec=0
+
+- name: Enable reset units
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    daemon_reload: true
+  loop:
+    - seat-reset-boot.service
+    - seat-logout-watch.service
+  when: not seat_in_container
+
+# --- Idle logout (user unit, runs for the player only) -----------------------
+
+- name: Install the idle watcher user unit
+  ansible.builtin.template:
+    src: seat-idle.service.j2
+    dest: /etc/systemd/user/seat-idle.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the graphical-session.target.wants folder
+  ansible.builtin.file:
+    path: /etc/systemd/user/graphical-session.target.wants
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Enable the idle watcher for graphical sessions
+  ansible.builtin.file:
+    src: /etc/systemd/user/seat-idle.service
+    dest: /etc/systemd/user/graphical-session.target.wants/seat-idle.service
+    state: link
+
+# --- Auto-login ---------------------------------------------------------
+
+- name: Create /etc/sddm.conf.d
+  ansible.builtin.file:
+    path: /etc/sddm.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Log the player in automatically
+  ansible.builtin.template:
+    src: sddm-autologin.conf.j2
+    dest: /etc/sddm.conf.d/10-gaming-room-autologin.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- First home ---------------------------------------------------------
+
+- name: Check for the player's home
+  ansible.builtin.stat:
+    path: "/home/{{ seat_player_user }}"
+  register: player_home
+
+- name: Create the player's home from the golden home
+  ansible.builtin.command: /usr/local/sbin/seat-reset boot
+  when: not player_home.stat.exists
+  changed_when: true

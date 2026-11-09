@@ -1,0 +1,53 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Takes a snapshot of / and then runs a full system update.
+# Run by update.yml from the server; never on a timer.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+log() { echo "seat-update: $*"; }
+
+freeze_file=/etc/seat/update-freeze-until
+if [[ -s $freeze_file ]]; then
+    until_date=$(tr -d '[:space:]' < "$freeze_file")
+    if [[ $(date +%F) < $until_date ]]; then
+        log "frozen until $until_date; no updates"
+        exit 0
+    fi
+fi
+
+# checkupdates uses a temporary database, so a "no updates" answer never
+# leaves the system half-synced (exit 2 = nothing to update).
+set +e
+checkupdates >/dev/null
+rc=$?
+set -e
+if (( rc == 2 )); then
+    log "no updates"
+    exit 0
+elif (( rc != 0 )); then
+    log "checkupdates failed ($rc)"
+    exit 1
+fi
+
+# Snapshot first, so a bad update can be rolled back.
+stamp=$(date +%Y%m%d-%H%M%S)
+if command -v snapper >/dev/null 2>&1 && snapper -c root list >/dev/null 2>&1; then
+    snapper -c root create --description "before seat-update $stamp"
+    log "snapper snapshot taken"
+elif [[ $(findmnt -no FSTYPE /) == btrfs ]]; then
+    mkdir -p /.seat-snapshots
+    btrfs subvolume snapshot -r / "/.seat-snapshots/pre-update-$stamp" >/dev/null
+    log "btrfs snapshot /.seat-snapshots/pre-update-$stamp"
+    # Keep only the newest few.
+    mapfile -t old < <(find /.seat-snapshots -mindepth 1 -maxdepth 1 -name 'pre-update-*' | sort | head -n -"$SEAT_UPDATE_KEEP_SNAPSHOTS")
+    for s in "${old[@]}"; do
+        btrfs subvolume delete "$s" >/dev/null
+    done
+else
+    log "root is not btrfs; updating without a snapshot"
+fi
+
+pacman -Syu --noconfirm
+log "update done"

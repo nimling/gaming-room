@@ -1,0 +1,11 @@
+#!/bin/bash
+# Managed by gaming-room Ansible.
+# Ends the player's session after inactivity, unless something holds an idle
+# inhibitor. The launcher holds one while a game runs, because gamepad input
+# never reaches the compositor and would otherwise look like no input.
+set -euo pipefail
+
+if systemd-inhibit --list --no-legend 2>/dev/null | grep -qw idle; then
+    exit 0
+fi
+exec systemctl start --no-block seat-reset.service

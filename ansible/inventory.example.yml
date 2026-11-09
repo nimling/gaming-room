@@ -1,10 +1,21 @@
-# Copy to inventory.yml (gitignored) and fill in real hosts.
+# Copy to inventory.yml (gitignored) and fill in real hosts and keys.
 # Placeholders only in this file: the repo is public.
 all:
   vars:
     ansible_user: orchestrator
+    # Public keys allowed to SSH in. Password SSH logins are turned off.
+    seat_admin_ssh_keys:
+      - "ssh-ed25519 AAAA...replace-me admin@example"
+    seat_orchestrator_ssh_keys:
+      - "ssh-ed25519 AAAA...replace-me orchestrator@gaming-server"
+    # The gaming server's address; the orchestrator may log in from here only.
+    seat_orchestrator_source: "192.0.2.10"
+    # Optional: sudo password for admin, as a hash (mkpasswd -m sha-512).
+    # seat_admin_password_hash: "$6$..."
   children:
     canary:
+      vars:
+        seat_config_branch: main      # the canary follows main; the rest follow stable
       hosts:
         seat-01:
     seats:

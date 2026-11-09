@@ -1,0 +1,12 @@
+# Managed by gaming-room Ansible
+[Unit]
+Description=Detect this seat's hardware tier
+After=systemd-modules-load.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/seat-tier
+
+[Install]
+WantedBy=multi-user.target

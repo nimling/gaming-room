@@ -1,0 +1,12 @@
+# Managed by gaming-room Ansible.
+[Unit]
+Description=Apply the gaming-room config at boot and every night
+
+[Timer]
+OnBootSec=2min
+OnCalendar={{ seat_pull_calendar }}
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

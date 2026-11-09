@@ -1,0 +1,79 @@
+---
+- name: Create the games group
+  ansible.builtin.group:
+    name: "{{ seat_games_group }}"
+    state: present
+
+# admin: for people. wheel, SSH key, sudo with password (if a hash is set).
+- name: Create admin account
+  ansible.builtin.user:
+    name: "{{ seat_admin_user }}"
+    groups: [wheel]
+    append: true
+    shell: /bin/bash
+    create_home: true
+    password: "{{ seat_admin_password_hash | default(omit, true) }}"
+
+- name: Authorize admin SSH keys
+  ansible.posix.authorized_key:
+    user: "{{ seat_admin_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ seat_admin_ssh_keys }}"
+
+# orchestrator: for Ansible and Claude on the gaming server. Key only.
+- name: Create orchestrator account
+  ansible.builtin.user:
+    name: "{{ seat_orchestrator_user }}"
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+
+- name: Authorize orchestrator SSH keys
+  ansible.posix.authorized_key:
+    user: "{{ seat_orchestrator_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ seat_orchestrator_ssh_keys }}"
+
+- name: Let orchestrator run Ansible as root without a password
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/10-orchestrator
+    owner: root
+    group: root
+    mode: "0440"
+    content: |
+      # Managed by gaming-room Ansible
+      {{ seat_orchestrator_user }} ALL=(ALL:ALL) NOPASSWD: ALL
+    validate: visudo -cf %s
+
+# player: the shared, disposable account. No wheel, no sudo, no password.
+# Its home is created by seat-reset from the golden snapshot (session role).
+- name: Create player account
+  ansible.builtin.user:
+    name: "{{ seat_player_user }}"
+    groups: ["{{ seat_games_group }}"]
+    append: false
+    shell: /bin/bash
+    home: "/home/{{ seat_player_user }}"
+    create_home: false
+    password_lock: true
+
+- name: Find existing members of wheel
+  ansible.builtin.getent:
+    database: group
+    key: wheel
+
+- name: Remove old accounts from wheel (the old single admin user)
+  ansible.builtin.command: gpasswd -d {{ item }} wheel
+  loop: "{{ (ansible_facts.getent_group.wheel[2] | default('')).split(',') | select | list }}"
+  when: item not in [seat_admin_user, seat_orchestrator_user]
+  changed_when: true
+
+- name: Install polkit rule for the player account
+  ansible.builtin.template:
+    src: 49-gaming-room.rules.j2
+    dest: /etc/polkit-1/rules.d/49-gaming-room.rules
+    owner: root
+    group: polkitd
+    mode: "0644"

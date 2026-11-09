@@ -1,0 +1,38 @@
+---
+# Each seat pulls this repo and applies seat.yml at boot and every night.
+# Canary seats follow main; the rest follow stable, which is moved forward to
+# main once the canary has been fine for a day.
+- name: Install git and Ansible
+  community.general.pacman:
+    name:
+      - ansible
+      - git
+    state: present
+
+- name: Keep the private settings for pull runs (written by a push run)
+  ansible.builtin.template:
+    src: local-vars.yml.j2
+    dest: /etc/seat/local-vars.yml
+    owner: root
+    group: root
+    mode: "0600"
+  when: (ansible_connection | default('ssh')) != 'local'
+
+- name: Install seat-pull units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - seat-pull.service
+    - seat-pull.timer
+
+- name: Enable the seat-pull timer
+  ansible.builtin.systemd_service:
+    name: seat-pull.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not seat_in_container

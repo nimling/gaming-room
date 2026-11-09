@@ -1,0 +1,13 @@
+# Managed by gaming-room Ansible.
+[Unit]
+Description=Reset the player's home before anyone logs in
+After=local-fs.target
+Before=display-manager.service systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/seat-reset boot
+
+[Install]
+WantedBy=multi-user.target
