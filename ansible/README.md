@@ -14,7 +14,18 @@ Everything on a seat is described here. Seats apply it themselves with `ansible-
 | `updates` | `seat-update` (snapshot, then full update) and the update freeze |
 | `pull` | `seat-pull.timer`: `ansible-pull` at boot and nightly |
 
-Launcher and voice roles come in Phases 2 and 3.
+Launcher roles come in Phase 3.
+
+## Server roles (Phase 2)
+
+| Role | Does |
+| --- | --- |
+| `server_base` | Ubuntu check, Docker, sshd (keys only), `ufw`, time zone, KVM check |
+| `server_mumble` | Mumble in Docker; root channel "Lobby" |
+| `server_lancache` | Lancache and its DNS in Docker |
+| `server_wol` | `wake-seats`, using `seat_mac` from the inventory |
+
+See [server/README.md](../server/README.md). Install the collections first: `ansible-galaxy collection install -r requirements.yml`.
 
 ## How the player session works
 
@@ -31,6 +42,7 @@ cp inventory.example.yml inventory.yml            # real values; gitignored
 ansible-playbook seat.yml -l canary --check --diff
 ansible-playbook seat.yml -l canary
 ansible-playbook update.yml -l canary              # a day later: -l seats
+ansible-playbook server.yml --check --diff         # the gaming server
 ```
 
 First run on a freshly installed seat (only the installer's `admin` user exists yet):

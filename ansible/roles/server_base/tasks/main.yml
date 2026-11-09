@@ -1,0 +1,111 @@
+---
+- name: Refuse anything but Ubuntu
+  ansible.builtin.assert:
+    that: ansible_distribution == 'Ubuntu'
+    fail_msg: "server.yml is written for Ubuntu Server LTS, not {{ ansible_distribution }}."
+
+- name: Look up the login user's home folder
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ server_login_user }}"
+
+- name: Find the login user's SSH keys
+  ansible.builtin.stat:
+    path: "{{ ansible_facts.getent_passwd[server_login_user][4] }}/.ssh/authorized_keys"
+  register: server_authorized_keys
+
+- name: Refuse to lock people out of SSH
+  ansible.builtin.assert:
+    that: server_authorized_keys.stat.exists and server_authorized_keys.stat.size > 0
+    fail_msg: >-
+      The login user has no SSH keys. This role turns password SSH logins off,
+      so add a key first (the Ubuntu installer can import it from GitHub).
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - dnsutils
+      - docker-compose-v2
+      - docker.io
+      - ufw
+      - unattended-upgrades
+      - wakeonlan
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set the time zone
+  community.general.timezone:
+    name: "{{ server_timezone }}"
+  when: not server_in_container
+
+- name: Harden sshd (keys only, no root)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-gaming-room.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+  notify: Reload ssh
+
+- name: Check sshd config before any reload
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+- name: Start Docker at boot
+  ansible.builtin.systemd_service:
+    name: docker.service
+    enabled: true
+    state: started
+  when: not server_in_container
+
+- name: Create the services folder
+  ansible.builtin.file:
+    path: "{{ server_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Firewall | allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+  when: not server_in_container
+
+- name: Firewall | allow the gaming VLAN to reach the services
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop:
+    - { port: "53", proto: any }       # Lancache DNS
+    - { port: "80", proto: tcp }       # Lancache
+    - { port: "443", proto: tcp }      # Lancache (passed through)
+    - { port: "64738", proto: any }    # Mumble
+  when: not server_in_container
+
+- name: Firewall | deny everything else, then turn it on
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: not server_in_container
+
+- name: Look for KVM (the PC Café Windows VM needs it)
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: server_kvm
+
+- name: Warn when virtualization is off
+  ansible.builtin.debug:
+    msg: "/dev/kvm is missing. Turn on VT-x or AMD-V in the BIOS before the PC Café spike."
+  when: not server_kvm.stat.exists

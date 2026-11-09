@@ -1,0 +1,25 @@
+# Managed by gaming-room Ansible (roles/server_lancache)
+# Ports bind to the LAN address only. That leaves 127.0.0.53:53 to
+# Ubuntu's own resolver, which would otherwise block port 53.
+name: lancache
+services:
+  dns:
+    image: {{ lancache_dns_image }}
+    container_name: lancache-dns
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "{{ server_lan_ip }}:53:53/udp"
+      - "{{ server_lan_ip }}:53:53/tcp"
+
+  monolithic:
+    image: {{ lancache_image }}
+    container_name: lancache
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "{{ server_lan_ip }}:80:80/tcp"
+      - "{{ server_lan_ip }}:443:443/tcp"
+    volumes:
+      - {{ lancache_cache_dir }}:/data/cache
+      - {{ lancache_logs_dir }}:/data/logs

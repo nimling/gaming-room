@@ -1,0 +1,6 @@
+---
+- name: Reload ssh
+  ansible.builtin.systemd_service:
+    name: ssh.service
+    state: reloaded
+  when: not server_in_container

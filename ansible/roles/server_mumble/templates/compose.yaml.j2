@@ -1,0 +1,21 @@
+# Managed by gaming-room Ansible (roles/server_mumble)
+name: mumble
+services:
+  mumble:
+    image: {{ mumble_image }}
+    container_name: mumble
+    restart: unless-stopped
+    ports:
+      - "{{ server_lan_ip }}:64738:64738/tcp"
+      - "{{ server_lan_ip }}:64738:64738/udp"
+    volumes:
+      - ./data:/data
+    environment:
+      MUMBLE_CONFIG_REGISTERNAME: "{{ mumble_root_name }}"
+      MUMBLE_CONFIG_WELCOMETEXT: "{{ mumble_welcome }}"
+      MUMBLE_CONFIG_USERS: "{{ mumble_max_users }}"
+      MUMBLE_CONFIG_BANDWIDTH: "{{ mumble_bandwidth }}"
+      MUMBLE_CONFIG_OPUSTHRESHOLD: "0"
+{% if mumble_server_password %}
+      MUMBLE_CONFIG_SERVERPASSWORD: "{{ mumble_server_password }}"
+{% endif %}

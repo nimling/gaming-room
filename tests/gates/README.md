@@ -8,6 +8,7 @@ Each phase ends with a gate. A gate passes only when its test passes on real sea
 | 1 | A fresh seat is configured in under 30 min, and a second run changes nothing | [`rebuild-time.sh`](rebuild-time.sh), from the server |
 | 1 | Logout leaves no login tokens | [`token-leak.sh`](token-leak.sh), on the seat |
 | 1 | `player` cannot change the system | [`player-lockdown.sh`](player-lockdown.sh), on the seat |
+| 2 | Mumble, cache DNS and cache answer on the VLAN | [`server-services.sh`](server-services.sh), from any machine on the VLAN |
 | 2 | 10 seats in one voice channel | `voice-count.sh` (planned) |
 | 2 | Repeat installs come from the cache | `cache-hit.sh` (planned) |
 | 3 | Power on to in a UT99 match in under 60 s, zero dialogs | `cold-start.sh` (planned) |

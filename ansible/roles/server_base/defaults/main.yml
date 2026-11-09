@@ -1,0 +1,16 @@
+---
+# Shared settings for every server role. Override in the private inventory.
+
+# Address the services listen on. Defaults to the server's main address.
+server_lan_ip: "{{ ansible_default_ipv4.address }}"
+# The gaming VLAN; the firewall lets these addresses reach the services.
+server_vlan_cidr: "{{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.prefix }}"
+# DNS for names the cache does not handle. Defaults to the VLAN gateway.
+server_upstream_dns: "{{ ansible_default_ipv4.gateway }}"
+server_timezone: Europe/Oslo
+# The person account Ansible logs in with (made by the Ubuntu installer).
+server_login_user: "{{ ansible_user | default(ansible_env.SUDO_USER) }}"
+# Compose projects live here, one folder per service.
+server_root: /srv/gaming-room
+# Set true in the container test: skips firewall, services and docker compose.
+server_in_container: false

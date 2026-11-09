@@ -1,0 +1,12 @@
+---
+mumble_image: mumblevoip/mumble-server:latest
+# The root channel's name. Seats join it with mumble://<nick>@<server>/
+mumble_root_name: Lobby
+mumble_welcome: "Welcome to the gaming room. Push to talk is V."
+mumble_max_users: 30
+# Bits per second per person. 72000 is Mumble's top quality; the VLAN has room.
+mumble_bandwidth: 72000
+# Empty: no server password. The VLAN is closed to the rest of the network.
+mumble_server_password: ""
+# The image runs as this user id; the data folder must belong to it.
+mumble_uid: 10000
