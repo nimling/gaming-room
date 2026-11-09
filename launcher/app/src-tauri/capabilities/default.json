@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The launcher window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

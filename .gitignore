@@ -16,3 +16,7 @@ secrets/
 .DS_Store
 .vscode/
 .idea/
+
+# Launcher build output
+launcher/target/
+launcher/app/src-tauri/gen/
