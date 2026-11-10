@@ -13,7 +13,7 @@ declare -A macs=(
 {% endif %}
 {% endfor %}
 )
-broadcast="{{ ansible_default_ipv4.broadcast | default('255.255.255.255') }}"
+broadcast="{{ ansible_default_ipv4.broadcast | default('255.255.255.255', true) }}"
 {% raw %}
 
 if [[ $# -gt 0 ]]; then
