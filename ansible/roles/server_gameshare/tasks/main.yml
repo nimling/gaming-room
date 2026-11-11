@@ -11,8 +11,8 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ server_login_user }}"
-    group: "{{ server_login_user }}"
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
     mode: "0755"
   loop:
     - "{{ gameshare_root }}"
@@ -48,6 +48,13 @@
 # Same steps as IW4x's Linux guide: iw4x.dll and the raw files (release.zip,
 # which holds iw4x.exe) go into the MW2 folder. Done once here; seats copy the
 # finished folder, so all ten run the same build.
+- name: IW4x | refuse unpinned downloads
+  ansible.builtin.assert:
+    that:
+      - iw4x_client_sha256 | length == 64
+      - iw4x_rawfiles_sha256 | length == 64
+    fail_msg: Set iw4x_client_sha256 and iw4x_rawfiles_sha256; the client runs on every seat.
+
 - name: IW4x | look for the MW2 game files
   ansible.builtin.stat:
     path: "{{ iw4x_dir }}/iw4mp.exe"
@@ -88,7 +95,7 @@
   ansible.builtin.get_url:
     url: "{{ iw4x_client_url }}"
     dest: "{{ iw4x_cache }}/iw4x-{{ iw4x_client_version }}.dll"
-    checksum: "{{ ('sha256:' ~ iw4x_client_sha256) if iw4x_client_sha256 else omit }}"
+    checksum: "sha256:{{ iw4x_client_sha256 }}"
     mode: "0644"
   when: iw4x_base_game.stat.exists
 
@@ -96,7 +103,7 @@
   ansible.builtin.get_url:
     url: "{{ iw4x_rawfiles_url }}"
     dest: "{{ iw4x_cache }}/release-{{ iw4x_rawfiles_version }}.zip"
-    checksum: "{{ ('sha256:' ~ iw4x_rawfiles_sha256) if iw4x_rawfiles_sha256 else omit }}"
+    checksum: "sha256:{{ iw4x_rawfiles_sha256 }}"
     mode: "0644"
     timeout: 120
   when: iw4x_base_game.stat.exists and not iw4x_rawfiles_current
@@ -106,8 +113,8 @@
     src: "{{ iw4x_cache }}/release-{{ iw4x_rawfiles_version }}.zip"
     dest: "{{ iw4x_dir }}"
     remote_src: true
-    owner: "{{ server_login_user }}"
-    group: "{{ server_login_user }}"
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
   when: iw4x_base_game.stat.exists and not iw4x_rawfiles_current
   # In a dry run the download does not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
@@ -117,8 +124,8 @@
     src: "{{ iw4x_cache }}/iw4x-{{ iw4x_client_version }}.dll"
     dest: "{{ iw4x_dir }}/iw4x.dll"
     remote_src: true
-    owner: "{{ server_login_user }}"
-    group: "{{ server_login_user }}"
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
     mode: "0644"
   when: iw4x_base_game.stat.exists
   # In a dry run the download does not exist yet.
@@ -128,8 +135,8 @@
   ansible.builtin.copy:
     dest: "{{ iw4x_dir }}/.iw4x-version"
     content: "{{ iw4x_version_line }}\n"
-    owner: "{{ server_login_user }}"
-    group: "{{ server_login_user }}"
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
     mode: "0644"
   when: iw4x_base_game.stat.exists
 

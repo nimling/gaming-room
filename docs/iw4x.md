@@ -14,7 +14,7 @@ Steam PC ──copy by hand──▶ server /srv/games/mw2 ──server.yml adds
 
 ## 1. Get MW2 onto the server
 
-1. Run the server playbook once, so the share exists: `ansible-playbook server.yml`.
+1. In the private inventory, set `gameshare_owner` to the person account that copies files in (for example the server's login user), on every machine that runs `server.yml`. Then run the server playbook once, so the share exists: `ansible-playbook server.yml`.
 2. On a PC with Steam, install **Call of Duty: Modern Warfare 2 (2009) – Multiplayer**.
 3. In Steam: right-click the game → Properties → Installed Files → **Verify integrity of game files**. A broken copy gives `Could not find zone 'code_pre_gfx_mp.ff'` later.
 4. Copy the game folder to the server (about 15 GB):
@@ -88,7 +88,7 @@ Then roll out to the other seats as usual.
 ## Updating IW4x
 
 1. Check the newest releases: [iw4x-client](https://github.com/iw4x/iw4x-client/releases) and [iw4x-rawfiles](https://github.com/iw4x/iw4x-rawfiles/releases).
-2. Change `iw4x_client_version`, `iw4x_rawfiles_version` and their checksums (`roles/server_gameshare/defaults`) in a pull request.
+2. Change `iw4x_client_version`, `iw4x_rawfiles_version` and their sha256 checksums (`roles/server_gameshare/defaults`) in a pull request. The checksums are required. GitHub lists them per release asset: `gh api repos/iw4x/iw4x-client/releases/tags/<version> --jq '.assets[] | {name, digest}'`.
 3. Run `server.yml`. Seats pick the update up at their next pull. Not in the 48 hours before game night.
 
 ## Not done yet
