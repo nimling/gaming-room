@@ -49,6 +49,10 @@ all:
           server_vlan_cidr: 192.0.2.0/24
           server_upstream_dns: 192.0.2.1
           ut99_server_enabled: true
+          pccafe_enabled: true
+          pccafe_ip_range: 192.0.2.248/30
+          pccafe_gateway: 192.0.2.1
+          pccafe_parent_nic: eth0
     seats:
       hosts:
         seat-01:
@@ -96,6 +100,22 @@ grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/va
 { command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
 command -v bzip2 >/dev/null || die "bzip2 missing"
 ok "build script, tools and dedicated server unit"
+
+step "Steam PC Cafe VM"
+c=/srv/gaming-room/pccafe/compose.yaml
+bat=/srv/gaming-room/pccafe/oem/install.bat
+[[ $(stat -c '%a %U' "$c") == "600 root" ]] || die "cafe compose file not root-only"
+grep -q 'image: dockurr/windows:6.06' "$c" || die "cafe image not pinned"
+grep -q 'driver: macvlan' "$c" || die "cafe network is not macvlan"
+grep -q 'parent: eth0' "$c" || die "cafe macvlan parent NIC"
+grep -q 'ip_range: 192.0.2.248/30' "$c" || die "cafe container address range"
+grep -q 'DHCP: "Y"' "$c" || die "cafe VM does not ask the router for its address"
+pw=$(cat /srv/gaming-room/pccafe/windows-password)
+(( ${#pw} >= 16 )) || die "cafe Windows password too short"
+grep -qF "PASSWORD: \"$pw\"" "$c" || die "cafe Windows password not used"
+grep -q 'localport=27036' "$bat" || die "cafe discovery firewall rule"
+grep -q 'localport=27037' "$bat" || die "cafe client firewall rule"
+ok "cafe VM compose file, network, password and firewall script"
 
 step "Claude on the server"
 id claude >/dev/null || die "no claude account"
