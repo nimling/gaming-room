@@ -57,6 +57,19 @@
   ignore_errors: "{{ ansible_check_mode }}"
   when: ut99_build
 
+- name: UT99 | download the mods
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ ut99_cache }}/{{ item.file }}"
+    checksum: "sha256:{{ item.sha256 }}"
+    mode: "0644"
+  loop: "{{ ut99_mods }}"
+  loop_control:
+    label: "{{ item.name }}"
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: ut99_build
+
 - name: UT99 | install the build script
   ansible.builtin.copy:
     src: ut99-build
@@ -73,19 +86,20 @@
 
 - name: UT99 | work out the wanted version
   ansible.builtin.set_fact:
-    ut99_version_line: "iso={{ ut99_iso_sha256 }} bp4={{ ut99_bp4_sha256 }} patch={{ ut99_patch_version }}"
+    ut99_version_line: >-
+      iso={{ ut99_iso_sha256 }} bp4={{ ut99_bp4_sha256 }} patch={{ ut99_patch_version }}{%
+      for m in ut99_mods %} {{ m.name }}={{ m.sha256[:12] }}{% endfor %}
 
 # A few minutes: unpacks 650 MB and decompresses every map.
 - name: UT99 | build the game folder
   ansible.builtin.command:
-    argv:
-      - /usr/local/sbin/ut99-build
-      - "{{ ut99_cache }}/UT_GOTY_CD1.ISO"
-      - "{{ ut99_cache }}/utbonuspack4-zip.7z"
-      - "{{ ut99_cache }}/{{ ut99_patch_file }}"
-      - "{{ ut99_dir }}"
-      - "{{ gameshare_owner }}"
-      - "{{ ut99_version_line }}"
+    argv: >-
+      {{ ['/usr/local/sbin/ut99-build',
+          ut99_cache ~ '/UT_GOTY_CD1.ISO',
+          ut99_cache ~ '/utbonuspack4-zip.7z',
+          ut99_cache ~ '/' ~ ut99_patch_file,
+          ut99_dir, gameshare_owner, ut99_version_line]
+         + (ut99_mods | map(attribute='file') | map('regex_replace', '^', ut99_cache ~ '/') | list) }}
   changed_when: true
   when: ut99_build and (ut99_built.content | default('') | b64decode | trim) != ut99_version_line
 

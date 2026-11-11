@@ -2,14 +2,17 @@
 # Managed by gaming-room Ansible (roles/server_gameshare).
 # Builds Unreal Tournament GOTY with OldUnreal's Linux patch into a folder,
 # the same steps as OldUnreal's install-ut99.sh, then swaps it into place.
-#   ut99-build <iso> <bonuspack4.7z> <patch.tar.bz2> <dest> <owner> <version line>
+#   ut99-build <iso> <bonuspack4.7z> <patch.tar.bz2> <dest> <owner> <version line> [mod.zip ...]
+# Each mod zip is laid out like the game folder (System/, Maps/, Music/...).
 set -euo pipefail
 
-if (( $# != 6 )); then
-    echo "usage: ut99-build ISO BP4 PATCH DEST OWNER VERSION" >&2
+if (( $# < 6 )); then
+    echo "usage: ut99-build ISO BP4 PATCH DEST OWNER VERSION [MOD.zip ...]" >&2
     exit 2
 fi
 iso=$1 bp4=$2 patch=$3 dest=$4 owner=$5 version=$6
+shift 6
+mods=("$@")
 # Ubuntu's 7zip package names its program 7z on newer releases, 7zz on older ones.
 sevenzip=$(command -v 7z || command -v 7zz || true)
 [[ -n $sevenzip ]] || { echo "ut99-build: 7z (package 7zip) is not installed" >&2; exit 1; }
@@ -41,6 +44,10 @@ done
 if [[ -e "$work/Maps/DM-Cybrosis][.unr" && ! -e "$work/Maps/DOM-Cybrosis][.unr" ]]; then
     cp "$work/Maps/DM-Cybrosis][.unr" "$work/Maps/DOM-Cybrosis][.unr"
 fi
+# Mods: the same files on the server and every seat, so online play matches.
+for mod in ${mods[@]+"${mods[@]}"}; do
+    unzip -q -o "$mod" -x 'Help/*' -d "$work"
+done
 for f in System64/ut-bin System64/ucc-bin "Maps/DM-Deck16][.unr"; do
     [[ -e "$work/$f" ]] || { echo "ut99-build: $f missing after the build" >&2; exit 1; }
 done
