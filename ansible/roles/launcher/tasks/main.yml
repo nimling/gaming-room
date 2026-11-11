@@ -10,9 +10,12 @@
       - gcc
       - git
       - mumble
+      - openssl
       - pkgconf
+      - python-cryptography
       - rust
       - spectacle
+      - sqlite
       - umu-launcher
       - webkit2gtk-4.1
     state: present
@@ -131,8 +134,9 @@
     mode: "0644"
 
 # KWin does not always honour the app's own full-screen request at start,
-# and KDE's taskbar stayed on top. A window rule forces it.
-- name: Force the launcher window to full screen (KWin rule in the golden home)
+# and KDE's taskbar stayed on top. A window rule forces it. A second rule
+# starts Mumble minimised; Mumble then hides in the tray.
+- name: Force the launcher to full screen and start Mumble minimised (KWin rules in the golden home)
   ansible.builtin.copy:
     src: kwinrulesrc
     dest: "/home/.golden/{{ seat_player_user }}/.config/kwinrulesrc"
@@ -156,3 +160,180 @@
     force: true
     owner: "{{ seat_player_user }}"
     group: "{{ seat_player_user }}"
+
+# --- Voice: Mumble joins with no wizard or dialog -----------------------------
+# Mumble 1.5 shows three dialogs on a fresh home: the audio wizard, the
+# certificate wizard and "unknown server certificate". The settings file
+# answers the first, a seat certificate the second, a pinned digest the third.
+
+# Mumble looks for its certificate in the XDG Documents folder, whose name
+# follows the locale. Fixed names make the path the same on every seat. The
+# folders exist up front so xdg-user-dirs-update keeps the file as it is.
+- name: Fix the player's XDG folder names (golden home)
+  ansible.builtin.copy:
+    src: user-dirs.dirs
+    dest: "/home/.golden/{{ seat_player_user }}/.config/user-dirs.dirs"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+
+- name: Create the XDG and Mumble folders in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/{{ item }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+  loop:
+    - Desktop
+    - Documents
+    - Downloads
+    - Music
+    - Pictures
+    - Projects
+    - Public
+    - Templates
+    - Videos
+    - .config/Mumble
+    - .config/Mumble/Mumble
+    - .local
+    - .local/share
+    - .local/share/Mumble
+    - .local/share/Mumble/Mumble
+
+# Wizard done, 10 ms frames, noise suppression, no update checks. Mumble 1.5
+# only speaks Opus, so there is no codec key.
+# Push-to-talk reads /dev/input (evdev), so it works in every window, Wayland
+# or X. Mumble stores a button as its Linux event code + 8 (a QVariant int):
+# the mouse side button (BTN_SIDE 275) is 283, V (KEY_V 47) is 55.
+- name: Pre-fill Mumble's settings (golden home)
+  ansible.builtin.copy:
+    src: mumble_settings.json
+    dest: "/home/.golden/{{ seat_player_user }}/.config/Mumble/Mumble/mumble_settings.json"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+
+# Each seat makes its own certificate; the key never leaves the seat. It is
+# kept outside the golden home so a rebuilt golden home gets the same one.
+- name: Create the folder for the seat's Mumble certificate
+  ansible.builtin.file:
+    path: /etc/seat/mumble
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create the seat's Mumble key
+  community.crypto.openssl_privatekey:
+    path: /etc/seat/mumble/key.pem
+    type: RSA
+    size: 2048
+    owner: root
+    group: root
+    mode: "0600"
+  # In a dry run of a fresh seat the folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Create the request for the seat's Mumble certificate
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: /etc/seat/mumble/key.pem
+    common_name: Gaming room seat
+  register: arcade_mumble_csr
+  changed_when: false
+  # In a dry run of a fresh seat the key does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Create the seat's Mumble certificate (self-signed)
+  community.crypto.x509_certificate:
+    path: /etc/seat/mumble/cert.pem
+    privatekey_path: /etc/seat/mumble/key.pem
+    csr_content: "{{ arcade_mumble_csr.csr | default('') }}"
+    provider: selfsigned
+    selfsigned_not_after: "+7300d"
+    owner: root
+    group: root
+    mode: "0644"
+  # In a dry run of a fresh seat the key does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# With no certificate in its settings, Mumble loads this file from the
+# Documents folder without asking. Without it, the certificate wizard opens.
+- name: Give Mumble the seat's certificate (golden home)
+  community.crypto.openssl_pkcs12:
+    path: "/home/.golden/{{ seat_player_user }}/Documents/MumbleAutomaticCertificateBackup.p12"
+    friendly_name: Gaming room seat
+    privatekey_path: /etc/seat/mumble/key.pem
+    certificate_path: /etc/seat/mumble/cert.pem
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0600"
+  # In a dry run of a fresh seat the key and certificate do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The server's certificate is self-signed, so Mumble asks before it trusts
+# it. Mumble keeps accepted certificates in its database; we add the server's
+# there. If the server is off, the pin from the last run stays.
+# Recreating the mumble container's data volume makes a new server
+# certificate. Seats then show the dialog again until the next playbook run
+# pins the new one.
+- name: Read the voice server's certificate
+  community.crypto.get_certificate:
+    host: "{{ arcade_voice_server }}"
+    port: "{{ arcade_voice_port }}"
+    timeout: 5
+  register: arcade_voice_cert
+  failed_when: false
+  # Only reads, so it also runs in a dry run.
+  check_mode: false
+  when: arcade_voice_server | length > 0
+
+- name: Work out the voice server certificate's digest
+  community.crypto.x509_certificate_info:
+    content: "{{ arcade_voice_cert.cert }}"
+  register: arcade_voice_cert_info
+  when: arcade_voice_cert.cert is defined
+
+- name: Read the digest Mumble already trusts (golden home)
+  ansible.builtin.command:
+    argv:
+      - sqlite3
+      - -readonly
+      - "/home/.golden/{{ seat_player_user }}/.local/share/Mumble/Mumble/mumble.sqlite"
+      - "SELECT digest FROM cert WHERE hostname = '{{ arcade_voice_server }}' AND port = {{ arcade_voice_port }};"
+  register: arcade_voice_pinned
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: arcade_voice_cert_info.fingerprints is defined
+
+- name: Trust the voice server's certificate in Mumble (golden home)
+  ansible.builtin.command:
+    argv:
+      - sqlite3
+      - "/home/.golden/{{ seat_player_user }}/.local/share/Mumble/Mumble/mumble.sqlite"
+      - >-
+        CREATE TABLE IF NOT EXISTS cert
+        (id INTEGER PRIMARY KEY AUTOINCREMENT, hostname TEXT, port INTEGER, digest TEXT);
+        CREATE UNIQUE INDEX IF NOT EXISTS cert_host_port ON cert(hostname, port);
+        REPLACE INTO cert (hostname, port, digest)
+        VALUES ('{{ arcade_voice_server }}', {{ arcade_voice_port }}, '{{ arcade_voice_digest }}');
+  vars:
+    arcade_voice_digest: "{{ arcade_voice_cert_info.fingerprints.sha1 | replace(':', '') | lower }}"
+  changed_when: true
+  when:
+    - arcade_voice_cert_info.fingerprints is defined
+    - arcade_voice_pinned.stdout | default('') != arcade_voice_digest
+
+- name: Look for Mumble's database in the golden home
+  ansible.builtin.stat:
+    path: "/home/.golden/{{ seat_player_user }}/.local/share/Mumble/Mumble/mumble.sqlite"
+  register: arcade_mumble_db
+
+- name: Give Mumble's database to the player (golden home)
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/.local/share/Mumble/Mumble/mumble.sqlite"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0600"
+  when: arcade_mumble_db.stat.exists

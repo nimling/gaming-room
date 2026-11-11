@@ -1,0 +1,34 @@
+{
+    "settings_version": 1,
+    "mumble_has_quit_normally": true,
+    "misc": {
+        "audio_wizard_has_been_shown": true,
+        "viewed_server_ping_consent_message": true
+    },
+    "audio": {
+        "transmit_mode": "PTT",
+        "noise_cancel_mode": "Speex&RNN",
+        "play_mute_cue": false,
+        "mute_cue_popup_shown": true
+    },
+    "network": {
+        "frames_per_packet": 1
+    },
+    "ui": {
+        "hide_in_tray": true,
+        "quit_behavior": "AlwaysMinimize",
+        "send_usage_statistics": false,
+        "disable_public_server_list": true
+    },
+    "update": {
+        "check_for_updates": false,
+        "check_for_plugin_updates": false
+    },
+    "shortcuts": {
+        "enable_evdev": true,
+        "defined": [
+            { "index": 1, "suppress": false, "buttons": ["AAAAAgAAAAEb"], "data": "AAAAAAE=" },
+            { "index": 1, "suppress": false, "buttons": ["AAAAAgAAAAA3"], "data": "AAAAAAE=" }
+        ]
+    }
+}

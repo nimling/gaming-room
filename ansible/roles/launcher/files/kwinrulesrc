@@ -1,7 +1,6 @@
 # Managed by gaming-room Ansible (roles/launcher).
 [General]
-count=1
-rules=gaming-room-arcade
+Order=gaming-room-arcade,gaming-room-mumble
 
 [gaming-room-arcade]
 Description=Arcade launcher full screen
@@ -9,3 +8,10 @@ title=Arcade
 titlematch=1
 fullscreen=true
 fullscreenrule=2
+
+[gaming-room-mumble]
+Description=Mumble starts minimised
+wmclass=Mumble
+wmclassmatch=1
+minimize=true
+minimizerule=3
