@@ -4,7 +4,7 @@
 use anyhow::{bail, Context, Result};
 use arcade_core::manifest::{self, Manifest, Tier};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{nick, ptt, Config, Display, Seat};
+use arcade_core::{lan, nick, ptt, Config, Display, Seat};
 use clap::{Args, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -53,6 +53,11 @@ enum Cmd {
     },
     /// Show the nickname, or set it
     Nick { name: Option<String> },
+    /// List the IP addresses of the seats and the server
+    Ips {
+        #[arg(long)]
+        json: bool,
+    },
     /// Show the push-to-talk key, or set it (a browser key code such as
     /// KeyB, or MouseForward; "default" for side button and V). Quit
     /// Mumble first: it rewrites its settings when it quits.
@@ -193,6 +198,17 @@ fn run() -> Result<ExitCode> {
                 None => bail!("no nickname set yet"),
             },
         },
+        Cmd::Ips { json } => {
+            let list = lan::entries(&config, &seat.name);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&list)?);
+            } else {
+                for e in list {
+                    let me = if e.this_seat { "  (this seat)" } else { "" };
+                    println!("{:<16} {}{me}", e.address, e.name);
+                }
+            }
+        }
         Cmd::Ptt { key } => match key.as_deref() {
             Some("default") => {
                 ptt::save(&seat.home, None)?;
