@@ -73,11 +73,23 @@ seat_mw2_dir: "{{ seat_classic_root }}/mw2"
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false
 
+# Proton for Windows games (roles/games). Pinned, so all seats match; to
+# update, change both values. The digest is on the GitHub release:
+#   gh api repos/GloriousEggroll/proton-ge-custom/releases/tags/<version> \
+#     --jq '.assets[] | select(.name | endswith("x86_64.tar.gz")) | .digest'
+seat_proton_version: GE-Proton11-12
+seat_proton_sha256: 0595159e417c3dbbfb7cc3ae0d3ed15a617cc607aa23ef756ea79029d7af5d70
+seat_proton_url: "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/{{ seat_proton_version }}/{{ seat_proton_version }}-x86_64.tar.gz"
+seat_runtime_root: "{{ seat_games_root }}/runtime"
+# umu keeps the Steam Runtime here instead of in the player's home.
+seat_umu_folders: "{{ seat_runtime_root }}/umu"
+
 # Launcher (roles/launcher)
 arcade_source_branch: "{{ seat_config_branch }}"
 arcade_build_root: /var/cache/arcade
 arcade_games_dir: /usr/local/share/arcade/games
-arcade_proton_path: ""
+# Pinned GE-Proton in /games/runtime (roles/games). Every seat runs this build.
+arcade_proton_path: "{{ seat_runtime_root }}/{{ seat_proton_version }}"
 # The gaming server's address for Mumble; set in the private inventory.
 arcade_voice_server: ""
 # Empty joins the root channel (named Lobby on our server).
