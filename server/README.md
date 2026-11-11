@@ -10,10 +10,11 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | --- | --- | --- | --- |
 | Mumble | `server_mumble` | 64738 TCP and UDP | Ready |
 | Lancache and its DNS | `server_lancache` | 53 TCP and UDP, 80, 443 | Ready |
-| Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x, see [docs/iw4x.md](../docs/iw4x.md) |
+| Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e |
 | Wake-on-LAN | `server_wol` | — | Ready: `wake-seats`, `wake-seats seat-03` |
 | Firewall, Docker, sshd | `server_base` | 22 | Ready |
-| UT99 and OpenRA game servers | — | 7777 UDP, 1234 TCP | Next: needs the UT99 data files on the server |
+| UT99 dedicated server | `server_gameshare` | 7777-7781 and 8777 UDP | Ready: InstaGib on DM-Deck16][, `ut99_server_enabled` in the private inventory |
+| OpenRA game server | — | 1234 TCP | Next |
 | LAN game list for the launcher | — | — | Later |
 | Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM) on macvlan |
 | Claude Code (orchestrator) | `server_claude` | — | Ready: `claude` account, Remote Control in tmux, own SSH key for the seats |

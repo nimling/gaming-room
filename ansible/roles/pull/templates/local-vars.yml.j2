@@ -13,3 +13,7 @@ seat_config_branch: {{ seat_config_branch | to_json }}
 arcade_voice_server: {{ arcade_voice_server | to_json }}
 arcade_hosts: {{ arcade_hosts | to_json }}
 seat_display: {{ seat_display | to_json }}
+# Game share: without these, nightly pulls would skip it and games would
+# only update on push runs.
+seat_gameshare: {{ seat_gameshare | to_json }}
+seat_shared_games: {{ seat_shared_games | to_json }}

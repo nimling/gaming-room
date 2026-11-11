@@ -10,6 +10,13 @@ die() { echo "FAIL  $*" >&2; exit 1; }
 
 step "Install tools"
 export DEBIAN_FRONTEND=noninteractive
+# Some CI runners cannot resolve *.ubuntu.com (GitHub, 2026-11-11). Then use
+# the kernel.org mirror, which is outside that domain and carries every pocket.
+if ! getent hosts archive.ubuntu.com >/dev/null; then
+    echo "archive.ubuntu.com does not resolve; using mirrors.edge.kernel.org"
+    sed -i -E 's#https?://(archive|security)\.ubuntu\.com/ubuntu#http://mirrors.edge.kernel.org/ubuntu#g' \
+        /etc/apt/sources.list.d/ubuntu.sources
+fi
 apt-get update -qq
 apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 iproute2 >/dev/null
 mkdir -p /run/sshd
@@ -41,6 +48,11 @@ all:
           server_lan_ip: 192.0.2.10
           server_vlan_cidr: 192.0.2.0/24
           server_upstream_dns: 192.0.2.1
+          ut99_server_enabled: true
+          pccafe_enabled: true
+          pccafe_ip_range: 192.0.2.248/30
+          pccafe_gateway: 192.0.2.1
+          pccafe_parent_nic: eth0
     seats:
       hosts:
         seat-01:
@@ -75,6 +87,35 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
+
+step "Unreal Tournament"
+[[ -x /usr/local/sbin/ut99-build ]] || die "UT99 build script missing"
+[[ ! -e /srv/games/ut99 ]] || die "UT99 built in the container (downloads should be off)"
+id ut99server >/dev/null || die "no ut99server account"
+unit=/etc/systemd/system/ut99-server.service
+grep -q '^User=ut99server$' "$unit" || die "UT99 server does not run as ut99server"
+grep -qF 'ucc-bin server "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM" port=7777' "$unit" || die "UT99 server command"
+grep -q '^ReadWritePaths=/var/lib/ut99-server$' "$unit" || die "UT99 server can write outside its home"
+grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/var/lib/ut99-server/.utpg/System/User.ini' "$unit" || die "UT99 server settings not in its home"
+{ command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
+command -v bzip2 >/dev/null || die "bzip2 missing"
+ok "build script, tools and dedicated server unit"
+
+step "Steam PC Cafe VM"
+c=/srv/gaming-room/pccafe/compose.yaml
+bat=/srv/gaming-room/pccafe/oem/install.bat
+[[ $(stat -c '%a %U' "$c") == "600 root" ]] || die "cafe compose file not root-only"
+grep -q 'image: dockurr/windows:6.06' "$c" || die "cafe image not pinned"
+grep -q 'driver: macvlan' "$c" || die "cafe network is not macvlan"
+grep -q 'parent: eth0' "$c" || die "cafe macvlan parent NIC"
+grep -q 'ip_range: 192.0.2.248/30' "$c" || die "cafe container address range"
+grep -q 'DHCP: "Y"' "$c" || die "cafe VM does not ask the router for its address"
+pw=$(cat /srv/gaming-room/pccafe/windows-password)
+(( ${#pw} >= 16 )) || die "cafe Windows password too short"
+grep -qF "PASSWORD: \"$pw\"" "$c" || die "cafe Windows password not used"
+grep -q 'localport=27036' "$bat" || die "cafe discovery firewall rule"
+grep -q 'localport=27037' "$bat" || die "cafe client firewall rule"
+ok "cafe VM compose file, network, password and firewall script"
 
 step "Claude on the server"
 id claude >/dev/null || die "no claude account"

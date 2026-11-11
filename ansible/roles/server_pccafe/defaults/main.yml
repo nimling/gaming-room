@@ -1,0 +1,27 @@
+---
+# Steam PC Café Server spike (docs/scope.md, "Steam PC Café").
+# Valve's café server runs on Windows only, so it runs in a Windows VM
+# (dockur/windows, KVM) on this server. The VM joins the gaming VLAN on its
+# own address (macvlan, DHCP from the router), because seats find the café
+# server by UDP broadcast on 27036 and connect to it on TCP 27037.
+# Off by default; switch it on in the private inventory.
+pccafe_enabled: false
+# Pinned image (Docker Hub dockurr/windows).
+pccafe_image: dockurr/windows:6.06
+# Windows Server 2022: Valve supports Server 2016 or later, and the free
+# 180-day evaluation is enough for the spike.
+pccafe_windows_version: "2022"
+pccafe_ram: 4G
+pccafe_cpus: "2"
+pccafe_disk: 64G
+pccafe_dir: "{{ server_root }}/pccafe"
+# NIC on the gaming VLAN that the macvlan network hangs off.
+pccafe_parent_nic: "{{ ansible_default_ipv4.interface }}"
+pccafe_subnet: "{{ server_vlan_cidr }}"
+pccafe_gateway: "{{ ansible_default_ipv4.gateway }}"
+# A few addresses OUTSIDE the router's DHCP pool for the container itself,
+# for example 192.0.2.248/30. Required when pccafe_enabled; private inventory.
+pccafe_ip_range: ""
+# Windows login for the VM (web viewer on port 8006, or RDP). The password is
+# made on the server and kept in {{ pccafe_dir }}/windows-password (root only).
+pccafe_windows_user: cafe

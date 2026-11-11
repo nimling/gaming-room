@@ -4,3 +4,8 @@
     name: sshd.service
     state: reloaded
   when: not seat_in_container
+
+- name: Reload udev rules
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: true
+  when: not seat_in_container

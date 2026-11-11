@@ -39,6 +39,10 @@ seat_games_root: /games
 seat_steam_library: /games/steam
 seat_classic_root: /games/classic
 
+# Headset sidetone (hearing your own voice), 0-128; 0 = off. Logitech
+# G431/G432/G433, set over HID by HeadsetControl at boot and on plug-in.
+seat_headset_sidetone: 0
+
 # Session
 seat_idle_logout_enabled: true
 seat_idle_logout_minutes: 20
@@ -68,11 +72,36 @@ seat_pull_enabled: true
 seat_openra_ra_mirrors: https://www.openra.net/packages/ra-quickinstall-mirrors.txt
 seat_openra_ra_sha1: 44241f68e69db9511db82cf83c174737ccda300b
 
+# Free LAN games from the CachyOS/Arch repos (roles/games), one manifest each
+# in games/. Empty skips them.
+seat_free_games:
+  - openttd
+  - openttd-opengfx
+  - openttd-opensfx
+  - teeworlds
+  - xonotic
+
 # Shared game files on the gaming server (roles/server_gameshare), as an
 # rsync URL such as rsync://gaming-server/games. Private inventory.
 # Empty: games from the share (MW2 with IW4x) are skipped.
 seat_gameshare: ""
 seat_mw2_dir: "{{ seat_classic_root }}/mw2"
+# Games copied from the share. required: files that show the server has a
+# finished install (rsync paths: no [ or ], they are wildcards there).
+# exclude: rsync patterns that never come from the server.
+# chmod: rsync --chmod for the copy (default D755,F644: nothing executable).
+seat_shared_games:
+  - name: mw2
+    dest: "{{ seat_mw2_dir }}"
+    required: [iw4mp.exe, iw4x.exe, iw4x.dll]
+    # Each seat makes its own IW4x key.
+    exclude: [/players/]
+  - name: ut99
+    dest: "{{ seat_classic_root }}/ut99"
+    required: [System64/ut-bin, .ut99-version]
+    exclude: []
+    # Native Linux game: keep the execute bit on its programs.
+    chmod: D755,Fu=rwX,Fgo=rX
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false
@@ -85,6 +114,8 @@ seat_proton_version: GE-Proton11-12
 seat_proton_sha256: 0595159e417c3dbbfb7cc3ae0d3ed15a617cc607aa23ef756ea79029d7af5d70
 seat_proton_url: "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/{{ seat_proton_version }}/{{ seat_proton_version }}-x86_64.tar.gz"
 seat_runtime_root: "{{ seat_games_root }}/runtime"
+# The tarball unpacks to <version>-x86_64.
+seat_proton_dir: "{{ seat_runtime_root }}/{{ seat_proton_version }}-x86_64"
 # umu keeps the Steam Runtime here instead of in the player's home.
 seat_umu_folders: "{{ seat_runtime_root }}/umu"
 
@@ -93,7 +124,7 @@ arcade_source_branch: "{{ seat_config_branch }}"
 arcade_build_root: /var/cache/arcade
 arcade_games_dir: /usr/local/share/arcade/games
 # Pinned GE-Proton in /games/runtime (roles/games). Every seat runs this build.
-arcade_proton_path: "{{ seat_runtime_root }}/{{ seat_proton_version }}"
+arcade_proton_path: "{{ seat_proton_dir }}"
 # The gaming server's address for Mumble; set in the private inventory.
 arcade_voice_server: ""
 # Empty joins the root channel (named Lobby on our server).

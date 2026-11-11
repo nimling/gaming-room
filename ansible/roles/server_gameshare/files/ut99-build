@@ -1,0 +1,72 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/server_gameshare).
+# Builds Unreal Tournament GOTY with OldUnreal's Linux patch into a folder,
+# the same steps as OldUnreal's install-ut99.sh, then swaps it into place.
+#   ut99-build <iso> <bonuspack4.7z> <patch.tar.bz2> <dest> <owner> <version line> [mod.zip ...]
+# Each mod zip is laid out like the game folder (System/, Maps/, Music/...).
+set -euo pipefail
+
+if (( $# < 6 )); then
+    echo "usage: ut99-build ISO BP4 PATCH DEST OWNER VERSION [MOD.zip ...]" >&2
+    exit 2
+fi
+iso=$1 bp4=$2 patch=$3 dest=$4 owner=$5 version=$6
+shift 6
+mods=("$@")
+# Ubuntu's 7zip package names its program 7z on newer releases, 7zz on older ones.
+sevenzip=$(command -v 7z || command -v 7zz || true)
+[[ -n $sevenzip ]] || { echo "ut99-build: 7z (package 7zip) is not installed" >&2; exit 1; }
+parent=$(dirname "$dest")
+mkdir -p "$parent"
+work=$(mktemp -d "$parent/.ut99-build.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+# The game data from the CD. Windows binaries, Windows settings and the
+# installers are left out; the patch brings the Linux versions.
+"$sevenzip" x -y -bd -o"$work" "$iso" \
+    '-x!System/UnrealTournament.ini' '-x!System/User.ini' '-x!System/*.bat' \
+    '-x!System/*.dll' '-x!System/*.exe' '-x!System/*.int' \
+    '-x!System/*.det' '-x!System/*.est' '-x!System/*.frt' '-x!System/*.itt' \
+    '-x!Autorun.inf' '-x!Setup.exe' '-x!DirectX7' '-x!GameSpy' '-x!Microsoft' \
+    '-x!NetGamesUSA.com' '-x!System400' >/dev/null
+"$sevenzip" x -y -bd -o"$work" "$bp4" >/dev/null
+tar -xjf "$patch" -C "$work"
+
+# Maps ship compressed (.unr.uz); the game reads only plain .unr files.
+shopt -s nullglob
+for uz in "$work"/Maps/*.unr.uz; do
+    map=$(basename "$uz" .uz)
+    (cd "$work/System64" && ./ucc-bin decompress "../Maps/$(basename "$uz")" -nohomedir >/dev/null)
+    mv "$work/System64/$map" "$work/Maps/$map"
+    rm -f "$uz"
+done
+# One Domination map ships under its DM name only.
+if [[ -e "$work/Maps/DM-Cybrosis][.unr" && ! -e "$work/Maps/DOM-Cybrosis][.unr" ]]; then
+    cp "$work/Maps/DM-Cybrosis][.unr" "$work/Maps/DOM-Cybrosis][.unr"
+fi
+# Mods: the same files on the server and every seat, so online play matches.
+for mod in ${mods[@]+"${mods[@]}"}; do
+    unzip -q -o "$mod" -x 'Help/*' -d "$work"
+done
+for f in System64/ut-bin System64/ucc-bin "Maps/DM-Deck16][.unr"; do
+    [[ -e "$work/$f" ]] || { echo "ut99-build: $f missing after the build" >&2; exit 1; }
+done
+
+echo "$version" > "$work/.ut99-version"
+chown -R "$owner:$owner" "$work"
+# rsyncd runs as nobody.
+chmod -R u+rwX,go+rX "$work"
+chmod 0755 "$work"
+
+if [[ -e $dest ]]; then
+    mv "$dest" "$work.old"
+fi
+if ! mv "$work" "$dest"; then
+    # Put the previous build back so the share is never left without the game.
+    [[ -e $work.old ]] && mv "$work.old" "$dest"
+    echo "ut99-build: could not move the new build into $dest" >&2
+    exit 1
+fi
+rm -rf "$work.old"
+trap - EXIT
+echo "ut99-build: $dest ready ($version)"
