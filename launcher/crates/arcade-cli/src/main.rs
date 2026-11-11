@@ -4,7 +4,7 @@
 use anyhow::{bail, Context, Result};
 use arcade_core::manifest::{self, Manifest, Tier};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{lan, nick, Config, Display, Seat};
+use arcade_core::{lan, nick, ptt, Config, Display, Seat};
 use clap::{Args, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -58,6 +58,10 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Show the push-to-talk key, or set it (a browser key code such as
+    /// KeyB, or MouseForward; "default" for side button and V). Quit
+    /// Mumble first: it rewrites its settings when it quits.
+    Ptt { key: Option<String> },
     /// Close everything and reset the seat for the next person
     EndSession,
 }
@@ -205,6 +209,17 @@ fn run() -> Result<ExitCode> {
                 }
             }
         }
+        Cmd::Ptt { key } => match key.as_deref() {
+            Some("default") => {
+                ptt::save(&seat.home, None)?;
+                println!("default");
+            }
+            Some(k) => {
+                ptt::save(&seat.home, Some(k))?;
+                println!("{k}");
+            }
+            None => println!("{}", ptt::load(&seat.home).as_deref().unwrap_or("default")),
+        },
         Cmd::EndSession => {
             let status = Command::new("systemctl")
                 .args(["start", "--no-block", "seat-reset.service"])

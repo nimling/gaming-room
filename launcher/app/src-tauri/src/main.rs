@@ -8,11 +8,13 @@
 
 use arcade_core::manifest::{self, Card, Manifest};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{lan, nick, Config, Seat};
+use arcade_core::{lan, nick, ptt, Config, Seat};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use tauri::{Manager, State};
 
 struct Arcade {
@@ -29,6 +31,7 @@ struct Boot {
     display: String,
     gpu: String,
     nickname: Option<String>,
+    ptt: Option<String>,
     voice: Option<String>,
     hosts: Vec<lan::Entry>,
     games: Vec<Card>,
@@ -56,16 +59,27 @@ fn bootstrap(app: State<'_, Arcade>) -> Result<Boot, String> {
         display: seat.display.to_string(),
         gpu: seat.gpu.clone(),
         nickname: nick::load(&seat.home),
+        ptt: ptt::load(&seat.home),
         voice: app.config.voice.as_ref().map(|v| v.channel.clone()),
         hosts: lan::entries(&app.config, &seat.name),
         games,
     })
 }
 
+/// Saves the nickname and joins voice under it. `key` is the push-to-talk
+/// key the player picked on the same screen; `None` is the default.
 #[tauri::command]
-fn set_nickname(app: State<'_, Arcade>, name: String) -> Result<(), String> {
+fn set_nickname(app: State<'_, Arcade>, name: String, key: Option<String>) -> Result<(), String> {
     let seat = Seat::detect(&app.root);
     nick::save(&seat.home, &name).map_err(text)?;
+    if key.as_deref() != ptt::load(&seat.home).as_deref() {
+        if let Some(k) = &key {
+            ptt::validate(k).map_err(text)?;
+        }
+        // Mumble writes its settings when it quits, so it must be gone first.
+        stop_mumble();
+        ptt::save(&seat.home, key.as_deref()).map_err(text)?;
+    }
     if let Some(url) = app.config.mumble_url(name.trim()) {
         Command::new("mumble")
             .arg(url)
@@ -105,6 +119,26 @@ fn launch(
     let child = plan::spawn(&p).map_err(text)?;
     *app.game.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, child));
     Ok(p)
+}
+
+/// Asks Mumble to quit and waits up to five seconds for it.
+fn stop_mumble() {
+    let running = || {
+        Command::new("pgrep")
+            .args(["-x", "mumble"])
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    if !running() {
+        return;
+    }
+    let _ = Command::new("pkill").args(["-x", "mumble"]).status();
+    for _ in 0..50 {
+        if !running() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
 }
 
 fn stop_game(app: &Arcade) {

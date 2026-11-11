@@ -8,6 +8,7 @@ pub mod lan;
 pub mod manifest;
 pub mod nick;
 pub mod plan;
+pub mod ptt;
 pub mod seat;
 
 pub use config::Config;
