@@ -163,12 +163,11 @@ fn run() -> Result<ExitCode> {
             match screenshot_after {
                 Some(secs) => {
                     thread::sleep(Duration::from_secs(secs));
-                    if let Some(status) = child.try_wait()? {
-                        bail!("{} closed before the screenshot ({status})", p.name);
+                    if !plan::alive(&mut child) {
+                        bail!("{} closed before the screenshot", p.name);
                     }
                     let shot = take_screenshot(&screenshot);
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    plan::stop(&mut child);
                     shot?;
                     println!("screenshot: {}", screenshot.display());
                 }

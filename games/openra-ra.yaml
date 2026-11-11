@@ -1,6 +1,7 @@
 # Red Alert on the OpenRA engine (native, free). Installed as the CachyOS
-# openra package, so there is no path. OpenRA takes settings as arguments.
-# Not yet tested on a seat.
+# openra package, so there is no path. The game content (EA freeware) is
+# fetched into /games/openra by the games role. Tested on seat-01: straight
+# to the main menu, no dialogs.
 id: openra-ra
 name: Red Alert
 subtitle: Allies against Soviets, on OpenRA
@@ -10,11 +11,12 @@ engine: OpenRA
 players: { min: 1, max: 8 }
 launch:
   command: ["openra-ra"]
-  args:
-    - "Player.Name={{ nickname }}"
-    - "Graphics.Mode=Fullscreen"
-    - "Graphics.CapFramerate=True"
-    - "Graphics.MaxFramerate={{ fps_cap }}"
+# OpenRA asks two first-start questions (introduction, system information)
+# unless its settings say they were answered. Versions from OpenRA's source
+# for release-20250330: IntroductionVersion 1, SystemInformationVersion 6.
+config:
+  - template: openra-ra/settings.yaml.j2
+    to: "~/.config/openra/settings.yaml"
 join:
   args: ["Launch.Connect={{ server }}"]
 profiles:
