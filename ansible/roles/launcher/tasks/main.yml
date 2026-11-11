@@ -196,6 +196,40 @@
     owner: "{{ seat_player_user }}"
     group: "{{ seat_player_user }}"
 
+# --- Unreal Tournament: the game's own default settings -----------------------
+# The launcher writes the nickname and screen keys into ~/.utpg/System before
+# the game starts. Without the full defaults under them, the game would find
+# a settings file with only those keys and lose its renderer and other
+# defaults. So the golden home starts with copies of the game's Default.ini
+# and DefUser.ini, once the game is on the seat.
+- name: UT99 | look for the game on the seat
+  ansible.builtin.stat:
+    path: "{{ seat_classic_root }}/ut99/System64/Default.ini"
+  register: ut99_on_seat
+
+- name: UT99 | create its settings folder in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/{{ item }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+  loop: [.utpg, .utpg/System]
+  when: ut99_on_seat.stat.exists
+
+- name: UT99 | start the golden home from the game's default settings
+  ansible.builtin.copy:
+    src: "{{ seat_classic_root }}/ut99/System64/{{ item.src }}"
+    dest: "/home/.golden/{{ seat_player_user }}/.utpg/System/{{ item.dest }}"
+    remote_src: true
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+  loop:
+    - { src: Default.ini, dest: UnrealTournament.ini }
+    - { src: DefUser.ini, dest: User.ini }
+  when: ut99_on_seat.stat.exists
+
 # --- Voice: Mumble joins with no wizard or dialog -----------------------------
 # Mumble 1.5 shows three dialogs on a fresh home: the audio wizard, the
 # certificate wizard and "unknown server certificate". The settings file

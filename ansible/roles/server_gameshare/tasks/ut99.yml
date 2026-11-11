@@ -1,0 +1,182 @@
+---
+# --- Unreal Tournament (GOTY) on OldUnreal 469e ------------------------------
+# Built once here from the pinned downloads; seats copy the finished folder.
+- name: UT99 | install the unpack tools
+  ansible.builtin.apt:
+    name:
+      - 7zip
+      - bzip2
+    state: present
+
+- name: UT99 | create the download cache
+  ansible.builtin.file:
+    path: "{{ ut99_cache }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: UT99 | download the GOTY CD (650 MB)
+  when: ut99_build
+  block:
+    - name: UT99 | download the GOTY CD from OldUnreal
+      ansible.builtin.get_url:
+        url: "{{ ut99_iso_url }}"
+        dest: "{{ ut99_cache }}/UT_GOTY_CD1.ISO"
+        checksum: "sha256:{{ ut99_iso_sha256 }}"
+        mode: "0644"
+        timeout: 120
+  rescue:
+    - name: UT99 | download the GOTY CD from archive.org instead
+      ansible.builtin.get_url:
+        url: "{{ ut99_iso_fallback_url }}"
+        dest: "{{ ut99_cache }}/UT_GOTY_CD1.ISO"
+        checksum: "sha256:{{ ut99_iso_sha256 }}"
+        mode: "0644"
+        timeout: 120
+      # In a dry run of a fresh server the cache folder does not exist yet.
+      ignore_errors: "{{ ansible_check_mode }}"
+
+- name: UT99 | download Bonus Pack 4
+  ansible.builtin.get_url:
+    url: "{{ ut99_bp4_url }}"
+    dest: "{{ ut99_cache }}/utbonuspack4-zip.7z"
+    checksum: "sha256:{{ ut99_bp4_sha256 }}"
+    mode: "0644"
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: ut99_build
+
+- name: UT99 | download the OldUnreal patch
+  ansible.builtin.get_url:
+    url: "{{ ut99_patch_url }}"
+    dest: "{{ ut99_cache }}/{{ ut99_patch_file }}"
+    checksum: "sha256:{{ ut99_patch_sha256 }}"
+    mode: "0644"
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: ut99_build
+
+- name: UT99 | install the build script
+  ansible.builtin.copy:
+    src: ut99-build
+    dest: /usr/local/sbin/ut99-build
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: UT99 | read the built version
+  ansible.builtin.slurp:
+    src: "{{ ut99_dir }}/.ut99-version"
+  register: ut99_built
+  failed_when: false
+
+- name: UT99 | work out the wanted version
+  ansible.builtin.set_fact:
+    ut99_version_line: "iso={{ ut99_iso_sha256 }} bp4={{ ut99_bp4_sha256 }} patch={{ ut99_patch_version }}"
+
+# A few minutes: unpacks 650 MB and decompresses every map.
+- name: UT99 | build the game folder
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/ut99-build
+      - "{{ ut99_cache }}/UT_GOTY_CD1.ISO"
+      - "{{ ut99_cache }}/utbonuspack4-zip.7z"
+      - "{{ ut99_cache }}/{{ ut99_patch_file }}"
+      - "{{ ut99_dir }}"
+      - "{{ gameshare_owner }}"
+      - "{{ ut99_version_line }}"
+  changed_when: true
+  when: ut99_build and (ut99_built.content | default('') | b64decode | trim) != ut99_version_line
+
+# --- Dedicated LAN server ------------------------------------------------------
+# Runs from the share as its own account. Its settings and logs live in that
+# account's home (~/.utpg, passed with ini= and userini=), so the share stays
+# read-only for it.
+- name: UT99 server | create its account
+  ansible.builtin.user:
+    name: "{{ ut99_server_user }}"
+    system: true
+    home: "{{ ut99_server_home }}"
+    create_home: true
+    shell: /usr/sbin/nologin
+    password_lock: true
+  when: ut99_server_enabled
+
+- name: UT99 server | create its settings folder
+  ansible.builtin.file:
+    path: "{{ ut99_server_home }}/.utpg/System"
+    state: directory
+    owner: "{{ ut99_server_user }}"
+    group: "{{ ut99_server_user }}"
+    mode: "0755"
+  when: ut99_server_enabled
+  # In a dry run of a fresh server the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: UT99 server | start from the game's default settings
+  ansible.builtin.copy:
+    src: "{{ ut99_dir }}/System64/{{ item.src }}"
+    dest: "{{ ut99_server_home }}/.utpg/System/{{ item.dest }}"
+    remote_src: true
+    force: false
+    owner: "{{ ut99_server_user }}"
+    group: "{{ ut99_server_user }}"
+    mode: "0644"
+  loop:
+    - { src: Default.ini, dest: UnrealTournament.ini }
+    - { src: DefUser.ini, dest: User.ini }
+  when: ut99_server_enabled and not server_in_container
+  # In a dry run the game is not built yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The VLAN has no internet master servers to report to; seats find the server
+# through the LAN beacon.
+- name: UT99 server | do not report to internet master servers
+  ansible.builtin.lineinfile:
+    path: "{{ ut99_server_home }}/.utpg/System/UnrealTournament.ini"
+    regexp: '^ServerActors=IpServer\.UdpServerUplink'
+    state: absent
+  notify: Restart the UT99 server
+  when: ut99_server_enabled and not server_in_container
+  # In a dry run the settings file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: UT99 server | install the service
+  ansible.builtin.template:
+    src: ut99-server.service.j2
+    dest: /etc/systemd/system/ut99-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the UT99 server
+  when: ut99_server_enabled
+
+- name: UT99 server | run it
+  ansible.builtin.systemd_service:
+    name: ut99-server.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: ut99_server_enabled and not server_in_container
+  # In a dry run the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: UT99 server | stop it when switched off
+  ansible.builtin.systemd_service:
+    name: ut99-server.service
+    enabled: false
+    state: stopped
+  when: not ut99_server_enabled and not server_in_container
+  failed_when: false
+
+# Game port 7777, query 7778, and up to 7781 for a second instance; 8777 is
+# the LAN beacon the in-game server browser listens for.
+- name: UT99 server | firewall, from the gaming VLAN only
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "{{ item }}"
+    proto: udp
+  loop: ["{{ ut99_server_port }}:{{ ut99_server_port + 4 }}", "8777"]
+  when: ut99_server_enabled and not server_in_container

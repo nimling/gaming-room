@@ -48,6 +48,7 @@ all:
           server_lan_ip: 192.0.2.10
           server_vlan_cidr: 192.0.2.0/24
           server_upstream_dns: 192.0.2.1
+          ut99_server_enabled: true
     seats:
       hosts:
         seat-01:
@@ -82,6 +83,19 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
+
+step "Unreal Tournament"
+[[ -x /usr/local/sbin/ut99-build ]] || die "UT99 build script missing"
+[[ ! -e /srv/games/ut99 ]] || die "UT99 built in the container (downloads should be off)"
+id ut99server >/dev/null || die "no ut99server account"
+unit=/etc/systemd/system/ut99-server.service
+grep -q '^User=ut99server$' "$unit" || die "UT99 server does not run as ut99server"
+grep -qF 'ucc-bin server "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM" port=7777' "$unit" || die "UT99 server command"
+grep -q '^ReadWritePaths=/var/lib/ut99-server$' "$unit" || die "UT99 server can write outside its home"
+grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/var/lib/ut99-server/.utpg/System/User.ini' "$unit" || die "UT99 server settings not in its home"
+{ command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
+command -v bzip2 >/dev/null || die "bzip2 missing"
+ok "build script, tools and dedicated server unit"
 
 step "Claude on the server"
 id claude >/dev/null || die "no claude account"
