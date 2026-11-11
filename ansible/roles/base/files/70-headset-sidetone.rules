@@ -1,0 +1,3 @@
+# Managed by gaming-room Ansible (roles/base).
+# Logitech G431/G432/G433: set the sidetone when the headset is plugged in.
+ACTION=="add", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0a9b|0a9c|0a6d", TAG+="systemd", ENV{SYSTEMD_WANTS}+="headset-sidetone.service"
