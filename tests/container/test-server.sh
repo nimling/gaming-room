@@ -67,6 +67,14 @@ grep -q 'PasswordAuthentication no' /etc/ssh/sshd_config.d/10-gaming-room.conf |
 grep -qx 'HandleLidSwitch=ignore' /etc/systemd/logind.conf.d/10-gaming-room.conf || die "lid switch"
 ok "compose files, settings and sshd"
 
+step "Claude on the server"
+id claude >/dev/null || die "no claude account"
+[[ -s /home/claude/.ssh/id_ed25519.pub ]] || die "no SSH key for claude"
+visudo -cf /etc/sudoers.d/20-claude >/dev/null || die "claude sudo rule invalid"
+grep -q 'claude --remote-control' /etc/systemd/system/claude-orchestrator.service || die "Remote Control service"
+[[ $(git config --file /home/claude/.gitconfig user.email) == 34557052+nimsim@users.noreply.github.com ]] || die "claude git identity"
+ok "account, key, sudo, service and git identity"
+
 step "wake-seats"
 bash -n /usr/local/bin/wake-seats
 grep -q '\[seat-01\]="00:00:5e:00:53:01"' /usr/local/bin/wake-seats || die "seat MAC missing"

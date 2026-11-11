@@ -1,0 +1,19 @@
+# Managed by gaming-room Ansible (roles/server_claude).
+# Claude Code with Remote Control, inside tmux so a person can attach:
+#   sudo -iu {{ server_claude_user }} tmux attach -t claude
+[Unit]
+Description=Claude Code orchestrator (Remote Control)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=forking
+User={{ server_claude_user }}
+WorkingDirectory=/home/{{ server_claude_user }}/gaming-room
+Environment=PATH=/home/{{ server_claude_user }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/tmux new-session -d -s claude -c /home/{{ server_claude_user }}/gaming-room "claude --remote-control"
+ExecStop=/usr/bin/tmux kill-session -t claude
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

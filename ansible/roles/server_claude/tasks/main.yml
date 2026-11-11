@@ -1,0 +1,97 @@
+---
+- name: Install the tools Claude uses on the server
+  ansible.builtin.apt:
+    name:
+      - ansible
+      - gh
+      - git
+      - shellcheck
+      - tmux
+      - yamllint
+    state: present
+
+- name: Create the claude account (with its own SSH key for the seats)
+  ansible.builtin.user:
+    name: "{{ server_claude_user }}"
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+    generate_ssh_key: true
+    ssh_key_type: ed25519
+    ssh_key_comment: "{{ server_claude_user }}@gaming-server"
+
+- name: Let claude run Ansible as root without a password
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/20-claude
+    owner: root
+    group: root
+    mode: "0440"
+    content: |
+      # Managed by gaming-room Ansible (roles/server_claude)
+      {{ server_claude_user }} ALL=(ALL) NOPASSWD: ALL
+    validate: visudo -cf %s
+
+- name: Trust seats on first contact (they are reinstalled from time to time)
+  ansible.builtin.copy:
+    dest: "/home/{{ server_claude_user }}/.ssh/config"
+    owner: "{{ server_claude_user }}"
+    group: "{{ server_claude_user }}"
+    mode: "0600"
+    content: |
+      # Managed by gaming-room Ansible (roles/server_claude)
+      Host *
+          StrictHostKeyChecking accept-new
+          ServerAliveInterval 30
+
+- name: Check out the repo for claude (never reset, Claude works in it)
+  ansible.builtin.git:
+    repo: "{{ server_claude_repo }}"
+    dest: "/home/{{ server_claude_user }}/gaming-room"
+    version: main
+    update: false
+  become: true
+  become_user: "{{ server_claude_user }}"
+  when: not server_in_container
+  # In a dry run of a fresh server the claude account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Commit as Nima with the noreply address, like every commit in this repo
+  community.general.git_config:
+    scope: global
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+  loop:
+    - { key: user.name, value: Nima Gharib }
+    - { key: user.email, value: 34557052+nimsim@users.noreply.github.com }
+  become: true
+  become_user: "{{ server_claude_user }}"
+  # In a dry run of a fresh server the claude account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install Claude Code (official installer, as the claude account)
+  ansible.builtin.shell:
+    cmd: set -o pipefail && curl -fsSL https://claude.ai/install.sh | bash
+    executable: /bin/bash
+    creates: "/home/{{ server_claude_user }}/.local/bin/claude"
+  become: true
+  become_user: "{{ server_claude_user }}"
+  when: not server_in_container
+  # In a dry run of a fresh server the claude account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install the Remote Control service (tmux, survives SSH and reboots)
+  ansible.builtin.template:
+    src: claude-orchestrator.service.j2
+    dest: /etc/systemd/system/claude-orchestrator.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start the Remote Control session at boot (after the first sign-in)
+  ansible.builtin.systemd_service:
+    name: claude-orchestrator.service
+    enabled: "{{ server_claude_autostart | bool }}"
+    daemon_reload: true
+  when: not server_in_container
+  # In a dry run of a fresh server the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"

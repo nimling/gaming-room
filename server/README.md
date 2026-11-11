@@ -15,7 +15,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | UT99 and OpenRA game servers | — | 7777 UDP, 1234 TCP | Next: needs the UT99 data files on the server |
 | LAN game list for the launcher | — | — | Later |
 | Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM) on macvlan |
-| Claude Code | — | — | Later: dedicated user, logs every command |
+| Claude Code (orchestrator) | `server_claude` | — | Ready: `claude` account, Remote Control in tmux, own SSH key for the seats |
 
 All service ports bind to the server's LAN address only. Docker publishes ports past `ufw`, so the VLAN is the real boundary; `ufw` guards SSH and anything else on the host.
 
@@ -55,3 +55,23 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 ## Hardware minimum
 
 CPU with VT-x or AMD-V, 16 GB RAM, 1–2 TB SSD, wired gigabit (2.5 GbE preferred).
+
+## Claude Code on the server
+
+Claude runs here as the orchestrator. People talk to it from the Claude app or claude.ai through Remote Control, from anywhere, without VPN. The server only makes outbound HTTPS connections.
+
+- Account `claude`: sudo without a password, its own SSH key (added as the seats' `orchestrator` key), the repo in `~/gaming-room` and the private inventory there.
+- `claude-orchestrator.service` starts `claude --remote-control` in tmux at boot (`server_claude_autostart: true` after the first sign-in).
+- Look at the session on the server: `sudo -iu claude tmux attach -t claude`, then Ctrl+B, D to leave it running.
+
+One-time setup by a person:
+
+1. Sign in: start `claude` as the `claude` account, open the sign-in link on any device, paste the code into the session. Needs a claude.ai plan with Remote Control (Team: an Owner turns it on).
+2. GitHub: a fine-grained token for `nimling/gaming-room` only, with Contents and Pull requests set to Read and write, approved by the organisation. Paste it with a hidden prompt, never on screen:
+
+   ```bash
+   read -rs T && printf '%s\n' "$T" | ssh <you>@<server> 'sudo -iu claude gh auth login --with-token'; unset T
+   ```
+
+   Then `gh auth setup-git` as `claude`. The token expires after 90 days.
+

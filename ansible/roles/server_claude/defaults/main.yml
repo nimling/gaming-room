@@ -1,0 +1,7 @@
+---
+# Claude Code on the gaming server (WP7): the orchestrator and tester.
+server_claude_user: claude
+server_claude_repo: https://github.com/nimling/gaming-room.git
+# Start the Remote Control session at boot. Turn on after the first sign-in:
+# the first start asks to trust the folder and to enable Remote Control.
+server_claude_autostart: false
