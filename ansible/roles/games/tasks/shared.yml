@@ -5,7 +5,7 @@
 # Running this again repairs the folder: changed or missing files are copied
 # back, and files that are not on the server are removed.
 # Called once per entry in seat_shared_games, as shared_game.
-- name: "{{ shared_game.name }} | check that the server has a finished install"
+- name: "Shared game | check that the server has a finished install: {{ shared_game.name }}"
   ansible.builtin.command:
     argv: [rsync, --list-only, "{{ seat_gameshare }}/{{ shared_game.name }}/{{ item }}"]
   loop: "{{ shared_game.required }}"
@@ -15,7 +15,7 @@
   # A read-only listing; dry runs need its answer.
   check_mode: false
 
-- name: "{{ shared_game.name }} | say why the game was not copied"
+- name: "Shared game | say why the game was not copied: {{ shared_game.name }}"
   ansible.builtin.debug:
     msg: >-
       {{ seat_gameshare }}/{{ shared_game.name }} is not ready (missing or unreachable:
@@ -24,7 +24,7 @@
   when: shared_game_files.results | selectattr('rc', '!=', 0) | list | length > 0
 
 # In a dry run rsync only lists what it would change.
-- name: "{{ shared_game.name }} | copy the game from the server (repairs it on later runs)"
+- name: "Shared game | copy it from the server (repairs it on later runs): {{ shared_game.name }}"
   ansible.builtin.command:
     argv: >-
       {{ ['rsync', '-rlt', '--delete', '--delete-excluded']
