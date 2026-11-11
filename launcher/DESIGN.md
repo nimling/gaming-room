@@ -29,7 +29,7 @@ The launcher follows **Fluent 2**. It must look modern and be easy to use with k
 1. Home: hero for the selected game with Play, Host LAN game and Join; LAN games on the right; game shelf below.
 2. Launch: the steps the launcher does for you (tier settings, your name, skip intro, start) and the time since Play.
 3. Running: Resume or Quit; the tile shows Running.
-4. Voice: Lobby flyout with who is talking; mute; push to talk on V.
+4. Voice: Lobby flyout with who is talking; mute; push to talk on the mouse side button or V.
 5. End session: one confirmation, then the seat reset, then the nickname screen.
 6. Seat flyout: the tier, with a prototype switch to see how A, B and C change the tuning.
 
