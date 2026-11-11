@@ -194,7 +194,9 @@
       Type=oneshot
       # The headset needs a moment after plug-in before it takes HID commands.
       ExecStartPre=/usr/bin/sleep 2
-      ExecStart=/usr/bin/headsetcontrol -s {{ seat_headset_sidetone }}
+      # "-": a seat with no headset plugged in is fine, not a failed unit.
+      # The udev rule runs this again when one is plugged in.
+      ExecStart=-/usr/bin/headsetcontrol -s {{ seat_headset_sidetone }}
 
 - name: Headsets | run it when a Logitech G431/G432/G433 is plugged in
   ansible.builtin.copy:
