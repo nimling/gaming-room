@@ -3,8 +3,9 @@
 # copies it read-only to /games/classic/mw2 (roles/games). iw4x-seat builds a
 # writable view of that folder in the player's home and starts IW4x with
 # umu-run, so it is "native" here: the script calls Proton itself.
-# Not yet tested on a seat. On the canary, confirm: no first-start dialog,
-# the name and the graphics settings stick, and +connect joins.
+# Tested on the canary up to the main menu (fullscreen 3440x1440). Still to
+# confirm: no welcome dialog with g_firstLaunch 0, the name, sound, the
+# framerate cap and +connect.
 id: iw4x
 name: Modern Warfare 2
 subtitle: IW4x multiplayer, 2009
@@ -29,6 +30,11 @@ launch:
     - "+set"
     - "com_maxfps"
     - "{{ fps_cap }}"
+    # Answers IW4x's "Welcome to IW4x" dialog (menu_first_launch), which
+    # otherwise waits for "I UNDERSTAND" at every session's first start.
+    - "+set"
+    - "g_firstLaunch"
+    - "0"
 # Address, or address:port; IW4x servers listen on 28960 by default.
 join:
   args: ["+connect", "{{ server }}"]

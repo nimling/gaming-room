@@ -1,0 +1,91 @@
+---
+# --- Proton for Windows games -------------------------------------------------
+# umu-run downloads the newest GE-Proton and the Steam Runtime into the
+# player's home when they are missing. The home is reset every session, so
+# each session would fetch about 1 GB again before the game starts. So:
+# - one pinned GE-Proton per seat in /games/runtime, read-only for the player;
+# - the Steam Runtime in /games/runtime/umu (UMU_FOLDERS_PATH), owned by the
+#   player so umu can fetch and update it once; it survives the reset.
+# All seats run the same Proton build, which LAN play needs.
+- name: Proton | create the runtime folder
+  ansible.builtin.file:
+    path: "{{ seat_runtime_root }}"
+    state: directory
+    owner: root
+    group: "{{ seat_games_group }}"
+    mode: "0755"
+
+- name: Proton | create the umu folder for the Steam Runtime
+  ansible.builtin.file:
+    path: "{{ seat_umu_folders }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_games_group }}"
+    mode: "0755"
+
+- name: Proton | look for the pinned build
+  ansible.builtin.stat:
+    path: "{{ seat_runtime_root }}/{{ seat_proton_version }}/proton"
+  register: seat_proton_installed
+
+- name: Proton | create the download cache
+  ansible.builtin.file:
+    path: /var/cache/arcade-proton
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not seat_proton_installed.stat.exists and not seat_in_container
+
+# About 570 MB, once per seat and version.
+- name: Proton | download {{ seat_proton_version }}
+  ansible.builtin.get_url:
+    url: "{{ seat_proton_url }}"
+    dest: "/var/cache/arcade-proton/{{ seat_proton_version }}-x86_64.tar.gz"
+    checksum: "sha256:{{ seat_proton_sha256 }}"
+    mode: "0644"
+    timeout: 120
+  when: not seat_proton_installed.stat.exists and not seat_in_container
+  # In a dry run the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Proton | unpack it into /games/runtime
+  ansible.builtin.unarchive:
+    src: "/var/cache/arcade-proton/{{ seat_proton_version }}-x86_64.tar.gz"
+    dest: "{{ seat_runtime_root }}"
+    remote_src: true
+    owner: root
+    group: "{{ seat_games_group }}"
+    creates: "{{ seat_runtime_root }}/{{ seat_proton_version }}/proton"
+  when: not seat_proton_installed.stat.exists and not seat_in_container
+  # In a dry run the download does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Proton | remove the download once unpacked
+  ansible.builtin.file:
+    path: "/var/cache/arcade-proton/{{ seat_proton_version }}-x86_64.tar.gz"
+    state: absent
+  when: not seat_proton_installed.stat.exists and not seat_in_container
+
+# The player's session reads this (systemd environment.d), so every Proton
+# game started from the launcher uses the shared folders. Proton runs inside
+# the Steam Runtime container, which sees only the home by default: games
+# in /games need it mounted, or their files look missing.
+- name: Proton | create the session environment folder
+  ansible.builtin.file:
+    path: /etc/environment.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Proton | point umu and the runtime container at /games
+  ansible.builtin.copy:
+    dest: /etc/environment.d/60-arcade-proton.conf
+    content: |
+      # Managed by gaming-room Ansible (roles/games).
+      UMU_FOLDERS_PATH={{ seat_umu_folders }}
+      PRESSURE_VESSEL_FILESYSTEMS_RO={{ seat_games_root }}
+    owner: root
+    group: root
+    mode: "0644"

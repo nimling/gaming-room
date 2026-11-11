@@ -103,6 +103,9 @@
   # In a dry run the folder and the download do not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+- name: Proton for Windows games
+  ansible.builtin.include_tasks: proton.yml
+
 - name: MW2 with IW4x, from the gaming server
   ansible.builtin.include_tasks: iw4x.yml
   when: seat_gameshare | length > 0

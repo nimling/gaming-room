@@ -24,6 +24,10 @@ problems=()
 [[ -f $src/iw4x.dll ]] || problems+=("IW4x client is missing: no iw4x.dll in $src")
 [[ -d $src/zone ]] || problems+=("game data is missing: no zone/ folder in $src")
 command -v umu-run >/dev/null || problems+=("umu-run is not installed")
+proton=${PROTONPATH:-$(sed -n "s/^proton:[[:space:]]*//p" /etc/arcade/arcade.yaml 2>/dev/null | head -n 1 || true)}
+if [[ $proton == /* && ! -x $proton/proton ]]; then
+    problems+=("Proton is missing: no $proton/proton")
+fi
 
 if [[ ${1:-} == --check ]]; then
     if [[ -f $src/.iw4x-version ]]; then
@@ -62,10 +66,16 @@ chmod -R u+w "$dir"
 # Same prefix and Proton build as the launcher uses for other Windows games.
 export WINEPREFIX=${WINEPREFIX:-$data/prefixes/iw4x}
 export GAMEID=${GAMEID:-0}
-if [[ -z ${PROTONPATH:-} ]]; then
-    PROTONPATH=$(sed -n "s/^proton:[[:space:]]*//p" /etc/arcade/arcade.yaml 2>/dev/null | head -n 1 || true)
-    export PROTONPATH=${PROTONPATH:-GE-Proton}
-fi
+export PROTONPATH=${proton:-GE-Proton}
+# The session normally sets these (/etc/environment.d/60-arcade-proton.conf).
+# umu keeps the Steam Runtime in /games, not in the home that is reset.
+export UMU_FOLDERS_PATH=${UMU_FOLDERS_PATH:-/games/runtime/umu}
+# Proton runs inside the Steam Runtime container, which does not see /games
+# unless asked; the game folder here links into it.
+case ":${PRESSURE_VESSEL_FILESYSTEMS_RO:-}:" in
+    *:/games:*) ;;
+    *) export PRESSURE_VESSEL_FILESYSTEMS_RO=${PRESSURE_VESSEL_FILESYSTEMS_RO:+$PRESSURE_VESSEL_FILESYSTEMS_RO:}/games ;;
+esac
 mkdir -p "$WINEPREFIX"
 
 cd "$dir"
