@@ -136,6 +136,12 @@ step "Tier detection"
 /usr/local/sbin/seat-tier
 grep -qx '[ABC]' /etc/seat/tier || die "no tier written"
 ok "tier $(cat /etc/seat/tier)"
+# Intel Arc: VRAM only from Vulkan. Recorded on seat-03 (A770 next to a Ryzen iGPU).
+SEAT_TIER_VULKANINFO=tests/container/fixtures/vulkaninfo-arc-a770.txt /usr/local/sbin/seat-tier >/dev/null
+grep -q '"gpu_vendor":"intel"' /etc/seat/hardware.json || die "Arc not detected: $(cat /etc/seat/hardware.json)"
+grep -q '"vram_mib":16288' /etc/seat/hardware.json || die "Arc VRAM wrong: $(cat /etc/seat/hardware.json)"
+ok "Intel Arc VRAM from Vulkan, iGPU ignored"
+/usr/local/sbin/seat-tier >/dev/null
 
 step "Update freeze"
 echo "2999-01-01" > /etc/seat/update-freeze-until

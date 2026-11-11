@@ -3,7 +3,9 @@
 seat_admin_ssh_keys: {{ seat_admin_ssh_keys | to_json }}
 seat_orchestrator_ssh_keys: {{ seat_orchestrator_ssh_keys | to_json }}
 seat_orchestrator_source: {{ seat_orchestrator_source | to_json }}
-seat_extra_ssh_users: {{ seat_extra_ssh_users | to_json }}
+# The account a first run logs in with is only allowed for that run; pull
+# runs must not bring it back.
+seat_extra_ssh_users: {{ seat_extra_ssh_users | difference([ansible_user | default('')]) | to_json }}
 seat_admin_password_hash: {{ seat_admin_password_hash | default('') | to_json }}
 seat_tier_override: {{ seat_tier_override | to_json }}
 seat_update_freeze_until: {{ seat_update_freeze_until | to_json }}
