@@ -59,6 +59,10 @@ seat_pull_calendar: "*-*-* 03:30"
 # follows does not yet have changes that were pushed to it from elsewhere.
 seat_pull_enabled: true
 
+# OpenRA Red Alert content (roles/games): OpenRA's Quick Install package
+seat_openra_ra_mirrors: https://www.openra.net/packages/ra-quickinstall-mirrors.txt
+seat_openra_ra_sha1: 44241f68e69db9511db82cf83c174737ccda300b
+
 # Launcher (roles/launcher)
 arcade_source_branch: "{{ seat_config_branch }}"
 arcade_build_root: /var/cache/arcade

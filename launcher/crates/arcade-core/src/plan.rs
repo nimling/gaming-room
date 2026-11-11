@@ -12,8 +12,11 @@ use minijinja::{context, Environment, UndefinedBehavior};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "server", rename_all = "lowercase")]
@@ -355,6 +358,9 @@ pub fn spawn(plan: &Plan) -> Result<Child> {
         }
         cmd.current_dir(dir);
     }
+    // Own process group: wrappers such as openra-ra start the real game as
+    // a child, and stopping only the wrapper would leave the game running.
+    cmd.process_group(0);
     cmd.spawn()
         .with_context(|| format!("starting {}", plan.program))
 }
@@ -378,6 +384,35 @@ pub fn shell_line(plan: &Plan) -> String {
         .chain(plan.args.iter().map(|a| quote(a)))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Sends a signal to a game's whole process group. True if any process got it.
+fn signal_group(child: &Child, signal: &str) -> bool {
+    Command::new("kill")
+        .args([signal, "--", &format!("-{}", child.id())])
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// True while the game, or anything it started, is still running.
+pub fn alive(child: &mut Child) -> bool {
+    matches!(child.try_wait(), Ok(None)) || signal_group(child, "-0")
+}
+
+/// Stops a game and everything it started: SIGTERM to the process group,
+/// up to three seconds to close, then SIGKILL for whatever is left.
+pub fn stop(child: &mut Child) {
+    signal_group(child, "-TERM");
+    for _ in 0..30 {
+        if !alive(child) {
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    if alive(child) {
+        signal_group(child, "-KILL");
+    }
+    let _ = child.wait();
 }
 
 #[cfg(test)]
@@ -568,5 +603,29 @@ profiles:
             fs::read_to_string(home.path().join("fake/game.ini")).unwrap(),
             "[Player]\nName=Kaptein\n"
         );
+    }
+
+    #[test]
+    fn stop_ends_the_whole_game_not_just_the_wrapper() {
+        let home = tempfile::tempdir().unwrap();
+        let yaml = r#"
+id: wrapper
+name: Wrapper game
+runtime: native
+gamemode: false
+players: { min: 1, max: 2 }
+launch: { command: ["sh", "-c", "sleep 300 & sleep 300"] }
+profiles:
+  A: { resolution: native, fps_cap: 60 }
+  B: { resolution: native, fps_cap: 60 }
+  C: { resolution: native, fps_cap: 60 }
+"#;
+        let (m, s, c) = (manifest(yaml), seat(home.path()), Config::default());
+        let p = build(&req(&m, &s, &c, Mode::Play)).unwrap();
+        let mut child = spawn(&p).unwrap();
+        thread::sleep(Duration::from_millis(300));
+        assert!(alive(&mut child));
+        stop(&mut child);
+        assert!(!alive(&mut child), "a process of the game survived stop()");
     }
 }

@@ -139,3 +139,20 @@
     owner: "{{ seat_player_user }}"
     group: "{{ seat_player_user }}"
     mode: "0644"
+
+- name: OpenRA | create its settings folder in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/.config/openra"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+
+- name: OpenRA | use the shared Red Alert content in /games (no install dialog)
+  ansible.builtin.file:
+    src: "{{ seat_games_root }}/openra/Content"
+    dest: "/home/.golden/{{ seat_player_user }}/.config/openra/Content"
+    state: link
+    force: true
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"

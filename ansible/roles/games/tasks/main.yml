@@ -41,3 +41,64 @@
     owner: root
     group: "{{ seat_games_group }}"
     mode: "0755"
+
+# --- OpenRA: Red Alert content ----------------------------------------------
+# OpenRA needs Red Alert's artwork and audio. EA released them as freeware in
+# 2008; OpenRA's "Quick Install" fetches that package and asks first, which
+# is a dialog, and it would land in the player's home and vanish at reset.
+# So each seat fetches it once into /games, checked against OpenRA's SHA1,
+# and the golden home links the player's OpenRA content to it (launcher role).
+- name: OpenRA | look for the installed engine
+  ansible.builtin.stat:
+    path: /usr/lib/openra/mods/ra-content/installer/downloads.yaml
+  register: openra_installed
+
+- name: OpenRA | create the shared content folder
+  ansible.builtin.file:
+    path: "{{ seat_games_root }}/openra/Content/ra/v2"
+    state: directory
+    owner: root
+    group: "{{ seat_games_group }}"
+    mode: "0755"
+  when: openra_installed.stat.exists
+
+- name: OpenRA | check for the Red Alert content
+  ansible.builtin.stat:
+    path: "{{ seat_games_root }}/openra/Content/ra/v2/allies.mix"
+  register: openra_ra_content
+  when: openra_installed.stat.exists
+
+- name: OpenRA | install unzip
+  community.general.pacman:
+    name: unzip
+    state: present
+  when: openra_installed.stat.exists
+
+- name: OpenRA | read the download mirrors
+  ansible.builtin.uri:
+    url: "{{ seat_openra_ra_mirrors }}"
+    return_content: true
+  register: openra_ra_mirrors
+  # A read-only GET; dry runs need its answer for the next task.
+  check_mode: false
+  when: openra_installed.stat.exists and not openra_ra_content.stat.exists
+
+- name: OpenRA | download the free Red Alert package
+  ansible.builtin.get_url:
+    url: "{{ openra_ra_mirrors.content.splitlines() | map('trim') | select | first }}"
+    dest: /var/cache/openra-ra-quickinstall.zip
+    checksum: "sha1:{{ seat_openra_ra_sha1 }}"
+    mode: "0644"
+  when: openra_installed.stat.exists and not openra_ra_content.stat.exists
+
+- name: OpenRA | unpack it into /games/openra
+  ansible.builtin.unarchive:
+    src: /var/cache/openra-ra-quickinstall.zip
+    dest: "{{ seat_games_root }}/openra/Content/ra/v2"
+    remote_src: true
+    owner: root
+    group: "{{ seat_games_group }}"
+    creates: "{{ seat_games_root }}/openra/Content/ra/v2/allies.mix"
+  when: openra_installed.stat.exists and not openra_ra_content.stat.exists
+  # In a dry run the folder and the download do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"

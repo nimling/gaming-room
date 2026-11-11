@@ -107,8 +107,7 @@ fn launch(
 
 fn stop_game(app: &Arcade) {
     if let Some((_, mut child)) = app.game.lock().unwrap_or_else(|e| e.into_inner()).take() {
-        let _ = child.kill();
-        let _ = child.wait();
+        plan::stop(&mut child);
     }
 }
 
@@ -122,7 +121,7 @@ fn quit(app: State<'_, Arcade>) {
 fn running(app: State<'_, Arcade>) -> Option<String> {
     let mut game = app.game.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((id, child)) = game.as_mut() {
-        if let Ok(None) = child.try_wait() {
+        if plan::alive(child) {
             return Some(id.clone());
         }
     }
