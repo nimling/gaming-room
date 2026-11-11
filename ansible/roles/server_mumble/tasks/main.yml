@@ -24,3 +24,5 @@
     state: present
     pull: missing
   when: not server_in_container
+  # In a dry run of a fresh server Docker is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"

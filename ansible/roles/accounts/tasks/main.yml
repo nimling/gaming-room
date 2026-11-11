@@ -20,6 +20,8 @@
     key: "{{ item }}"
     state: present
   loop: "{{ seat_admin_ssh_keys }}"
+  # In a dry run of a fresh seat the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 # orchestrator: for Ansible and Claude on the gaming server. Key only.
 - name: Create orchestrator account
@@ -35,6 +37,8 @@
     key: "{{ item }}"
     state: present
   loop: "{{ seat_orchestrator_ssh_keys }}"
+  # In a dry run of a fresh seat the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Let orchestrator run Ansible as root without a password
   ansible.builtin.copy:

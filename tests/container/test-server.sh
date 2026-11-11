@@ -64,6 +64,7 @@ grep -qx 'LANCACHE_IP=192.0.2.10' /srv/gaming-room/lancache/.env || die "Lancach
 grep -qx 'UPSTREAM_DNS=192.0.2.1' /srv/gaming-room/lancache/.env || die "upstream DNS"
 [[ $(stat -c %u /srv/gaming-room/mumble/data) == 10000 ]] || die "Mumble data folder owner"
 grep -q 'PasswordAuthentication no' /etc/ssh/sshd_config.d/10-gaming-room.conf || die "sshd hardening"
+grep -qx 'HandleLidSwitch=ignore' /etc/systemd/logind.conf.d/10-gaming-room.conf || die "lid switch"
 ok "compose files, settings and sshd"
 
 step "wake-seats"

@@ -58,12 +58,36 @@
   ansible.builtin.command: sshd -t
   changed_when: false
 
+- name: Create the logind drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/logind.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Keep running when a laptop lid closes
+  ansible.builtin.copy:
+    dest: /etc/systemd/logind.conf.d/10-gaming-room.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible: the server may be a laptop.
+      [Login]
+      HandleLidSwitch=ignore
+      HandleLidSwitchExternalPower=ignore
+      HandleLidSwitchDocked=ignore
+  notify: Reload logind
+
 - name: Start Docker at boot
   ansible.builtin.systemd_service:
     name: docker.service
     enabled: true
     state: started
   when: not server_in_container
+  # In a dry run of a fresh server Docker is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Create the services folder
   ansible.builtin.file:

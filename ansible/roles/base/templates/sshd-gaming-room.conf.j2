@@ -2,5 +2,6 @@
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
-AllowUsers {{ seat_admin_user }} {{ seat_orchestrator_user }}{% if seat_orchestrator_source %}@{{ seat_orchestrator_source }}{% endif %}{% for user in seat_extra_ssh_users %} {{ user }}{% endfor %}
+{% set sources = ([seat_orchestrator_source] if seat_orchestrator_source is string else seat_orchestrator_source) | select | list %}
+AllowUsers {{ seat_admin_user }}{% if sources %}{% for source in sources %} {{ seat_orchestrator_user }}@{{ source }}{% endfor %}{% else %} {{ seat_orchestrator_user }}{% endif %}{% for user in seat_extra_ssh_users %} {{ user }}{% endfor %}
 

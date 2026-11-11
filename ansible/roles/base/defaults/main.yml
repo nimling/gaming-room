@@ -11,9 +11,13 @@ seat_games_group: games
 seat_admin_ssh_keys: []
 seat_orchestrator_ssh_keys: []
 
-# Address or CIDR the orchestrator may log in from (the gaming server).
+# Addresses or CIDRs the orchestrator may log in from: the server, and for
+# now the Mac that drives Ansible. A single string also works.
 # Empty = no address restriction; set it before go-live.
-seat_orchestrator_source: ""
+seat_orchestrator_source: []
+# Temporary sudo rules to delete at the end of a run, for example the one
+# that let the installer's user run the very first run.
+seat_temporary_sudoers: []
 
 # Extra users still allowed to SSH in, e.g. during migration.
 seat_extra_ssh_users: []
@@ -51,3 +55,6 @@ seat_update_keep_snapshots: 3
 seat_config_repo: https://github.com/nimling/gaming-room.git
 seat_config_branch: stable     # the canary group overrides this with main
 seat_pull_calendar: "*-*-* 03:30"
+# Set false to keep the pull timer off, for example while the branch a seat
+# follows does not yet have changes that were pushed to it from elsewhere.
+seat_pull_enabled: true

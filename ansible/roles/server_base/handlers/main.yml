@@ -4,3 +4,8 @@
     name: ssh.service
     state: reloaded
   when: not server_in_container
+
+- name: Reload logind
+  ansible.builtin.command: systemctl kill --signal=HUP systemd-logind.service
+  changed_when: true
+  when: not server_in_container
