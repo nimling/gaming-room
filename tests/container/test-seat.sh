@@ -68,6 +68,9 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+[[ $(readlink /home/.golden/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam games would land in the home"
+[[ $(stat -c '%U %a' /games/steam/steamapps) == "player 2775" ]] || die "player cannot install into /games/steam/steamapps"
+ok "Steam installs games into /games"
 grep -qx 'proton: /games/runtime/GE-Proton[0-9-]*-x86_64' /etc/arcade/arcade.yaml || die "launcher Proton path: $(cat /etc/arcade/arcade.yaml)"
 grep -qx 'UMU_FOLDERS_PATH=/games/runtime/umu' /etc/environment.d/60-arcade-proton.conf || die "umu folders"
 grep -qx 'PRESSURE_VESSEL_FILESYSTEMS_RO=/games' /etc/environment.d/60-arcade-proton.conf || die "runtime container cannot see /games"
@@ -121,8 +124,18 @@ ok "capture refused"
 step "End session"
 /usr/local/sbin/seat-reset session
 [[ ! -e /home/player/saved-game.txt ]] || die "player files survived"
+[[ ! -e /games/steam/steamapps/compatdata/12345 ]] || die "Proton prefix survived the reset"
+[[ ! -e /home/player/.local/share/Steam/config/loginusers.vdf ]] || die "Steam login survived the reset"
+[[ $(readlink /home/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam library link missing after reset"
+# A game installed in this session, through the link, lands in /games and
+# survives the next End session.
+runuser -u player -- mkdir -p /home/player/.local/share/Steam/steamapps/common/SomeGame
+runuser -u player -- touch /home/player/.local/share/Steam/steamapps/appmanifest_12345.acf
+[[ -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game did not land in /games"
+/usr/local/sbin/seat-reset session
+[[ -d /games/steam/steamapps/common/SomeGame && -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game deleted by the reset"
 btrfs subvolume show /home/player >/dev/null || die "home is no longer a subvolume"
-ok "home replaced"
+ok "home replaced; Steam games kept, Steam login and Proton prefixes gone"
 
 step "Gate: token leak"
 bash tests/gates/token-leak.sh
