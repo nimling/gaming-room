@@ -80,6 +80,8 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+for prog in openttd teeworlds xonotic-sdl; do command -v "$prog" >/dev/null || die "$prog not installed"; done
+ok "free LAN games installed"
 [[ $(readlink /home/.golden/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam games would land in the home"
 [[ $(stat -c '%U %a' /games/steam/steamapps) == "player 2775" ]] || die "player cannot install into /games/steam/steamapps"
 ok "Steam installs games into /games"

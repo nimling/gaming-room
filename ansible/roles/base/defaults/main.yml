@@ -72,6 +72,15 @@ seat_pull_enabled: true
 seat_openra_ra_mirrors: https://www.openra.net/packages/ra-quickinstall-mirrors.txt
 seat_openra_ra_sha1: 44241f68e69db9511db82cf83c174737ccda300b
 
+# Free LAN games from the CachyOS/Arch repos (roles/games), one manifest each
+# in games/. Empty skips them.
+seat_free_games:
+  - openttd
+  - openttd-opengfx
+  - openttd-opensfx
+  - teeworlds
+  - xonotic
+
 # Shared game files on the gaming server (roles/server_gameshare), as an
 # rsync URL such as rsync://gaming-server/games. Private inventory.
 # Empty: games from the share (MW2 with IW4x) are skipped.

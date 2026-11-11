@@ -1,0 +1,34 @@
+# Xonotic: free, fast arena shooter (GPL), native. CachyOS package xonotic.
+# Every setting goes on the command line, so the fresh home needs no file.
+# To check on the canary: no first-start screen, the nickname, fullscreen.
+id: xonotic
+name: Xonotic
+subtitle: Fast arena shooter, free and open source
+group: classic
+runtime: native
+engine: Darkplaces
+players: { min: 2, max: 24 }
+launch:
+  command: ["xonotic-sdl"]
+  args:
+    - "+_cl_name"
+    - "{{ nickname }}"
+    - "+vid_fullscreen"
+    - "1"
+    - "+vid_width"
+    - "{{ width }}"
+    - "+vid_height"
+    - "{{ height }}"
+    - "+cl_maxfps"
+    - "{{ fps_cap }}"
+# Address, or address:port; servers listen on 26000 by default.
+join:
+  args: ["+connect", "{{ server }}"]
+host:
+  map: stormkeep
+  args: ["+maxplayers", "16", "+map", "{{ map }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 120 }
+art: { hue: 205, glow: 190, motif: streaks }
