@@ -1,9 +1,12 @@
 # Managed by gaming-room Ansible (roles/server_pccafe).
-# Windows VM for the Steam PC Café Server. Web viewer: http://<container address>:8006
+# Windows VM for the Steam PC Café Server. Web viewer: http://<server>:8006
 services:
   windows:
     image: {{ pccafe_image }}
     container_name: pccafe
+    # Host network: the VM's NIC is the tap on {{ pccafe_bridge }}, not a
+    # container network. Windows gets its address from the router.
+    network_mode: host
     environment:
       VERSION: "{{ pccafe_windows_version }}"
       RAM_SIZE: "{{ pccafe_ram }}"
@@ -11,32 +14,15 @@ services:
       DISK_SIZE: "{{ pccafe_disk }}"
       USERNAME: "{{ pccafe_windows_user }}"
       PASSWORD: "{{ pccafe_password.content | default('') | b64decode | trim }}"
-      # Windows asks the router for its own address on the gaming VLAN.
-      DHCP: "Y"
+      # dockur sets up no network; the NIC comes from ARGUMENTS.
+      NETWORK: "N"
+      ARGUMENTS: "-netdev tap,id=hostnet0,ifname={{ pccafe_tap }},script=no,downscript=no -device {{ pccafe_adapter }},id=net0,netdev=hostnet0,mac={{ pccafe_mac }}"
     devices:
       - /dev/kvm
       - /dev/net/tun
-      - /dev/vhost-net
-    device_cgroup_rules:
-      - "c *:* rwm"
-    cap_add:
-      - NET_ADMIN
     volumes:
       - ./storage:/storage
       - ./shared:/shared
       - ./oem:/oem
-    networks:
-      vlan: {}
     stop_grace_period: 2m
     restart: unless-stopped
-
-networks:
-  vlan:
-    driver: macvlan
-    driver_opts:
-      parent: {{ pccafe_parent_nic }}
-    ipam:
-      config:
-        - subnet: {{ pccafe_subnet }}
-          gateway: {{ pccafe_gateway }}
-          ip_range: {{ pccafe_ip_range }}

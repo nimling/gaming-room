@@ -2,8 +2,8 @@
 # Steam PC Café Server spike (docs/scope.md, "Steam PC Café").
 # Valve's café server runs on Windows only, so it runs in a Windows VM
 # (dockur/windows, KVM) on this server. The VM joins the gaming VLAN on its
-# own address (macvlan, DHCP from the router), because seats find the café
-# server by UDP broadcast on 27036 and connect to it on TCP 27037.
+# own address (DHCP from the router), because seats find the café server by
+# UDP broadcast on 27036 and connect to it on TCP 27037.
 # Off by default; switch it on in the private inventory.
 pccafe_enabled: false
 # Pinned image (Docker Hub dockurr/windows).
@@ -15,13 +15,22 @@ pccafe_ram: 4G
 pccafe_cpus: "2"
 pccafe_disk: 64G
 pccafe_dir: "{{ server_root }}/pccafe"
-# NIC on the gaming VLAN that the macvlan network hangs off.
-pccafe_parent_nic: "{{ ansible_default_ipv4.interface }}"
-pccafe_subnet: "{{ server_vlan_cidr }}"
-pccafe_gateway: "{{ ansible_default_ipv4.gateway }}"
-# A few addresses OUTSIDE the router's DHCP pool for the container itself,
-# for example 192.0.2.248/30. Required when pccafe_enabled; private inventory.
-pccafe_ip_range: ""
-# Windows login for the VM (web viewer on port 8006, or RDP). The password is
+# Network. The server's NIC joins a bridge, and the VM's NIC is a tap on that
+# bridge, so Windows is on the VLAN like a seat. macvlan was tried first:
+# QEMU's macvtap path stopped carrying the guest's traffic once Windows'
+# driver took over (virtio-net hung at boot, e1000e got no DHCP).
+pccafe_bridge: br0
+# The physical NIC on the gaming VLAN, for example enp2s0. Required when
+# pccafe_enabled; private inventory. (After the switch the default route is
+# on the bridge, so facts can't tell which NIC it is.)
+pccafe_bridge_nic: ""
+pccafe_tap: tap-cafe
+pccafe_adapter: virtio-net-pci
+# A locally administered MAC for the VM, stable per server, so the router
+# keeps giving Windows the same address.
+pccafe_mac: >-
+  {{ (['02'] + ((inventory_hostname ~ '-pccafe') | hash('md5')
+     | batch(2) | map('join') | list)[:5]) | join(':') }}
+# Windows login for the VM (web viewer on <server>:8006, or RDP). The password is
 # made on the server and kept in {{ pccafe_dir }}/windows-password (root only).
 pccafe_windows_user: cafe

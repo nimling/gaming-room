@@ -5,7 +5,3 @@ rem Runs once, at the end of the Windows install (dockur copies it to C:\OEM).
 rem Seats find the cafe server by UDP broadcast on 27036 and connect on TCP 27037.
 netsh advfirewall firewall add rule name="Steam PC Cafe discovery" dir=in action=allow protocol=UDP localport=27036
 netsh advfirewall firewall add rule name="Steam PC Cafe clients" dir=in action=allow protocol=TCP localport=27037
-
-rem macvlan: the VM cannot reach the gaming server's own address, so it must
-rem not use the gaming server for DNS. Use the VLAN gateway instead.
-powershell -NoProfile -Command "Get-NetAdapter | Where-Object Status -eq 'Up' | Set-DnsClientServerAddress -ServerAddresses '{{ pccafe_gateway }}'"
