@@ -2,6 +2,10 @@
 # Shared game files for the seats, served read-only over rsync on the gaming
 # VLAN. Seats copy from here (roles/games) at boot and nightly.
 gameshare_root: /srv/games
+# Owner of the share, so a person can copy game files in. Set it to the
+# person account in the private inventory: the default (the account that runs
+# the playbook) differs between the Mac and the server's claude account.
+gameshare_owner: "{{ server_login_user }}"
 gameshare_module: games
 gameshare_port: 873
 # Seats sync at the same time after Wake-on-LAN; this caps the load.
@@ -16,9 +20,10 @@ iw4x_dir: "{{ gameshare_root }}/mw2"
 # seats pick it up at their next pull.
 iw4x_client_version: r5083
 iw4x_rawfiles_version: v0.2.36
-# sha256 of iw4x.dll for the pinned version. Empty skips the check; fill it
-# in after the first download (sha256sum /var/cache/iw4x/iw4x-*.dll).
-iw4x_client_sha256: ""
+# sha256 of each pinned download. Required: iw4x.dll runs on every seat.
+# GitHub lists them per release asset:
+#   gh api repos/iw4x/iw4x-client/releases/tags/<version> --jq '.assets[] | {name, digest}'
+iw4x_client_sha256: 50f3250e69bc970bcb17dd22c0b2a00299892ebc5bb4780ba37aeaf6319c31fc
 iw4x_rawfiles_sha256: 1e80420c02397e872e02581d3a083b31db99c443a8449267c8a2108bff6e2260
 iw4x_client_url: "https://github.com/iw4x/iw4x-client/releases/download/{{ iw4x_client_version }}/iw4x.dll"
 iw4x_rawfiles_url: "https://github.com/iw4x/iw4x-rawfiles/releases/download/{{ iw4x_rawfiles_version }}/release.zip"
