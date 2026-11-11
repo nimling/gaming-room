@@ -15,6 +15,10 @@ seat_orchestrator_ssh_keys: []
 # now the Mac that drives Ansible. A single string also works.
 # Empty = no address restriction; set it before go-live.
 seat_orchestrator_source: []
+# The gaming VLAN, allowed through the seat firewall so LAN games work (one
+# seat hosts, the others join). Defaults to the seat's own subnet. Empty
+# turns the rule off.
+seat_lan_cidr: "{{ ansible_default_ipv4.network | default('') }}{{ ('/' ~ ansible_default_ipv4.prefix) if ansible_default_ipv4.prefix is defined else '' }}"
 # Temporary sudo rules to delete at the end of a run, for example the one
 # bootstrap/seat.sh adds so the installer's user can do the very first run.
 # Deleting a file that is not there is a no-op, so this stays on for all seats.
