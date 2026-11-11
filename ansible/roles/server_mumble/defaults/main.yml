@@ -2,7 +2,7 @@
 mumble_image: mumblevoip/mumble-server:latest
 # The root channel's name. Seats join it with mumble://<nick>@<server>/
 mumble_root_name: Lobby
-mumble_welcome: "Welcome to the gaming room. Push to talk is V."
+mumble_welcome: "Welcome to the gaming room. Push to talk: mouse side button or V."
 mumble_max_users: 30
 # Bits per second per person. 72000 is Mumble's top quality; the VLAN has room.
 mumble_bandwidth: 72000

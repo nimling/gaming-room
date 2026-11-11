@@ -445,7 +445,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 
   <footer class="statusbar">
     <button class="btn subtle mic" id="mic" data-action="mute" aria-pressed="false" title="Mute or unmute">
-      <span id="mic-ico"></span><span id="mic-label">Hold <kbd>V</kbd> to talk</span>
+      <span id="mic-ico"></span><span id="mic-label">Hold <kbd>Side button</kbd> or <kbd>V</kbd> to talk</span>
     </button>
     <button class="voice" data-fly="voice" aria-haspopup="dialog">
       <i class="dot"></i><span id="voice-text">Lobby · <b id="voice-n">7</b> people</span><span class="talker" id="talker"></span>
@@ -489,7 +489,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   <div class="stack">
     <button class="btn" data-action="mute" id="fly-mute">Mute my mic</button>
   </div>
-  <p class="fine">Push to talk is <kbd>V</kbd> everywhere, also inside games.</p>
+  <p class="fine">Push to talk: hold the mouse side button or <kbd>V</kbd>. It works everywhere, also inside games.</p>
 </div>
 
 <div class="flyout" id="fly-me" role="dialog" aria-label="You" data-modal="false" hidden>
@@ -828,7 +828,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     m.classList.toggle('muted', state.muted); m.classList.toggle('live', !!live && !state.muted);
     m.setAttribute('aria-pressed', String(state.muted));
     $('#mic-ico').innerHTML = ico(state.muted ? 'micoff' : 'mic', 's16');
-    $('#mic-label').innerHTML = state.muted ? 'Muted' : live ? 'Talking' : 'Hold <kbd>V</kbd> to talk';
+    $('#mic-label').innerHTML = state.muted ? 'Muted' : live ? 'Talking' : 'Hold <kbd>Side button</kbd> or <kbd>V</kbd> to talk';
     $('#fly-mute').textContent = state.muted ? 'Unmute my mic' : 'Mute my mic';
   }
   function renderTier() {
