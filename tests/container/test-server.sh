@@ -86,7 +86,8 @@ grep -q '^User=ut99server$' "$unit" || die "UT99 server does not run as ut99serv
 grep -qF 'ucc-bin server "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM" port=7777' "$unit" || die "UT99 server command"
 grep -q '^ReadWritePaths=/var/lib/ut99-server$' "$unit" || die "UT99 server can write outside its home"
 grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/var/lib/ut99-server/.utpg/System/User.ini' "$unit" || die "UT99 server settings not in its home"
-{ command -v 7z && command -v bzip2; } >/dev/null || die "7z or bzip2 missing"
+{ command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
+command -v bzip2 >/dev/null || die "bzip2 missing"
 ok "build script, tools and dedicated server unit"
 
 step "Claude on the server"

@@ -17,6 +17,7 @@
     mode: "0755"
 
 - name: UT99 | download the GOTY CD (650 MB)
+  when: ut99_build
   block:
     - name: UT99 | download the GOTY CD from OldUnreal
       ansible.builtin.get_url:
@@ -35,7 +36,6 @@
         timeout: 120
       # In a dry run of a fresh server the cache folder does not exist yet.
       ignore_errors: "{{ ansible_check_mode }}"
-  when: ut99_build
 
 - name: UT99 | download Bonus Pack 4
   ansible.builtin.get_url:
