@@ -16,8 +16,9 @@ seat_orchestrator_ssh_keys: []
 # Empty = no address restriction; set it before go-live.
 seat_orchestrator_source: []
 # Temporary sudo rules to delete at the end of a run, for example the one
-# that let the installer's user run the very first run.
-seat_temporary_sudoers: []
+# bootstrap/seat.sh adds so the installer's user can do the very first run.
+# Deleting a file that is not there is a no-op, so this stays on for all seats.
+seat_temporary_sudoers: ["/etc/sudoers.d/90-seat-bootstrap"]
 
 # Extra users still allowed to SSH in, e.g. during migration.
 seat_extra_ssh_users: []

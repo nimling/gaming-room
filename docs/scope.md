@@ -71,7 +71,7 @@ Each seat is identical and disposable; everything shared lives on one server on 
     - `player`: no `wheel`, no `sudo`, auto-login via SDDM. A polkit rule allows shutdown and reboot only.
     - `orchestrator`: SSH key from the server only; used by Ansible and Claude.
 - **Hardware tiers:** a boot script reads GPU, RAM and display and writes the tier (A, B or C) to `/etc/seat/tier`. CachyOS's `chwd` keeps choosing drivers.
-- **Disk layout (btrfs):** `/home/player` is its own subvolume, reset from a golden snapshot. `/games` is its own subvolume and is kept: Steam library in `/games/steam`, classic games read-only in `/games/classic`.
+- **Disk layout (btrfs where possible):** `/home/player` is its own subvolume, reset from a golden snapshot. All ten seats were installed on ext4 instead (found during rollout, November 2026), so resets copy the golden home: about 1.2 s on seat-01. Switch to btrfs only at a reinstall. `/games` is its own subvolume and is kept: Steam library in `/games/steam`, classic games read-only in `/games/classic`.
 - **Updates on our schedule:** updates run only from the playbook in a set window. The canary seat goes first; the rest follow a day later. A btrfs snapshot is taken before every update. No updates in the 48 h before a game night.
 - **Power:** Wake-on-LAN, so the server can start all seats before a session.
 

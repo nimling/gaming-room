@@ -41,11 +41,11 @@ seat_in_container: true
 seat_admin_ssh_keys: ["$key"]
 seat_orchestrator_ssh_keys: ["$key"]
 seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
-seat_temporary_sudoers: ["/etc/sudoers.d/90-installer"]
 arcade_voice_server: "192.0.2.10"
 seat_display: "3440x1440@144"
 EOF
-echo 'installer ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/90-installer
+# What bootstrap/seat.sh leaves behind; the default seat_temporary_sudoers removes it.
+echo 'installer ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/90-seat-bootstrap
 printf '[Autologin]\nSession=plasma\n' >/etc/plasmalogin.conf
 mkdir -p /etc/skel/.config/autostart && printf '[Desktop Entry]\nName=Hello\n' >/etc/skel/.config/autostart/cachyos-hello.desktop
 run_playbook() {
@@ -55,7 +55,7 @@ run_playbook
 ok "first run"
 allow=$(grep '^AllowUsers' /etc/ssh/sshd_config.d/10-gaming-room.conf)
 [[ $allow == "AllowUsers admin orchestrator@192.0.2.10 orchestrator@198.51.100.20" ]] || die "wrong $allow"
-[[ ! -e /etc/sudoers.d/90-installer ]] || die "temporary sudo rule left behind"
+[[ ! -e /etc/sudoers.d/90-seat-bootstrap ]] || die "temporary sudo rule left behind"
 [[ -e /etc/sudoers.d/10-orchestrator ]] || die "orchestrator sudo rule missing"
 ok "orchestrator sources and temporary sudo rule"
 grep -qx 'User=player' /etc/plasmalogin.conf || die "Plasma Login Manager auto-login: $(cat /etc/plasmalogin.conf)"
@@ -136,6 +136,12 @@ step "Tier detection"
 /usr/local/sbin/seat-tier
 grep -qx '[ABC]' /etc/seat/tier || die "no tier written"
 ok "tier $(cat /etc/seat/tier)"
+# Intel Arc: VRAM only from Vulkan. Recorded on seat-03 (A770 next to a Ryzen iGPU).
+SEAT_TIER_VULKANINFO=tests/container/fixtures/vulkaninfo-arc-a770.txt /usr/local/sbin/seat-tier >/dev/null
+grep -q '"gpu_vendor":"intel"' /etc/seat/hardware.json || die "Arc not detected: $(cat /etc/seat/hardware.json)"
+grep -q '"vram_mib":16288' /etc/seat/hardware.json || die "Arc VRAM wrong: $(cat /etc/seat/hardware.json)"
+ok "Intel Arc VRAM from Vulkan, iGPU ignored"
+/usr/local/sbin/seat-tier >/dev/null
 
 step "Update freeze"
 echo "2999-01-01" > /etc/seat/update-freeze-until

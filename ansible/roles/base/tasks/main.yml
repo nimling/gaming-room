@@ -47,10 +47,11 @@
     group: root
     mode: "0644"
 
-- name: First run | reboot if the running kernel was replaced
-  ansible.builtin.reboot:
-    msg: "gaming-room: rebooting into the updated kernel"
-    reboot_timeout: 900
+# The reboot itself runs at the end of the play (seat.yml post_tasks), so the
+# auto-login and session settings are in place when the seat comes back.
+- name: First run | remember to reboot into the updated kernel at the end
+  ansible.builtin.set_fact:
+    seat_reboot_needed: true
   when:
     - seat_first_update is not skipped
     - not seat_first_update.stat.exists
@@ -110,6 +111,20 @@
     group: root
     mode: "0644"
   notify: Reload sshd
+
+- name: Look for ufw (CachyOS turns it on and drops SSH)
+  ansible.builtin.stat:
+    path: /usr/bin/ufw
+  register: seat_ufw
+
+- name: Firewall | allow SSH from the orchestrator's addresses
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ (([seat_orchestrator_source] if seat_orchestrator_source is string else seat_orchestrator_source) | select | list) or ['any'] }}"
+  when: seat_ufw.stat.exists and not seat_in_container
 
 - name: Check sshd config before any reload
   ansible.builtin.command: sshd -t

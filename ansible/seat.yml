@@ -23,6 +23,13 @@
     - pull
 
   post_tasks:
+    # Before the sudo rules go: the first run may still need one to reboot.
+    - name: Reboot into the updated kernel (first run only)
+      ansible.builtin.reboot:
+        msg: "gaming-room: rebooting into the updated kernel"
+        reboot_timeout: 900
+      when: seat_reboot_needed | default(false)
+
     # Last on purpose: the run itself may be using one of these rules.
     - name: Remove temporary sudo rules
       ansible.builtin.file:

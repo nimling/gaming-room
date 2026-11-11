@@ -1,0 +1,48 @@
+GPU0:
+VkPhysicalDeviceProperties:
+---------------------------
+	apiVersion        = 1.4.311
+	vendorID          = 0x1002
+	deviceType        = PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+	deviceName        = AMD Ryzen 7 7700X 8-Core Processor (RADV RAPHAEL_MENDOCINO)
+
+VkPhysicalDeviceMemoryProperties:
+=================================
+memoryHeaps: count = 2
+	memoryHeaps[0]:
+		size   = 22548578304 (0x540000000) (21.00 GiB)
+		budget = 22548578304 (0x540000000) (21.00 GiB)
+		usage  = 0 (0x00000000) (0.00 B)
+		flags: count = 1
+			MEMORY_HEAP_DEVICE_LOCAL_BIT
+	memoryHeaps[1]:
+		size   = 536870912 (0x20000000) (512.00 MiB)
+		flags: count = 1
+			MEMORY_HEAP_DEVICE_LOCAL_BIT
+memoryTypes: count = 1
+	memoryTypes[0]:
+		heapIndex     = 0
+
+GPU1:
+VkPhysicalDeviceProperties:
+---------------------------
+	apiVersion        = 1.4.311
+	vendorID          = 0x8086
+	deviceType        = PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+	deviceName        = Intel(R) Arc(tm) A770 Graphics (DG2)
+
+VkPhysicalDeviceMemoryProperties:
+=================================
+memoryHeaps: count = 2
+	memoryHeaps[0]:
+		size   = 17079205888 (0x3fa000000) (15.91 GiB)
+		budget = 17079205888 (0x3fa000000) (15.91 GiB)
+		usage  = 0 (0x00000000) (0.00 B)
+		flags: count = 1
+			MEMORY_HEAP_DEVICE_LOCAL_BIT
+	memoryHeaps[1]:
+		size   = 33554432000 (0x7d0000000) (31.25 GiB)
+		flags: count = None
+memoryTypes: count = 1
+	memoryTypes[0]:
+		heapIndex     = 0

@@ -1,4 +1,9 @@
 ---
+- name: Install vulkaninfo (the only dependable VRAM figure for Intel Arc)
+  community.general.pacman:
+    name: vulkan-tools
+    state: present
+
 - name: Install seat-tier
   ansible.builtin.copy:
     src: seat-tier

@@ -32,7 +32,45 @@ for f in /sys/class/drm/card*/device/mem_info_vram_total; do
     fi
 done
 
-# Intel and anything else: no reliable VRAM figure, treat as integrated.
+# Vulkan: the largest device-local heap of a discrete GPU. This is the only
+# dependable source for Intel Arc (no sysfs file has the size, and the PCI BAR
+# overstates it). Integrated GPUs are skipped: their device-local heap is
+# system RAM. SEAT_TIER_VULKANINFO, if set, names a file to read instead
+# (tests).
+vk_out=""
+if [[ -n ${SEAT_TIER_VULKANINFO:-} ]]; then
+    vk_out=$(cat "$SEAT_TIER_VULKANINFO")
+elif command -v vulkaninfo >/dev/null 2>&1; then
+    vk_out=$(timeout 30 vulkaninfo 2>/dev/null || true)
+fi
+if [[ -n $vk_out ]]; then
+    read -r vk_mib vk_vendor < <(awk '
+        /^GPU[0-9]+:/            { gpu = $1; next }
+        /deviceType *=/          { type[gpu] = $3 }
+        /vendorID *=/            { vendor[gpu] = $3 }
+        /memoryHeaps\[[0-9]+\]:/ { in_heap = 1; size = 0; next }
+        /memoryTypes/            { in_heap = 0 }
+        in_heap && /^[[:space:]]*size *=/ { size = $3 }
+        in_heap && /MEMORY_HEAP_DEVICE_LOCAL_BIT/ {
+            if (size > best[gpu]) best[gpu] = size
+        }
+        END {
+            top = 0; v = "unknown"
+            for (g in best) if (type[g] == "PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" && best[g] > top) { top = best[g]; v = vendor[g] }
+            printf "%d %s\n", top / 1048576, v
+        }' <<<"$vk_out")
+    if (( vk_mib > vram_mib )); then
+        vram_mib=$vk_mib
+        case $vk_vendor in
+            0x8086) gpu_vendor=intel ;;
+            0x1002) gpu_vendor=amd ;;
+            0x10de|0x10DE) gpu_vendor=nvidia ;;
+            *) gpu_vendor=other ;;
+        esac
+    fi
+fi
+
+# Intel integrated only, or nothing found: treat as integrated (tier by RAM fails).
 if [[ $gpu_vendor == unknown ]] && command -v lspci >/dev/null 2>&1; then
     if lspci | grep -iE 'vga|3d|display' | grep -qi intel; then
         gpu_vendor=intel
