@@ -1,47 +1,7 @@
 ---
 # --- MW2 (2009) with IW4x ----------------------------------------------------
-# The gaming server holds the finished game folder (roles/server_gameshare).
-# Each seat mirrors it into /games/classic/mw2, read-only for the player.
-# Running this again repairs the folder: changed or missing files are copied
-# back, and files that are not on the server are removed.
-- name: IW4x | install rsync
-  community.general.pacman:
-    name: rsync
-    state: present
-
-- name: IW4x | check that the server has a finished install
-  ansible.builtin.command:
-    argv: [rsync, --list-only, "{{ seat_gameshare }}/mw2/{{ item }}"]
-  loop: [iw4mp.exe, iw4x.exe, iw4x.dll]
-  register: iw4x_server_files
-  changed_when: false
-  failed_when: false
-  # A read-only listing; dry runs need its answer.
-  check_mode: false
-
-- name: IW4x | say why the game was not copied
-  ansible.builtin.debug:
-    msg: >-
-      {{ seat_gameshare }}/mw2 is not ready (missing or unreachable:
-      {{ iw4x_server_files.results | selectattr('rc', '!=', 0) | map(attribute='item') | join(', ') }}).
-      Leaving {{ seat_mw2_dir }} as it is.
-  when: iw4x_server_files.results | selectattr('rc', '!=', 0) | list | length > 0
-
-# The first copy is about 15 GB. In a dry run rsync only lists what it would
-# change. players/ never comes from the server: each seat makes its own key.
-- name: IW4x | copy the game from the server (repairs it on later runs)
-  ansible.builtin.command:
-    argv: >-
-      {{ ['rsync', '-rlt', '--delete', '--delete-excluded', '--exclude=/players/',
-          '--chmod=D755,F644', '--itemize-changes']
-         + (['--checksum'] if seat_gameshare_verify else [])
-         + (['--dry-run'] if ansible_check_mode else [])
-         + [seat_gameshare ~ '/mw2/', seat_mw2_dir ~ '/'] }}
-  register: iw4x_sync
-  changed_when: iw4x_sync.stdout | length > 0
-  check_mode: false
-  when: iw4x_server_files.results | selectattr('rc', '!=', 0) | list | length == 0
-
+# The game folder comes from the share (shared.yml, entry mw2 in
+# seat_shared_games). This adds the start script that runs it.
 - name: IW4x | install the start script
   ansible.builtin.copy:
     src: iw4x-seat

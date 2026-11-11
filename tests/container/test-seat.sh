@@ -11,7 +11,7 @@ step "Install tools"
 pacman -Syu --noconfirm --needed \
     ansible ansible-lint shellcheck yamllint \
     btrfs-progs openssh sudo polkit sddm swayidle libnotify pciutils \
-    git pacman-contrib util-linux python >/dev/null
+    git pacman-contrib util-linux python rsync >/dev/null
 ssh-keygen -A >/dev/null
 
 # Work on a writable copy; the repo is mounted read-only.
@@ -33,6 +33,17 @@ mkfs.btrfs -q /tmp/home.img
 mount -o loop /tmp/home.img /home
 ok "$(findmnt -no FSTYPE -T /home) on /home"
 
+step "A stand-in game share (rsync daemon)"
+mkdir -p /srv/share/mw2/players /srv/share/ut99/System64 /srv/share/ut99/Maps
+touch /srv/share/mw2/iw4mp.exe /srv/share/mw2/iw4x.exe /srv/share/mw2/iw4x.dll /srv/share/mw2/players/key
+install -m 755 /dev/null /srv/share/ut99/System64/ut-bin; touch '/srv/share/ut99/Maps/DM-Deck16][.unr'
+printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
+echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
+printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
+rsync --daemon --config=/tmp/rsyncd.conf
+ok "rsync://127.0.0.1/games"
+
 step "Apply seat.yml"
 ssh-keygen -q -t ed25519 -N '' -f /tmp/admin_key
 key=$(cat /tmp/admin_key.pub)
@@ -43,6 +54,7 @@ seat_orchestrator_ssh_keys: ["$key"]
 seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
 arcade_voice_server: "192.0.2.10"
 seat_display: "3440x1440@144"
+seat_gameshare: rsync://127.0.0.1/games
 EOF
 # What bootstrap/seat.sh leaves behind; the default seat_temporary_sudoers removes it.
 echo 'installer ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/90-seat-bootstrap
@@ -68,6 +80,15 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+
+step "Games from the share"
+[[ -e /games/classic/mw2/iw4x.dll && -x /usr/local/bin/iw4x-seat ]] || die "MW2 not copied from the share"
+[[ ! -e /games/classic/mw2/players ]] || die "MW2 players/ came from the share"
+[[ -e '/games/classic/ut99/Maps/DM-Deck16][.unr' && -x /games/classic/ut99/System64/ut-bin ]] || die "UT99 not copied from the share, or not executable"
+[[ ! -x /games/classic/mw2/iw4x.exe ]] || die "MW2 files became executable"
+grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTournament.ini || die "UT99 defaults not in the golden home"
+grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
+ok "mw2 and ut99 mirrored; UT99 defaults seeded"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json

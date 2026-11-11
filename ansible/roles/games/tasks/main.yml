@@ -103,6 +103,21 @@
   # In a dry run the folder and the download do not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: MW2 with IW4x, from the gaming server
+# --- Games from the gaming server's share ------------------------------------
+- name: Install rsync for the game share
+  community.general.pacman:
+    name: rsync
+    state: present
+  when: seat_gameshare | length > 0
+
+- name: Copy each shared game from the gaming server
+  ansible.builtin.include_tasks: shared.yml
+  loop: "{{ seat_shared_games }}"
+  loop_control:
+    loop_var: shared_game
+    label: "{{ shared_game.name }}"
+  when: seat_gameshare | length > 0
+
+- name: MW2 with IW4x, the start script
   ansible.builtin.include_tasks: iw4x.yml
   when: seat_gameshare | length > 0

@@ -1,6 +1,8 @@
 # Unreal Tournament (GOTY) on OldUnreal 469e, native Linux.
-# Not yet tested on a seat. The INI key names and the binary name are
-# from the 469 Linux build; confirm them on the canary seat before merge.
+# The server builds the game (roles/server_gameshare); each seat copies it
+# read-only to /games/classic/ut99 (roles/games). The golden home starts with
+# the game's own default settings (roles/launcher), and the keys below go on
+# top at every start.
 id: ut99
 name: Unreal Tournament
 subtitle: Deathmatch, CTF, Assault, Domination
@@ -12,11 +14,13 @@ players: { min: 2, max: 16 }
 launch:
   workdir: System64
   command: ["./ut-bin"]
+# Address, or address:port; servers listen on 7777 by default.
 join:
   args: ["{{ server }}"]
+# InstaGib is built in: one shot, one frag.
 host:
-  map: DM-Morpheus
-  args: ["{{ map }}?Listen"]
+  map: DM-Deck16][
+  args: ["{{ map }}?Listen?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM"]
 config:
   - ini: "~/.utpg/System/User.ini"
     set:
@@ -24,10 +28,17 @@ config:
         Name: "{{ nickname }}"
   - ini: "~/.utpg/System/UnrealTournament.ini"
     set:
+      # No first-start setup screen.
+      FirstRun:
+        FirstRun: "469"
+      # Skip the intro flyby; start in the quiet menu map.
+      URL:
+        LocalMap: UT-Logo-Map.unr
       SDLDrv.SDLClient:
         StartupFullscreen: "True"
         FullscreenViewportX: "{{ width }}"
         FullscreenViewportY: "{{ height }}"
+      OpenGLDrv.OpenGLRenderDevice:
         FrameRateLimit: "{{ fps_cap }}"
 profiles:
   A: { resolution: native, fps_cap: refresh }

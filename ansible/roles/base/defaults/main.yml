@@ -69,6 +69,22 @@ seat_openra_ra_sha1: 44241f68e69db9511db82cf83c174737ccda300b
 # Empty: games from the share (MW2 with IW4x) are skipped.
 seat_gameshare: ""
 seat_mw2_dir: "{{ seat_classic_root }}/mw2"
+# Games copied from the share. required: files that show the server has a
+# finished install (rsync paths: no [ or ], they are wildcards there).
+# exclude: rsync patterns that never come from the server.
+# chmod: rsync --chmod for the copy (default D755,F644: nothing executable).
+seat_shared_games:
+  - name: mw2
+    dest: "{{ seat_mw2_dir }}"
+    required: [iw4mp.exe, iw4x.exe, iw4x.dll]
+    # Each seat makes its own IW4x key.
+    exclude: [/players/]
+  - name: ut99
+    dest: "{{ seat_classic_root }}/ut99"
+    required: [System64/ut-bin, .ut99-version]
+    exclude: []
+    # Native Linux game: keep the execute bit on its programs.
+    chmod: D755,Fu=rwX,Fgo=rX
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false

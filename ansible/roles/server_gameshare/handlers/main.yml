@@ -4,3 +4,12 @@
     name: rsync.service
     state: restarted
   when: not server_in_container
+
+- name: Restart the UT99 server
+  ansible.builtin.systemd_service:
+    name: ut99-server.service
+    state: restarted
+    daemon_reload: true
+  when: ut99_server_enabled and not server_in_container
+  # In a dry run the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
