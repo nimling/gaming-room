@@ -1,0 +1,11 @@
+# Managed by gaming-room Ansible (roles/launcher).
+[General]
+count=1
+rules=gaming-room-arcade
+
+[gaming-room-arcade]
+Description=Arcade launcher full screen
+title=Arcade
+titlematch=1
+fullscreen=true
+fullscreenrule=2

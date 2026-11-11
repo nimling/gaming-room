@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Arcade
+Comment=Nimtech gaming room launcher
+# WebKitGTK's DMA-BUF renderer shows a blank window on some NVIDIA setups.
+Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 /usr/local/bin/arcade-app
+Icon=applications-games
+NoDisplay=true
+X-KDE-autostart-phase=2

@@ -58,3 +58,15 @@ seat_pull_calendar: "*-*-* 03:30"
 # Set false to keep the pull timer off, for example while the branch a seat
 # follows does not yet have changes that were pushed to it from elsewhere.
 seat_pull_enabled: true
+
+# Launcher (roles/launcher)
+arcade_source_branch: "{{ seat_config_branch }}"
+arcade_build_root: /var/cache/arcade
+arcade_games_dir: /usr/local/share/arcade/games
+arcade_proton_path: ""
+# The gaming server's address for Mumble; set in the private inventory.
+arcade_voice_server: ""
+# Empty joins the root channel (named Lobby on our server).
+arcade_voice_channel: ""
+# Screen size and refresh, for example 3440x1440@144; private inventory, per seat.
+seat_display: ""

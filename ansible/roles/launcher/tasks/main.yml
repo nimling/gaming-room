@@ -1,0 +1,141 @@
+---
+# Builds the Arcade launcher on the seat from this repo, installs it and
+# starts it full screen when the player logs in. See launcher/README.md.
+
+- name: Install the launcher's runtime and build packages
+  community.general.pacman:
+    name:
+      - gamemode
+      - gamescope
+      - gcc
+      - git
+      - mumble
+      - pkgconf
+      - rust
+      - spectacle
+      - umu-launcher
+      - webkit2gtk-4.1
+    state: present
+
+# Crates run build scripts, so the build runs as an unprivileged account.
+- name: Create the launcher build account
+  ansible.builtin.user:
+    name: arcade-build
+    system: true
+    home: "{{ arcade_build_root }}"
+    create_home: true
+    shell: /usr/bin/nologin
+    password_lock: true
+
+- name: Fetch the launcher source
+  ansible.builtin.git:
+    repo: "{{ seat_config_repo }}"
+    dest: "{{ arcade_build_root }}/src"
+    version: "{{ arcade_source_branch }}"
+    depth: 1
+    force: true
+  become: true
+  become_user: arcade-build
+  register: arcade_src
+  when: not seat_in_container
+  # In a dry run of a fresh seat the build account and build do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Look for the installed launcher
+  ansible.builtin.stat:
+    path: /usr/local/bin/arcade-app
+  register: arcade_installed
+
+- name: Build the launcher (a few minutes the first time)
+  ansible.builtin.command:
+    cmd: cargo build --release --locked -p arcade-cli -p arcade-app
+    chdir: "{{ arcade_build_root }}/src/launcher"
+  environment:
+    CARGO_HOME: "{{ arcade_build_root }}/cargo"
+    CARGO_TARGET_DIR: "{{ arcade_build_root }}/target"
+  become: true
+  become_user: arcade-build
+  changed_when: true
+  # Skipped in dry runs: the build account does not exist yet on a fresh seat.
+  when: not seat_in_container and not ansible_check_mode and (arcade_src is changed or not arcade_installed.stat.exists)  # noqa: no-handler
+
+- name: Install the launcher programs
+  ansible.builtin.copy:
+    src: "{{ arcade_build_root }}/target/release/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - arcade
+    - arcade-app
+  when: not seat_in_container
+  # In a dry run of a fresh seat the build account and build do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Create the launcher folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/arcade
+    - "{{ arcade_games_dir }}"
+
+- name: Install the game manifests
+  ansible.builtin.copy:
+    src: "{{ arcade_build_root }}/src/games/"
+    dest: "{{ arcade_games_dir }}/"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "u=rwX,go=rX"
+  when: not seat_in_container
+  # In a dry run of a fresh seat the build account and build do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write the launcher settings
+  ansible.builtin.template:
+    src: arcade.yaml.j2
+    dest: /etc/arcade/arcade.yaml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write the seat's screen size for the launcher
+  ansible.builtin.copy:
+    dest: /etc/seat/display
+    content: "{{ seat_display }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: seat_display | length > 0
+
+- name: Create the autostart folder in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/.config/autostart"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+
+- name: Start the launcher when the player logs in (from the next reset)
+  ansible.builtin.copy:
+    src: arcade.desktop
+    dest: "/home/.golden/{{ seat_player_user }}/.config/autostart/arcade.desktop"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+
+# KWin does not always honour the app's own full-screen request at start,
+# and KDE's taskbar stayed on top. A window rule forces it.
+- name: Force the launcher window to full screen (KWin rule in the golden home)
+  ansible.builtin.copy:
+    src: kwinrulesrc
+    dest: "/home/.golden/{{ seat_player_user }}/.config/kwinrulesrc"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
