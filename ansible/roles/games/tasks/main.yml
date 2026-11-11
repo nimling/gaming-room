@@ -118,6 +118,9 @@
     label: "{{ shared_game.name }}"
   when: seat_gameshare | length > 0
 
+- name: Proton for Windows games
+  ansible.builtin.include_tasks: proton.yml
+
 - name: MW2 with IW4x, the start script
   ansible.builtin.include_tasks: iw4x.yml
   when: seat_gameshare | length > 0

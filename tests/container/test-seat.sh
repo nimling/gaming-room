@@ -80,6 +80,11 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+grep -qx 'proton: /games/runtime/GE-Proton[0-9-]*' /etc/arcade/arcade.yaml || die "launcher Proton path: $(cat /etc/arcade/arcade.yaml)"
+grep -qx 'UMU_FOLDERS_PATH=/games/runtime/umu' /etc/environment.d/60-arcade-proton.conf || die "umu folders"
+grep -qx 'PRESSURE_VESSEL_FILESYSTEMS_RO=/games' /etc/environment.d/60-arcade-proton.conf || die "runtime container cannot see /games"
+[[ $(stat -c %U /games/runtime/umu) == player ]] || die "player cannot write the umu folder"
+ok "Proton pinned in /games/runtime, umu outside the home"
 
 step "Games from the share"
 [[ -e /games/classic/mw2/iw4x.dll && -x /usr/local/bin/iw4x-seat ]] || die "MW2 not copied from the share"
