@@ -4,7 +4,8 @@
 #
 # How to use:
 #   1. Log in as the player on the seat and set things up (start Steam once,
-#      add /games/steam as a library, set up Mumble...).
+#      set up Mumble...). Keep ~/.local/share/Steam/steamapps as the link to
+#      /games/steam/steamapps (roles/launcher), so games survive the reset.
 #   2. Sign out of every account (Steam, Epic, browser).
 #   3. From SSH as admin:  sudo seat-golden-capture
 # Refuses if the home still holds logins.

@@ -1,0 +1,39 @@
+---
+# --- One game from the gaming server's share ----------------------------------
+# The gaming server holds the finished game folder (roles/server_gameshare).
+# Each seat mirrors it into /games/classic/<name>, read-only for the player.
+# Running this again repairs the folder: changed or missing files are copied
+# back, and files that are not on the server are removed.
+# Called once per entry in seat_shared_games, as shared_game.
+- name: "Shared game | check that the server has a finished install: {{ shared_game.name }}"
+  ansible.builtin.command:
+    argv: [rsync, --list-only, "{{ seat_gameshare }}/{{ shared_game.name }}/{{ item }}"]
+  loop: "{{ shared_game.required }}"
+  register: shared_game_files
+  changed_when: false
+  failed_when: false
+  # A read-only listing; dry runs need its answer.
+  check_mode: false
+
+- name: "Shared game | say why the game was not copied: {{ shared_game.name }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ seat_gameshare }}/{{ shared_game.name }} is not ready (missing or unreachable:
+      {{ shared_game_files.results | selectattr('rc', '!=', 0) | map(attribute='item') | join(', ') }}).
+      Leaving {{ shared_game.dest }} as it is.
+  when: shared_game_files.results | selectattr('rc', '!=', 0) | list | length > 0
+
+# In a dry run rsync only lists what it would change.
+- name: "Shared game | copy it from the server (repairs it on later runs): {{ shared_game.name }}"
+  ansible.builtin.command:
+    argv: >-
+      {{ ['rsync', '-rlt', '--delete', '--delete-excluded']
+         + (shared_game.exclude | default([]) | map('regex_replace', '^', '--exclude=') | list)
+         + ['--chmod=' ~ (shared_game.chmod | default('D755,F644')), '--itemize-changes']
+         + (['--checksum'] if seat_gameshare_verify else [])
+         + (['--dry-run'] if ansible_check_mode else [])
+         + [seat_gameshare ~ '/' ~ shared_game.name ~ '/', shared_game.dest ~ '/'] }}
+  register: shared_game_sync
+  changed_when: shared_game_sync.stdout | length > 0
+  check_mode: false
+  when: shared_game_files.results | selectattr('rc', '!=', 0) | list | length == 0

@@ -1,0 +1,42 @@
+# Managed by gaming-room Ansible (roles/server_pccafe).
+# Windows VM for the Steam PC Café Server. Web viewer: http://<container address>:8006
+services:
+  windows:
+    image: {{ pccafe_image }}
+    container_name: pccafe
+    environment:
+      VERSION: "{{ pccafe_windows_version }}"
+      RAM_SIZE: "{{ pccafe_ram }}"
+      CPU_CORES: "{{ pccafe_cpus }}"
+      DISK_SIZE: "{{ pccafe_disk }}"
+      USERNAME: "{{ pccafe_windows_user }}"
+      PASSWORD: "{{ pccafe_password.content | default('') | b64decode | trim }}"
+      # Windows asks the router for its own address on the gaming VLAN.
+      DHCP: "Y"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+      - /dev/vhost-net
+    device_cgroup_rules:
+      - "c *:* rwm"
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./storage:/storage
+      - ./shared:/shared
+      - ./oem:/oem
+    networks:
+      vlan: {}
+    stop_grace_period: 2m
+    restart: unless-stopped
+
+networks:
+  vlan:
+    driver: macvlan
+    driver_opts:
+      parent: {{ pccafe_parent_nic }}
+    ipam:
+      config:
+        - subnet: {{ pccafe_subnet }}
+          gateway: {{ pccafe_gateway }}
+          ip_range: {{ pccafe_ip_range }}

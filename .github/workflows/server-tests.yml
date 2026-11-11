@@ -22,7 +22,9 @@ permissions:
 jobs:
   container:
     name: Server playbook in Ubuntu
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04 ("resolute"), whose runners
+    # could not resolve ubuntu.com on 2026-11-11 (apt hung for hours).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

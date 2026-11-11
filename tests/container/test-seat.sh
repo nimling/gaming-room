@@ -11,7 +11,7 @@ step "Install tools"
 pacman -Syu --noconfirm --needed \
     ansible ansible-lint shellcheck yamllint \
     btrfs-progs openssh sudo polkit sddm swayidle libnotify pciutils \
-    git pacman-contrib util-linux python >/dev/null
+    git pacman-contrib util-linux python rsync >/dev/null
 ssh-keygen -A >/dev/null
 
 # Work on a writable copy; the repo is mounted read-only.
@@ -33,6 +33,17 @@ mkfs.btrfs -q /tmp/home.img
 mount -o loop /tmp/home.img /home
 ok "$(findmnt -no FSTYPE -T /home) on /home"
 
+step "A stand-in game share (rsync daemon)"
+mkdir -p /srv/share/mw2/players /srv/share/ut99/System64 /srv/share/ut99/Maps
+touch /srv/share/mw2/iw4mp.exe /srv/share/mw2/iw4x.exe /srv/share/mw2/iw4x.dll /srv/share/mw2/players/key
+install -m 755 /dev/null /srv/share/ut99/System64/ut-bin; touch '/srv/share/ut99/Maps/DM-Deck16][.unr'
+printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
+echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
+printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
+rsync --daemon --config=/tmp/rsyncd.conf
+ok "rsync://127.0.0.1/games"
+
 step "Apply seat.yml"
 ssh-keygen -q -t ed25519 -N '' -f /tmp/admin_key
 key=$(cat /tmp/admin_key.pub)
@@ -43,6 +54,7 @@ seat_orchestrator_ssh_keys: ["$key"]
 seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
 arcade_voice_server: "192.0.2.10"
 seat_display: "3440x1440@144"
+seat_gameshare: rsync://127.0.0.1/games
 EOF
 # What bootstrap/seat.sh leaves behind; the default seat_temporary_sudoers removes it.
 echo 'installer ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/90-seat-bootstrap
@@ -68,11 +80,29 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
-grep -qx 'proton: /games/runtime/GE-Proton[0-9-]*' /etc/arcade/arcade.yaml || die "launcher Proton path: $(cat /etc/arcade/arcade.yaml)"
+for prog in openttd teeworlds xonotic-sdl; do command -v "$prog" >/dev/null || die "$prog not installed"; done
+ok "free LAN games installed"
+[[ $(readlink /home/.golden/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam games would land in the home"
+[[ $(stat -c '%U %a' /games/steam/steamapps) == "player 2775" ]] || die "player cannot install into /games/steam/steamapps"
+ok "Steam installs games into /games"
+command -v headsetcontrol >/dev/null || die "HeadsetControl missing"
+grep -q 'ExecStart=-/usr/bin/headsetcontrol -s 0' /etc/systemd/system/headset-sidetone.service || die "sidetone service"
+grep -q 'ATTRS{idProduct}=="0a9b|0a9c|0a6d"' /etc/udev/rules.d/70-headset-sidetone.rules || die "sidetone udev rule"
+ok "G432 sidetone off at boot and plug-in"
+grep -qx 'proton: /games/runtime/GE-Proton[0-9-]*-x86_64' /etc/arcade/arcade.yaml || die "launcher Proton path: $(cat /etc/arcade/arcade.yaml)"
 grep -qx 'UMU_FOLDERS_PATH=/games/runtime/umu' /etc/environment.d/60-arcade-proton.conf || die "umu folders"
 grep -qx 'PRESSURE_VESSEL_FILESYSTEMS_RO=/games' /etc/environment.d/60-arcade-proton.conf || die "runtime container cannot see /games"
 [[ $(stat -c %U /games/runtime/umu) == player ]] || die "player cannot write the umu folder"
 ok "Proton pinned in /games/runtime, umu outside the home"
+
+step "Games from the share"
+[[ -e /games/classic/mw2/iw4x.dll && -x /usr/local/bin/iw4x-seat ]] || die "MW2 not copied from the share"
+[[ ! -e /games/classic/mw2/players ]] || die "MW2 players/ came from the share"
+[[ -e '/games/classic/ut99/Maps/DM-Deck16][.unr' && -x /games/classic/ut99/System64/ut-bin ]] || die "UT99 not copied from the share, or not executable"
+[[ ! -x /games/classic/mw2/iw4x.exe ]] || die "MW2 files became executable"
+grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTournament.ini || die "UT99 defaults not in the golden home"
+grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
+ok "mw2 and ut99 mirrored; UT99 defaults seeded"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json
@@ -121,8 +151,18 @@ ok "capture refused"
 step "End session"
 /usr/local/sbin/seat-reset session
 [[ ! -e /home/player/saved-game.txt ]] || die "player files survived"
+[[ ! -e /games/steam/steamapps/compatdata/12345 ]] || die "Proton prefix survived the reset"
+[[ ! -e /home/player/.local/share/Steam/config/loginusers.vdf ]] || die "Steam login survived the reset"
+[[ $(readlink /home/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam library link missing after reset"
+# A game installed in this session, through the link, lands in /games and
+# survives the next End session.
+runuser -u player -- mkdir -p /home/player/.local/share/Steam/steamapps/common/SomeGame
+runuser -u player -- touch /home/player/.local/share/Steam/steamapps/appmanifest_12345.acf
+[[ -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game did not land in /games"
+/usr/local/sbin/seat-reset session
+[[ -d /games/steam/steamapps/common/SomeGame && -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game deleted by the reset"
 btrfs subvolume show /home/player >/dev/null || die "home is no longer a subvolume"
-ok "home replaced"
+ok "home replaced; Steam games kept, Steam login and Proton prefixes gone"
 
 step "Gate: token leak"
 bash tests/gates/token-leak.sh

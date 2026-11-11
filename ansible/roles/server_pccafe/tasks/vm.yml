@@ -1,0 +1,75 @@
+---
+- name: Café | check the settings
+  ansible.builtin.assert:
+    that:
+      - pccafe_ip_range is match('^[0-9.]+/[0-9]+$')
+      - pccafe_parent_nic | length > 0
+    fail_msg: >-
+      Set pccafe_ip_range in the private inventory: a few free addresses on the
+      gaming VLAN outside the router's DHCP pool, for example 192.0.2.248/30.
+
+- name: Café | check that KVM is available
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: pccafe_kvm
+
+- name: Café | stop without KVM
+  ansible.builtin.assert:
+    that: pccafe_kvm.stat.exists or server_in_container
+    fail_msg: /dev/kvm is missing. Turn on AMD-V (SVM) in the firmware and load kvm_amd.
+
+- name: Café | create the folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - "{{ pccafe_dir }}"
+    - "{{ pccafe_dir }}/storage"
+    - "{{ pccafe_dir }}/shared"
+    - "{{ pccafe_dir }}/oem"
+
+- name: Café | make the Windows password once
+  ansible.builtin.shell: |
+    set -o pipefail
+    umask 077
+    head -c 18 /dev/urandom | base64 | tr -d '/+=' > {{ pccafe_dir }}/windows-password
+  args:
+    creates: "{{ pccafe_dir }}/windows-password"
+    executable: /bin/bash
+
+- name: Café | read the Windows password
+  ansible.builtin.slurp:
+    src: "{{ pccafe_dir }}/windows-password"
+  register: pccafe_password
+  # In a dry run of a fresh server the file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Café | write the script Windows runs after its install
+  ansible.builtin.template:
+    src: install.bat.j2
+    dest: "{{ pccafe_dir }}/oem/install.bat"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Café | write the compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ pccafe_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+  # In a dry run of a fresh server the password does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Café | run the Windows VM
+  community.docker.docker_compose_v2:
+    project_src: "{{ pccafe_dir }}"
+    state: present
+    pull: missing
+  when: not server_in_container
+  # In a dry run of a fresh server Docker is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"

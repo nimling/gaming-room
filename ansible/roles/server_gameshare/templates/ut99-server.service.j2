@@ -1,0 +1,22 @@
+# Managed by gaming-room Ansible (roles/server_gameshare).
+[Unit]
+Description=Unreal Tournament dedicated LAN server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ ut99_server_user }}
+Group={{ ut99_server_user }}
+Environment=HOME={{ ut99_server_home }}
+WorkingDirectory={{ ut99_dir }}/System64
+# ucc-bin otherwise saves its settings next to itself, in the read-only share.
+ExecStart={{ ut99_dir }}/System64/ucc-bin server "{{ ut99_server_url }}" port={{ ut99_server_port }} ini={{ ut99_server_home }}/.utpg/System/UnrealTournament.ini userini={{ ut99_server_home }}/.utpg/System/User.ini
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{ ut99_server_home }}
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

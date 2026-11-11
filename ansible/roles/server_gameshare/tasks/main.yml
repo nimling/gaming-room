@@ -97,6 +97,8 @@
     dest: "{{ iw4x_cache }}/iw4x-{{ iw4x_client_version }}.dll"
     checksum: "sha256:{{ iw4x_client_sha256 }}"
     mode: "0644"
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
   when: iw4x_base_game.stat.exists
 
 - name: IW4x | download the raw files (release.zip, about 750 MB)
@@ -106,6 +108,8 @@
     checksum: "sha256:{{ iw4x_rawfiles_sha256 }}"
     mode: "0644"
     timeout: 120
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
   when: iw4x_base_game.stat.exists and not iw4x_rawfiles_current
 
 - name: IW4x | unpack the raw files into the MW2 folder
@@ -148,3 +152,6 @@
     recurse: true
     mode: "u+rwX,go+rX"
   when: iw4x_base_game.stat.exists
+
+- name: Unreal Tournament
+  ansible.builtin.include_tasks: ut99.yml
