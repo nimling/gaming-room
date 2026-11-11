@@ -10,6 +10,13 @@ die() { echo "FAIL  $*" >&2; exit 1; }
 
 step "Install tools"
 export DEBIAN_FRONTEND=noninteractive
+# Some CI runners cannot resolve *.ubuntu.com (GitHub, 2026-11-11). Then use
+# the kernel.org mirror, which is outside that domain and carries every pocket.
+if ! getent hosts archive.ubuntu.com >/dev/null; then
+    echo "archive.ubuntu.com does not resolve; using mirrors.edge.kernel.org"
+    sed -i -E 's#https?://(archive|security)\.ubuntu\.com/ubuntu#http://mirrors.edge.kernel.org/ubuntu#g' \
+        /etc/apt/sources.list.d/ubuntu.sources
+fi
 apt-get update -qq
 apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 iproute2 >/dev/null
 mkdir -p /run/sshd
