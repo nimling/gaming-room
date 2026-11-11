@@ -69,6 +69,24 @@ grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "laun
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
 
+step "Mumble is pre-filled in the golden home"
+mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json
+mumble_cert=/home/.golden/player/Documents/MumbleAutomaticCertificateBackup.p12
+python -m json.tool "$mumble_conf" >/dev/null || die "Mumble settings are not valid JSON"
+grep -q '"audio_wizard_has_been_shown": true' "$mumble_conf" || die "Mumble audio wizard not marked done"
+grep -q '"transmit_mode": "PTT"' "$mumble_conf" || die "Mumble push-to-talk"
+grep -q '"frames_per_packet": 1' "$mumble_conf" || die "Mumble 10 ms frames"
+grep -q '"enable_evdev": true' "$mumble_conf" || die "Mumble evdev push-to-talk"
+grep -q '"AAAAAgAAAAEb"' "$mumble_conf" || die "Mumble push-to-talk on the mouse side button"
+id -nG player | tr ' ' '\n' | grep -qx input || die "player not in the input group (push-to-talk)"
+[[ $(stat -c '%U %a' "$mumble_cert") == "player 600" ]] || die "Mumble seat certificate owner or mode"
+openssl pkcs12 -in "$mumble_cert" -passin pass: -nokeys 2>/dev/null | grep -q 'BEGIN CERTIFICATE' || die "Mumble seat certificate unreadable"
+[[ $(stat -c '%U %a' /etc/seat/mumble/key.pem) == "root 600" ]] || die "Mumble seat key owner or mode"
+grep -qx 'wmclass=Mumble' /home/.golden/player/.config/kwinrulesrc || die "Mumble start-minimised rule"
+grep -qxF "XDG_DOCUMENTS_DIR=\"\$HOME/Documents\"" /home/.golden/player/.config/user-dirs.dirs || die "XDG Documents folder not fixed"
+[[ -d /home/.golden/player/Documents ]] || die "Documents folder missing in the golden home"
+ok "settings, seat certificate and window rule"
+
 step "Second run changes nothing"
 second=$(run_playbook)
 echo "$second" | tail -n 4

@@ -24,6 +24,7 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 - The root channel is called **Lobby**. Seats join it with `mumble://<nickname>@<server>/`.
 - No server password by default: the VLAN is closed to the rest of the network. Set `mumble_server_password` in the private inventory to add one.
 - Opus always (`opusthreshold=0`), 72 kbit/s per person, up to 30 people.
+- Seats trust the server's self-signed certificate in advance (`roles/launcher`). Recreating the data volume makes a new certificate; run the seat playbook again to re-pin it, or seats ask about it.
 - The SuperUser password is printed once in `docker logs mumble`. Store it in Bitwarden. Team channels can be added with it from any Mumble client.
 
 ## Cache

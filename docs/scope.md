@@ -139,6 +139,7 @@ Open source, no license or slot limits, client in the CachyOS repos, Opus codec,
 
 - Official `mumble-server` container. The root channel is called Lobby; Team channels are added with the SuperUser account. No server password by default, because the VLAN is closed; one can be set in the private inventory.
 - After the nickname step, the launcher starts Mumble with `mumble://<nickname>@<server>/`.
+- Mumble's settings are pre-filled in the golden home, so it joins with no wizard or dialog: push-to-talk on the mouse side button (V also works) in every window, 10 ms frames, noise suppression on, hidden in the tray. Each seat makes its own certificate. The server's certificate is trusted in advance.
 - Golden config: Opus, 10 ms per packet, push-to-talk on one agreed key, noise suppression, audio wizard done.
 - One headset per seat, same model if possible.
 

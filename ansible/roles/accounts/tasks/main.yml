@@ -53,10 +53,13 @@
 
 # player: the shared, disposable account. No wheel, no sudo, no password.
 # Its home is created by seat-reset from the golden snapshot (session role).
+# input: Mumble reads the mouse and keyboard directly (evdev) so push-to-talk
+# works in every window. The player can then read raw input on its own seat;
+# accepted because one person uses a seat at a time.
 - name: Create player account
   ansible.builtin.user:
     name: "{{ seat_player_user }}"
-    groups: ["{{ seat_games_group }}"]
+    groups: ["{{ seat_games_group }}", input]
     append: false
     shell: /bin/bash
     home: "/home/{{ seat_player_user }}"
