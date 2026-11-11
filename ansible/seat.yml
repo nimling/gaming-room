@@ -20,3 +20,12 @@
     - session
     - updates
     - pull
+
+  post_tasks:
+    # Last on purpose: the run itself may be using one of these rules.
+    - name: Remove temporary sudo rules
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ seat_temporary_sudoers }}"
+      when: item is match('^/etc/sudoers\\.d/') and item != '/etc/sudoers.d/10-orchestrator'

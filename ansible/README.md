@@ -10,7 +10,7 @@ Everything on a seat is described here. Seats apply it themselves with `ansible-
 | `accounts` | `admin`, `player` and `orchestrator` accounts; removes old users from `wheel`; polkit rule for the player |
 | `tier` | `seat-tier` detects GPU memory and RAM at every boot and writes `/etc/seat/tier` (A, B or C) |
 | `games` | `/games` as a btrfs subvolume: `/games/steam` (player-writable), `/games/classic` (read-only) |
-| `session` | Golden home, `seat-reset`, logout watcher, idle logout, SDDM auto-login, token check, golden capture |
+| `session` | Golden home, `seat-reset`, logout watcher, idle logout, auto-login (SDDM or Plasma Login Manager), token check, golden capture |
 | `updates` | `seat-update` (snapshot, then full update) and the update freeze |
 | `pull` | `seat-pull.timer`: `ansible-pull` at boot and nightly |
 
@@ -30,8 +30,8 @@ See [server/README.md](../server/README.md). Install the collections first: `ans
 ## How the player session works
 
 - At boot, `seat-reset-boot.service` replaces `/home/player` with a btrfs snapshot of `/home/.golden/player`.
-- SDDM logs the player in.
-- **End session** (launcher), **20 min idle** (`seat-idle`) and a **KDE log out** (`seat-logout-watch.service`) all lead to `seat-reset`. It stops SDDM, ends the player's processes, replaces the home, removes Proton prefixes and temp files, and starts SDDM again.
+- The login manager logs the player in. Newer CachyOS uses KDE's Plasma Login Manager (`/etc/plasmalogin.conf`); older installs use SDDM.
+- **End session** (launcher), **20 min idle** (`seat-idle`) and a **KDE log out** (`seat-logout-watch.service`) all lead to `seat-reset`. It stops the login manager, ends the player's processes, replaces the home, removes Proton prefixes and temp files, and starts the login manager again. On ext4 it copies the golden home instead of taking a snapshot; on seat-01 a reset takes about 1.2 seconds.
 - `seat-reset` refuses to touch the home if the golden home is missing.
 - Changes to the golden home: log in as the player, set things up, sign out of every account, then run `sudo seat-golden-capture` as admin. It refuses while any login token is left (`seat-token-check`).
 
@@ -45,11 +45,34 @@ ansible-playbook update.yml -l canary              # a day later: -l seats
 ansible-playbook server.yml --check --diff         # the gaming server
 ```
 
-First run on a freshly installed seat (only the installer's `admin` user exists yet):
+### First run on a freshly installed seat
+
+1. At the seat, once: the bootstrap line in [`../bootstrap/seat.sh`](../bootstrap/seat.sh) (SSH on, GitHub keys, host name).
+2. At the seat, once, as the installer's user (here `nim`), so Ansible can use sudo without a password for this one run:
+
+   ```bash
+   echo 'nim ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/90-nim
+   ```
+
+3. In `inventory.yml`, for that seat only: `ansible_user: nim`, `seat_extra_ssh_users: [nim]` and `seat_temporary_sudoers: ["/etc/sudoers.d/90-nim"]`.
+4. Run `ansible-playbook seat.yml -l seat-01 --check --diff`, then without `--check`.
+   - A fresh seat may carry a months-old package list. The first run updates the whole system once, restarts sshd (an OpenSSH upgrade otherwise resets every new connection) and reboots if the kernel changed.
+   - The last task deletes the temporary sudo rule. `nim` leaves `wheel` and SSH.
+5. Remove the three lines from step 3. From now on Ansible logs in as `orchestrator` with passwordless sudo, from the addresses in `seat_orchestrator_source` only.
+
+Measured on seat-01 (RTX 3090, ext4): full system update about 2 minutes, configuration 84 seconds, second run 0 changes.
+
+### Running Ansible from a Mac
+
+Ansible is not installed on the Mac; it runs in a small container with the SSH key mounted read-only:
 
 ```bash
-ansible-playbook seat.yml -l seat-01 -u admin --ask-become-pass
+docker run --rm -v "$PWD":/repo:ro -v ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro \
+  -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -w /repo/ansible gaming-room-ansible \
+  ansible-playbook seat.yml -l canary --check --diff
 ```
+
+The image is `python:3.13-slim` plus `openssh-client`, `ansible-core` and the `ansible.posix`, `community.docker` and `community.general` collections.
 
 ## Branches
 

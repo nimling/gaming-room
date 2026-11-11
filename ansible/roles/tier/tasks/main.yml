@@ -36,6 +36,8 @@
     enabled: true
     daemon_reload: true
   when: not seat_in_container
+  # In a dry run of a fresh seat the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Detect the tier now
   ansible.builtin.command: /usr/local/sbin/seat-tier

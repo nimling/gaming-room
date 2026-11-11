@@ -29,10 +29,12 @@
     - seat-pull.service
     - seat-pull.timer
 
-- name: Enable the seat-pull timer
+- name: Enable the seat-pull timer (or keep it off while seat_pull_enabled is false)
   ansible.builtin.systemd_service:
     name: seat-pull.timer
-    enabled: true
-    state: started
+    enabled: "{{ seat_pull_enabled | bool }}"
+    state: "{{ 'started' if seat_pull_enabled | bool else 'stopped' }}"
     daemon_reload: true
   when: not seat_in_container
+  # In a dry run of a fresh seat the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"

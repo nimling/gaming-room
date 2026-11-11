@@ -6,6 +6,58 @@
       seat_admin_ssh_keys is empty. Password SSH logins are turned off by this
       role, so set at least one admin key in the private inventory.
 
+# A fresh seat may carry a months-old package list. On a rolling distro,
+# installing anything on top of that fails or half-upgrades the system,
+# so the first run updates everything once, then reboots into the new kernel.
+- name: Check whether this seat has had its first full update
+  ansible.builtin.stat:
+    path: /etc/seat-first-update-done
+  register: seat_first_update
+
+- name: First run | update the package keyrings
+  community.general.pacman:
+    name:
+      - archlinux-keyring
+      - cachyos-keyring
+    state: latest
+    update_cache: true
+  when: not seat_first_update.stat.exists and not seat_in_container
+
+- name: First run | update the whole system
+  community.general.pacman:
+    upgrade: true
+  register: seat_first_upgrade
+  when: not seat_first_update.stat.exists and not seat_in_container
+
+# A running sshd from before an OpenSSH upgrade cannot start the new
+# sshd-session helper, so every new connection is reset until it restarts.
+# Open sessions (this run's) survive the restart.
+# Not a handler: it must run now, before the reboot below, not at play end.
+- name: First run | restart sshd after the update  # noqa: no-handler
+  ansible.builtin.systemd_service:
+    name: sshd.service
+    state: restarted
+  when: seat_first_upgrade is changed
+
+- name: First run | remember that the full update is done
+  ansible.builtin.copy:
+    dest: /etc/seat-first-update-done
+    content: "Full system update by gaming-room Ansible before the first configuration.\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: First run | reboot if the running kernel was replaced
+  ansible.builtin.reboot:
+    msg: "gaming-room: rebooting into the updated kernel"
+    reboot_timeout: 900
+  when:
+    - seat_first_update is not skipped
+    - not seat_first_update.stat.exists
+    - not seat_in_container
+    - (ansible_connection | default('ssh')) != 'local'
+    - ('/usr/lib/modules/' ~ ansible_kernel) is not directory
+
 - name: Install base packages
   community.general.pacman:
     name:

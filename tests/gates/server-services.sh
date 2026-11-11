@@ -7,6 +7,11 @@
 set -uo pipefail
 
 server=${1:?usage: server-services.sh <server-address>}
+if ip -4 -o address 2>/dev/null | grep -q " $server/"; then
+    echo "INFO  run this from a seat, not from the server: Lancache DNS gives the"
+    echo "      server itself the real Steam addresses on purpose (rpz-passthru)."
+    exit 2
+fi
 fail=0
 pass() { echo "PASS  $*"; }
 bad() { echo "FAIL  $*"; fail=1; }

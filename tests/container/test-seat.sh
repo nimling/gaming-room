@@ -40,12 +40,24 @@ cat > /tmp/vars.yml <<EOF
 seat_in_container: true
 seat_admin_ssh_keys: ["$key"]
 seat_orchestrator_ssh_keys: ["$key"]
+seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
+seat_temporary_sudoers: ["/etc/sudoers.d/90-installer"]
 EOF
+echo 'installer ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/90-installer
+printf '[Autologin]\nSession=plasma\n' >/etc/plasmalogin.conf
 run_playbook() {
     (cd ansible && ansible-playbook seat.yml -i localhost, -c local -e target=localhost -e @/tmp/vars.yml)
 }
 run_playbook
 ok "first run"
+allow=$(grep '^AllowUsers' /etc/ssh/sshd_config.d/10-gaming-room.conf)
+[[ $allow == "AllowUsers admin orchestrator@192.0.2.10 orchestrator@198.51.100.20" ]] || die "wrong $allow"
+[[ ! -e /etc/sudoers.d/90-installer ]] || die "temporary sudo rule left behind"
+[[ -e /etc/sudoers.d/10-orchestrator ]] || die "orchestrator sudo rule missing"
+ok "orchestrator sources and temporary sudo rule"
+grep -qx 'User=player' /etc/plasmalogin.conf || die "Plasma Login Manager auto-login: $(cat /etc/plasmalogin.conf)"
+grep -qx 'Relogin=false' /etc/plasmalogin.conf || die "Plasma Login Manager relogin"
+ok "Plasma Login Manager auto-login"
 
 step "Second run changes nothing"
 second=$(run_playbook)
