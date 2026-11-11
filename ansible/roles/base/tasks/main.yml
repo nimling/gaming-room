@@ -168,3 +168,49 @@
       # Managed by gaming-room Ansible
       [connection]
       ethernet.wake-on-lan=64
+
+# --- Headsets: no sidetone ------------------------------------------------------
+# The Logitech G432 (and G431/G433) plays the microphone back into the
+# headphones whenever an app opens the mic, so players hear themselves in
+# Mumble. That sidetone is set in the headset over HID, not in the sound
+# mixer. HeadsetControl sets it; a udev rule runs it at boot and on plug-in.
+- name: Headsets | install HeadsetControl
+  community.general.pacman:
+    name: headsetcontrol
+    state: present
+
+- name: Headsets | set the sidetone once a headset appears
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/headset-sidetone.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible (roles/base).
+      [Unit]
+      Description=Set the headset sidetone (hearing your own voice) to {{ seat_headset_sidetone }}
+
+      [Service]
+      Type=oneshot
+      # The headset needs a moment after plug-in before it takes HID commands.
+      ExecStartPre=/usr/bin/sleep 2
+      ExecStart=/usr/bin/headsetcontrol -s {{ seat_headset_sidetone }}
+
+- name: Headsets | run it when a Logitech G431/G432/G433 is plugged in
+  ansible.builtin.copy:
+    src: 70-headset-sidetone.rules
+    dest: /etc/udev/rules.d/70-headset-sidetone.rules
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload udev rules
+
+- name: Headsets | set it now
+  ansible.builtin.systemd_service:
+    name: headset-sidetone.service
+    state: started
+    daemon_reload: true
+  when: not seat_in_container
+  # No headset plugged in (or in a dry run, no unit yet) is not an error.
+  failed_when: false
+  changed_when: false

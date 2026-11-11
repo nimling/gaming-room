@@ -39,6 +39,10 @@ seat_games_root: /games
 seat_steam_library: /games/steam
 seat_classic_root: /games/classic
 
+# Headset sidetone (hearing your own voice), 0-128; 0 = off. Logitech
+# G431/G432/G433, set over HID by HeadsetControl at boot and on plug-in.
+seat_headset_sidetone: 0
+
 # Session
 seat_idle_logout_enabled: true
 seat_idle_logout_minutes: 20
