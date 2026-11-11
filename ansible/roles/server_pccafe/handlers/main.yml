@@ -11,3 +11,5 @@
     state: restarted
     daemon_reload: true
   when: not server_in_container
+  # In a dry run the unit file is not written.
+  ignore_errors: "{{ ansible_check_mode }}"

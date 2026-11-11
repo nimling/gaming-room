@@ -18,7 +18,7 @@ if ! getent hosts archive.ubuntu.com >/dev/null; then
         /etc/apt/sources.list.d/ubuntu.sources
 fi
 apt-get update -qq
-apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 iproute2 >/dev/null
+apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 python3-apt iproute2 >/dev/null
 mkdir -p /run/sshd
 
 cp -a /repo /work
@@ -57,7 +57,9 @@ all:
           seat_mac: "00:00:5e:00:53:01"
         seat-02:
 EOF
-run() { (cd ansible && ansible-playbook server.yml -i /tmp/inventory.yml); }
+run() { (cd ansible && ansible-playbook server.yml -i /tmp/inventory.yml "$@"); }
+run --check >/tmp/check.log 2>&1 || { tail -n 30 /tmp/check.log; die "dry run on a fresh server failed"; }
+ok "dry run"
 run
 ok "first run"
 

@@ -88,6 +88,8 @@
     state: started
     daemon_reload: true
   when: not server_in_container
+  # In a dry run the unit file is not written.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 # Forwarded bridge traffic only meets the firewall if br_netfilter is loaded
 # (Docker can load it). Then this keeps the VLAN <-> VM traffic flowing.
