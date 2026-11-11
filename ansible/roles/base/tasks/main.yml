@@ -126,6 +126,16 @@
   loop: "{{ (([seat_orchestrator_source] if seat_orchestrator_source is string else seat_orchestrator_source) | select | list) or ['any'] }}"
   when: seat_ufw.stat.exists and not seat_in_container
 
+# LAN games: a seat that hosts a match (WC3, UT, OpenRA, MW2) must accept the
+# other seats' joins and answer their LAN-browser broadcasts. Each game uses
+# its own ports, and some pick them at random, so the whole gaming VLAN may
+# reach the seats. Nothing outside the VLAN can.
+- name: Firewall | allow LAN games from the gaming network
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ seat_lan_cidr }}"
+  when: seat_ufw.stat.exists and not seat_in_container and seat_lan_cidr | length > 0
+
 - name: Check sshd config before any reload
   ansible.builtin.command: sshd -t
   changed_when: false
