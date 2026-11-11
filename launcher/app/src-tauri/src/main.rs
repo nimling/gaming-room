@@ -66,7 +66,9 @@ fn bootstrap(app: State<'_, Arcade>) -> Result<Boot, String> {
 
 /// Saves the nickname and joins voice under it. `key` is the push-to-talk
 /// key the player picked on the same screen; `None` is the default.
-#[tauri::command]
+/// Runs off the main thread: stopping Mumble can take up to 5 s, and a sync
+/// command would freeze the window that long.
+#[tauri::command(async)]
 fn set_nickname(app: State<'_, Arcade>, name: String, key: Option<String>) -> Result<(), String> {
     let seat = Seat::detect(&app.root);
     nick::save(&seat.home, &name).map_err(text)?;
@@ -87,7 +89,8 @@ fn set_nickname(app: State<'_, Arcade>, name: String, key: Option<String>) -> Re
     Ok(())
 }
 
-#[tauri::command]
+// Async: stopping a running game can take up to 3 s.
+#[tauri::command(async)]
 fn launch(
     app: State<'_, Arcade>,
     id: String,
@@ -145,7 +148,8 @@ fn stop_game(app: &Arcade) {
     }
 }
 
-#[tauri::command]
+// Async: stopping a running game can take up to 3 s.
+#[tauri::command(async)]
 fn quit(app: State<'_, Arcade>) {
     stop_game(&app);
 }
@@ -163,7 +167,8 @@ fn running(app: State<'_, Arcade>) -> Option<String> {
     None
 }
 
-#[tauri::command]
+// Async: stopping a running game can take up to 3 s.
+#[tauri::command(async)]
 fn end_session(app: State<'_, Arcade>) -> Result<(), String> {
     stop_game(&app);
     let status = Command::new("systemctl")
