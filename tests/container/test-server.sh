@@ -67,6 +67,15 @@ grep -q 'PasswordAuthentication no' /etc/ssh/sshd_config.d/10-gaming-room.conf |
 grep -qx 'HandleLidSwitch=ignore' /etc/systemd/logind.conf.d/10-gaming-room.conf || die "lid switch"
 ok "compose files, settings and sshd"
 
+step "Game share"
+grep -qx '\[games\]' /etc/rsyncd.conf || die "rsync module missing"
+grep -q 'read only = yes' /etc/rsyncd.conf || die "game share is not read-only"
+grep -q 'hosts allow = 192.0.2.0/24' /etc/rsyncd.conf || die "game share not limited to the VLAN"
+grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the LAN address"
+[[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
+[[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
+ok "read-only rsync share; IW4x waits for MW2"
+
 step "Claude on the server"
 id claude >/dev/null || die "no claude account"
 [[ -s /home/claude/.ssh/id_ed25519.pub ]] || die "no SSH key for claude"

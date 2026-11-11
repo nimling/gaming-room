@@ -1,6 +1,6 @@
 ---
 # Configures the gaming server (Ubuntu Server LTS): Docker, firewall,
-# Mumble, Lancache and Wake-on-LAN. Run from a machine on the gaming VLAN:
+# Mumble, Lancache, the game share and Wake-on-LAN. Run from a machine on the gaming VLAN:
 #   ansible-playbook server.yml --check --diff
 #   ansible-playbook server.yml
 - name: Configure the gaming server
@@ -11,5 +11,6 @@
     - server_base
     - server_mumble
     - server_lancache
+    - server_gameshare
     - server_wol
     - server_claude

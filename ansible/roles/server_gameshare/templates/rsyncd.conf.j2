@@ -1,0 +1,21 @@
+# Managed by gaming-room Ansible (roles/server_gameshare).
+# Read-only game files for the seats. Seats run, for example:
+#   rsync -rlt rsync://<server>/{{ gameshare_module }}/mw2/ /games/classic/mw2/
+uid = nobody
+gid = nogroup
+use chroot = yes
+address = {{ server_lan_ip }}
+port = {{ gameshare_port }}
+max connections = {{ gameshare_max_connections }}
+reverse lookup = no
+log file = /var/log/rsyncd.log
+
+[{{ gameshare_module }}]
+    path = {{ gameshare_root }}
+    comment = Gaming room game files (read-only)
+    read only = yes
+    list = yes
+    hosts allow = {{ server_vlan_cidr }}
+    hosts deny = *
+    # Settings and keys from anyone who tried a game on the server stay here.
+    exclude = players/

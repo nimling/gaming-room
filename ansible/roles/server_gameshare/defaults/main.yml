@@ -1,0 +1,25 @@
+---
+# Shared game files for the seats, served read-only over rsync on the gaming
+# VLAN. Seats copy from here (roles/games) at boot and nightly.
+gameshare_root: /srv/games
+gameshare_module: games
+gameshare_port: 873
+# Seats sync at the same time after Wake-on-LAN; this caps the load.
+gameshare_max_connections: 12
+
+# --- MW2 (2009) with IW4x ----------------------------------------------------
+# Copy the Steam install of MW2 into this folder by hand (see docs/iw4x.md).
+# Once iw4mp.exe is there, this role adds IW4x on top of it.
+iw4x_dir: "{{ gameshare_root }}/mw2"
+# Pinned so every seat runs the same IW4x; seats on different builds cannot
+# play together. To update: change the versions, run server.yml, and the
+# seats pick it up at their next pull.
+iw4x_client_version: r5083
+iw4x_rawfiles_version: v0.2.36
+# sha256 of iw4x.dll for the pinned version. Empty skips the check; fill it
+# in after the first download (sha256sum /var/cache/iw4x/iw4x-*.dll).
+iw4x_client_sha256: ""
+iw4x_rawfiles_sha256: 1e80420c02397e872e02581d3a083b31db99c443a8449267c8a2108bff6e2260
+iw4x_client_url: "https://github.com/iw4x/iw4x-client/releases/download/{{ iw4x_client_version }}/iw4x.dll"
+iw4x_rawfiles_url: "https://github.com/iw4x/iw4x-rawfiles/releases/download/{{ iw4x_rawfiles_version }}/release.zip"
+iw4x_cache: /var/cache/iw4x

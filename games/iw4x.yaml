@@ -1,0 +1,39 @@
+# Call of Duty: Modern Warfare 2 (2009) multiplayer on IW4x, through Proton.
+# The server holds MW2 with IW4x on top (roles/server_gameshare); each seat
+# copies it read-only to /games/classic/mw2 (roles/games). iw4x-seat builds a
+# writable view of that folder in the player's home and starts IW4x with
+# umu-run, so it is "native" here: the script calls Proton itself.
+# Not yet tested on a seat. On the canary, confirm: no first-start dialog,
+# the name and the graphics settings stick, and +connect joins.
+id: iw4x
+name: Modern Warfare 2
+subtitle: IW4x multiplayer, 2009
+group: classic
+runtime: native
+engine: IW4x on Proton
+path: /games/classic/mw2
+players: { min: 2, max: 18 }
+launch:
+  command: ["iw4x-seat"]
+  # A fresh players/ folder each session, so these are the only settings.
+  args:
+    - "+set"
+    - "name"
+    - "{{ nickname }}"
+    - "+set"
+    - "r_fullscreen"
+    - "1"
+    - "+set"
+    - "r_mode"
+    - "{{ width }}x{{ height }}"
+    - "+set"
+    - "com_maxfps"
+    - "{{ fps_cap }}"
+# Address, or address:port; IW4x servers listen on 28960 by default.
+join:
+  args: ["+connect", "{{ server }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 120 }
+art: { hue: 95, glow: 40, motif: contour }

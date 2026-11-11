@@ -114,6 +114,7 @@ A thin launcher of our own on top of proven runners: the launcher owns the exper
 | Warcraft | Warcraft II: Wargus (native, uses original data). Warcraft III: Proton | Broadcast discovery inside one VLAN | Which Warcraft and edition we own |
 | Unreal Tournament (99) | OldUnreal 469e, native Linux | Dedicated server | Needs the original data files |
 | Unreal Tournament 2004 | Native Linux build or Proton, by testing | Dedicated server | Which runs better on our tiers |
+| Call of Duty: Modern Warfare 2 (2009) | IW4x through Proton; game files from the server's share ([runbook](iw4x.md)) | IW4x server on the gaming server, or `+connect` to a seat | One owned Steam copy per seat |
 | Steam games | Steam with Proton | Per game | Kernel-level anti-cheat is best effort |
 | DOS-era titles | DOSBox Staging; IPX over UDP | DOSBox IPX server | Which ones we want |
 
