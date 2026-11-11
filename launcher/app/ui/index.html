@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Nimtech Arcade</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -104,6 +105,8 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+/* The artifact host adds this; the Tauri app serves the file as is. */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -1166,7 +1169,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#seat-short').textContent = b.seat_name; $('#seat-name').textContent = b.seat_name;
     $('#spec-gpu').textContent = b.gpu; $('#spec-display').textContent = b.display;
     $('#wl-kicker').textContent = `${b.seat_name} · Nimtech Arcade`;
-    $('#voice-text').textContent = b.voice ? `Voice · ${b.voice}` : 'Voice not set up';
+    $('#voice-text').textContent = b.voice != null ? `Voice · ${b.voice || 'Lobby'}` : 'Voice not set up';
     setInterval(async () => {
       if (!state.running) return;
       try { if (!(await invoke('running'))) quit(true); } catch (err) { /* keep state */ }

@@ -94,6 +94,21 @@
     group: "{{ seat_player_user }}"
     mode: "0755"
 
+- name: Do not start the CachyOS welcome app for the player (copied from /etc/skel)
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/.config/autostart/cachyos-hello.desktop"
+    state: absent
+
+- name: Keep the seat awake during a session (KDE suspends after 15 minutes)
+  ansible.builtin.copy:
+    dest: "/home/.golden/{{ seat_player_user }}/.config/powerdevilrc"
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+    content: |
+      [AC][SuspendAndShutdown]
+      AutoSuspendAction=0
+
 - name: Turn off the screen lock for the player (no password to unlock with)
   ansible.builtin.copy:
     dest: "/home/.golden/{{ seat_player_user }}/.config/kscreenlockerrc"

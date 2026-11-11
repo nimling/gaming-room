@@ -1,0 +1,10 @@
+# Managed by gaming-room Ansible (roles/launcher). Read by arcade and arcade-app.
+games_dir: {{ arcade_games_dir }}
+{% if arcade_proton_path %}
+proton: {{ arcade_proton_path }}
+{% endif %}
+{% if arcade_voice_server %}
+voice:
+  server: "{{ arcade_voice_server }}"
+  channel: "{{ arcade_voice_channel }}"
+{% endif %}

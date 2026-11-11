@@ -42,9 +42,12 @@ seat_admin_ssh_keys: ["$key"]
 seat_orchestrator_ssh_keys: ["$key"]
 seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
 seat_temporary_sudoers: ["/etc/sudoers.d/90-installer"]
+arcade_voice_server: "192.0.2.10"
+seat_display: "3440x1440@144"
 EOF
 echo 'installer ALL=(ALL) NOPASSWD:ALL' >/etc/sudoers.d/90-installer
 printf '[Autologin]\nSession=plasma\n' >/etc/plasmalogin.conf
+mkdir -p /etc/skel/.config/autostart && printf '[Desktop Entry]\nName=Hello\n' >/etc/skel/.config/autostart/cachyos-hello.desktop
 run_playbook() {
     (cd ansible && ansible-playbook seat.yml -i localhost, -c local -e target=localhost -e @/tmp/vars.yml)
 }
@@ -58,6 +61,13 @@ ok "orchestrator sources and temporary sudo rule"
 grep -qx 'User=player' /etc/plasmalogin.conf || die "Plasma Login Manager auto-login: $(cat /etc/plasmalogin.conf)"
 grep -qx 'Relogin=false' /etc/plasmalogin.conf || die "Plasma Login Manager relogin"
 ok "Plasma Login Manager auto-login"
+grep -q 'server: "192.0.2.10"' /etc/arcade/arcade.yaml || die "launcher voice server: $(cat /etc/arcade/arcade.yaml)"
+grep -qx '3440x1440@144' /etc/seat/display || die "seat display"
+grep -q 'arcade-app' /home/.golden/player/.config/autostart/arcade.desktop || die "launcher autostart"
+grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die "auto-suspend still on"
+grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
+[[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
+ok "launcher settings, autostart and no auto-suspend"
 
 step "Second run changes nothing"
 second=$(run_playbook)
