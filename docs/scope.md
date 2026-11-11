@@ -146,8 +146,9 @@ Open source, no license or slot limits, client in the CachyOS repos, Opus codec,
 
 Claude Code runs on the gaming server and works like a team member: it writes changes as pull requests, applies them to the canary seat, and runs the gate tests. People review and merge. Rules are in [CLAUDE.md](../CLAUDE.md).
 
-- Dedicated `claude` user on the server, signed in with a Nimtech seat or API key. The server is an SSH connection in the Claude desktop app; nightly runs use a systemd timer with `claude -p`.
-- `orchestrator` account on each seat: SSH key only, accepted only from the server's IP.
+- Dedicated `claude` user on the server, signed in with a Nimtech Team seat. People reach it from anywhere through Remote Control (Claude app or claude.ai), with no VPN; the server makes outbound HTTPS only. It runs in tmux and starts at boot. Live since 11 November 2026.
+- GitHub: a fine-grained token for this repo only (Contents and Pull requests). `main` is not branch-protected by choice; the repo rules and Claude settings forbid pushing to it.
+- `orchestrator` account on each seat: SSH key only, accepted only from the server (plus the Mac that drove the first setup).
 - The gaming VLAN has no route into the corporate network.
 - Every command Claude runs is logged on the server.
 

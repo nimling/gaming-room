@@ -24,6 +24,7 @@ Launcher roles come in Phase 3.
 | `server_mumble` | Mumble in Docker; root channel "Lobby" |
 | `server_lancache` | Lancache and its DNS in Docker |
 | `server_wol` | `wake-seats`, using `seat_mac` from the inventory |
+| `server_claude` | `claude` account with sudo and its own SSH key, Claude Code, GitHub CLI, Ansible, and `claude-orchestrator.service` (Remote Control in tmux) |
 
 See [server/README.md](../server/README.md). Install the collections first: `ansible-galaxy collection install -r requirements.yml`.
 
