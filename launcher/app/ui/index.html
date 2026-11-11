@@ -330,6 +330,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .hint { margin: 0; color: var(--fg-3); font-size: 13px; line-height: 18px; }
 .invalid #nick-in, .invalid #nick-in:focus { box-shadow: inset 0 -2px 0 var(--critical); }
 .invalid .hint { color: var(--critical); }
+.ptt-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; }
+.ptt-keys { color: var(--fg-2); margin-right: 4px; }
+.ptt-keys kbd { font-size: 13px; height: 24px; padding: 0 8px; }
+.capturing #ptt-change { box-shadow: inset 0 0 0 1px var(--accent); color: var(--fg); }
 .welcome-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .preview { margin: 18px 0 0; display: flex; gap: 8px; flex-wrap: wrap; color: var(--fg-3); font-size: 13px; }
 .preview span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--card); border: 1px solid var(--stroke); }
@@ -489,7 +493,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   <div class="stack">
     <button class="btn" data-action="mute" id="fly-mute">Mute my mic</button>
   </div>
-  <p class="fine">Push to talk: hold the mouse side button or <kbd>V</kbd>. It works everywhere, also inside games.</p>
+  <p class="fine" id="ptt-fine">Push to talk: hold the mouse side button or <kbd>V</kbd>. It works everywhere, also inside games.</p>
 </div>
 
 <div class="flyout" id="fly-me" role="dialog" aria-label="You" data-modal="false" hidden>
@@ -514,6 +518,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       <label for="nick-in">Nickname</label>
       <input id="nick-in" maxlength="16" spellcheck="false" placeholder="Your nickname" data-autofocus>
       <p class="hint" id="nick-hint">2 to 16 characters: letters A–Z, numbers, - or _. The seat forgets it when you end the session.</p>
+    </div>
+    <div class="field" id="ptt-field">
+      <label for="ptt-change">Push to talk</label>
+      <div class="ptt-row">
+        <span class="ptt-keys" id="ptt-keys"></span>
+        <button class="btn" id="ptt-change" type="button" data-action="ptt-change">Change</button>
+        <button class="btn subtle" id="ptt-reset" type="button" data-action="ptt-reset" hidden>Use default</button>
+      </div>
+      <p class="hint" id="ptt-hint">Hold it to talk in voice, also inside games.</p>
     </div>
     <div class="welcome-actions">
       <button class="btn accent lg" id="nick-go" type="submit">Let's play</button>
@@ -624,7 +637,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   };
   let PEOPLE = ['Kaptein', 'Lyn', 'Mora', 'Pixel', 'Ola', 'Tuva'];
 
-  const state = { nick: 'Nima', tier: 'B', filter: 'all', sel: 'ut99', running: null, muted: false, talker: null, lastReset: new Date(Date.now() - 47 * 60000) };
+  const state = { nick: 'Nima', ptt: null, pttDraft: null, capturing: false, tier: 'B', filter: 'all', sel: 'ut99', running: null, muted: false, talker: null, lastReset: new Date(Date.now() - 47 * 60000) };
   const game = id => GAMES.find(g => g.id === id);
   const servers = id => (LAN[id] || []).slice().sort((a, b) => (b.mine ? -1 : 0) - (a.mine ? -1 : 0) || b.n - a.n);
   const joinable = id => servers(id).filter(s => !s.mine && s.n < s.max);
@@ -632,6 +645,20 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
   const avatar = (name, cls = '') => `<span class="avatar ${cls}" style="--av:hsl(${hue(name)},42%,40%)">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
   const hhmm = d => d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+
+  /* Push to talk. null is the golden default: mouse side button or V. Keys are browser
+     KeyboardEvent.code values; the Rust core (ptt.rs) maps the same list to evdev codes. */
+  const PTT_OK = /^(Key[A-Z]|Digit[0-9]|F([1-9]|1[0-2])|Backquote|CapsLock|(Shift|Control|Alt)(Left|Right)|Mouse(Back|Forward|Middle))$/;
+  const PTT_MOUSE = { 1: 'MouseMiddle', 3: 'MouseBack', 4: 'MouseForward' };
+  const PTT_NAMES = { MouseBack: 'Side button', MouseForward: 'Front side button', MouseMiddle: 'Middle button', Backquote: '`', CapsLock: 'Caps Lock' };
+  function pttName(code) {
+    if (PTT_NAMES[code]) return PTT_NAMES[code];
+    const m = /^(Shift|Control|Alt)(Left|Right)$/.exec(code);
+    if (m) return `${m[2]} ${m[1] === 'Control' ? 'Ctrl' : m[1]}`;
+    return code.replace(/^(Key|Digit)/, '');
+  }
+  const pttKbd = code => code ? `<kbd>${esc(pttName(code))}</kbd>` : '<kbd>Side button</kbd> or <kbd>V</kbd>';
+  const pttHeld = e => state.ptt ? e.code === state.ptt : e.code === 'KeyV';
 
   /* ---------- Generative key art (stand-in for real art from the manifest) ---------- */
   function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -828,7 +855,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     m.classList.toggle('muted', state.muted); m.classList.toggle('live', !!live && !state.muted);
     m.setAttribute('aria-pressed', String(state.muted));
     $('#mic-ico').innerHTML = ico(state.muted ? 'micoff' : 'mic', 's16');
-    $('#mic-label').innerHTML = state.muted ? 'Muted' : live ? 'Talking' : 'Hold <kbd>Side button</kbd> or <kbd>V</kbd> to talk';
+    $('#mic-label').innerHTML = state.muted ? 'Muted' : live ? 'Talking' : `Hold ${pttKbd(state.ptt)} to talk`;
+    $('#ptt-fine').innerHTML = `Push to talk: hold ${pttKbd(state.ptt)}. It works everywhere, also inside games.`;
     $('#fly-mute').textContent = state.muted ? 'Unmute my mic' : 'Mute my mic';
   }
   function renderTier() {
@@ -904,6 +932,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   function back() {
     const top = layers[layers.length - 1];
     if (!top) { focusSelected(); return; }
+    if (state.capturing) { stopCapture(); return; }
     if (top.id === 'welcome' && !$('#nick-cancel').hidden) { closeLayer(top); return; }
     if (top.id === 'welcome' || top.id === 'reset') return;
     if (top.id === 'launch') { if (!$('#ln-running').hidden) closeLayer(top); return; }
@@ -1022,8 +1051,36 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#nick-in').value = rename ? state.nick : '';
     $('#nick-field').classList.remove('invalid');
     $('#nick-hint').textContent = '2 to 16 characters: letters A–Z, numbers, - or _. The seat forgets it when you end the session.';
+    state.pttDraft = state.ptt; stopCapture();
     renderPreview();
     openLayer($('#welcome'));
+  }
+  function renderPtt(hint = 'Hold it to talk in voice, also inside games.') {
+    $('#ptt-keys').innerHTML = pttKbd(state.pttDraft);
+    $('#ptt-change').textContent = state.capturing ? 'Press a key or mouse button…' : 'Change';
+    $('#ptt-reset').hidden = state.capturing || !state.pttDraft;
+    $('#ptt-field').classList.toggle('capturing', state.capturing);
+    $('#ptt-hint').textContent = hint;
+  }
+  function startCapture() { state.capturing = true; renderPtt('Esc cancels. Enter, Space, Tab and the arrows stay with the launcher.'); }
+  function stopCapture(code) {
+    if (code) state.pttDraft = code;
+    state.capturing = false; renderPtt();
+  }
+  let skipClick = false;
+  function captureKey(e) {
+    if (!state.capturing) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.type === 'keydown') {
+      if (e.repeat) return;
+      if (e.key === 'Escape') { stopCapture(); return; }
+      if (PTT_OK.test(e.code)) { stopCapture(e.code); return; }
+      renderPtt(`${e.key === ' ' ? 'Space' : e.key} is needed by the launcher. Pick another key.`);
+      return;
+    }
+    if (PTT_MOUSE[e.button]) { stopCapture(PTT_MOUSE[e.button]); return; }
+    if (e.button === 0) { stopCapture(); skipClick = true; return; }
+    renderPtt('The right button opens menus in games. Pick another button.');
   }
   function renderPreview() {
     const v = $('#nick-in').value.trim() || '…';
@@ -1038,8 +1095,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       $('#nick-in').focus(); return;
     }
     const first = $('#nick-cancel').hidden;
-    if (LIVE) invoke('set_nickname', { name: v }).catch(err => toast(`Voice did not connect: ${esc(err)}`));
-    state.nick = v; renderMe();
+    stopCapture();
+    if (LIVE) invoke('set_nickname', { name: v, key: state.pttDraft }).catch(err => toast(`Voice did not connect: ${esc(err)}`));
+    state.nick = v; state.ptt = state.pttDraft; renderMe(); renderMic();
     closeLayer($('#welcome'), false); focusSelected();
     toast(first ? `Welcome, ${esc(v)}. You're in the Lobby voice channel.` : `You're ${esc(v)} from the next game you start`);
   }
@@ -1062,7 +1120,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     const lis = $$('.step', R);
     for (let i = 0; i < lis.length; i++) { lis[i].dataset.s = 'active'; await sleep(650); lis[i].dataset.s = 'done'; }
     await sleep(350);
-    state.nick = ''; state.lastReset = new Date(); state.muted = false;
+    state.nick = ''; state.ptt = null; state.lastReset = new Date(); state.muted = false;
     $('#spec-reset').textContent = hhmm(state.lastReset);
     renderMe(); renderMic(); closeLayer(R, false);
     openWelcome('first');
@@ -1096,20 +1154,29 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       case 'rename': openWelcome('rename'); break;
       case 'first-start': openWelcome('first'); break;
       case 'cancel-rename': closeLayer($('#welcome')); break;
+      case 'ptt-change': if (!state.capturing) startCapture(); break;
+      case 'ptt-reset': state.pttDraft = null; renderPtt(); $('#ptt-change').focus(); break;
       case 'mute': toggleMute(); break;
     }
   });
   document.addEventListener('dblclick', e => { const t = e.target.closest('.tile'); if (t) play(t.dataset.id); });
   document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('#shelf .tile'); if (t && t.dataset.id !== state.sel) select(t.dataset.id); });
+  /* While picking a push-to-talk key, the next key or button press is the answer. */
+  document.addEventListener('keydown', captureKey, true);
+  document.addEventListener('mousedown', captureKey, true);
+  document.addEventListener('click', e => { if (skipClick) { skipClick = false; e.stopPropagation(); } }, true);
+  ['mouseup', 'auxclick'].forEach(t => document.addEventListener(t, e => { if (e.button === 3 || e.button === 4) e.preventDefault(); }, true));
   const KEYDIR = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
   document.addEventListener('keydown', e => {
     const typing = e.target.tagName === 'INPUT';
     if (KEYDIR[e.key] && !(typing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) { e.preventDefault(); move(KEYDIR[e.key]); return; }
     if (e.key === 'Escape') { e.preventDefault(); back(); return; }
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('tile')) { e.preventDefault(); play(e.target.dataset.id); return; }
-    if ((e.key === 'v' || e.key === 'V') && !typing && !e.repeat && !layers.some(l => l.dataset.modal === 'true')) renderMic(true);
+    if (pttHeld(e) && !typing && !e.repeat && !layers.some(l => l.dataset.modal === 'true')) renderMic(true);
   });
-  document.addEventListener('keyup', e => { if (e.key === 'v' || e.key === 'V') renderMic(false); });
+  document.addEventListener('keyup', e => { if (pttHeld(e)) renderMic(false); });
+  document.addEventListener('mousedown', e => { if (state.ptt && PTT_MOUSE[e.button] === state.ptt) renderMic(true); });
+  document.addEventListener('mouseup', e => { if (state.ptt && PTT_MOUSE[e.button] === state.ptt) renderMic(false); });
   $('#wl-form').addEventListener('submit', submitNick);
   $('#nick-in').addEventListener('input', () => { $('#nick-field').classList.remove('invalid'); renderPreview(); });
 
@@ -1163,7 +1230,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   async function boot() {
     const b = await invoke('bootstrap');
     GAMES = b.games; LAN = {}; PEOPLE = [];
-    state.tier = b.tier; state.nick = b.nickname || '';
+    state.tier = b.tier; state.nick = b.nickname || ''; state.ptt = b.ptt || null;
     state.sel = GAMES.length ? GAMES[0].id : null;
     document.documentElement.classList.add('live');
     $('#seat-short').textContent = b.seat_name; $('#seat-name').textContent = b.seat_name;
@@ -1181,6 +1248,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       try { await boot(); } catch (err) { toast(`Could not read this seat: ${esc(err)}`); }
     } else if (saved && typeof saved === 'object') {
       if (typeof saved.nick === 'string') state.nick = saved.nick;
+      if (typeof saved.ptt === 'string' && PTT_OK.test(saved.ptt)) state.ptt = saved.ptt;
       if (saved.tier in TIERS) state.tier = saved.tier;
       if (saved.sel && game(saved.sel)) state.sel = saved.sel;
       if (['all', 'classic', 'steam', 'lan'].includes(saved.filter)) state.filter = saved.filter;
@@ -1192,7 +1260,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     if (!state.nick) openWelcome('first');
   }
   const H = window.claude && window.claude.hot;
-  if (H && H.snapshot) H.snapshot(() => ({ nick: state.nick, tier: state.tier, sel: state.sel, filter: state.filter }));
+  if (H && H.snapshot) H.snapshot(() => ({ nick: state.nick, ptt: state.ptt, tier: state.tier, sel: state.sel, filter: state.filter }));
   H && H.ready ? H.ready(start) : start((H && H.data) || {});
 })();
 </script>
