@@ -12,6 +12,5 @@ network:
       interfaces: [{{ pccafe_bridge_nic }}]
       macaddress: "{{ ansible_facts[pccafe_bridge_nic | replace('-', '_')].macaddress }}"
       dhcp4: true
-      parameters:
-        stp: false
-        forward-delay: 0
+      # No bridge parameters (stp, forward-delay): `netplan try` refuses to roll back custom
+      # bridge parameters, and networkd's defaults (STP off) are what we want.

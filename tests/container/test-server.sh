@@ -109,13 +109,16 @@ grep -q 'image: dockurr/windows:6.06' "$c" || die "cafe image not pinned"
 grep -q 'network_mode: host' "$c" || die "cafe container not on the host network"
 grep -q 'NETWORK: "N"' "$c" || die "dockur still sets up its own network"
 grep -qE 'ifname=tap-cafe,script=no,downscript=no -device virtio-net-pci,id=net0,netdev=hostnet0,mac=02(:[0-9a-f]{2}){5}"' "$c" \
-    || { grep ARGUMENTS "$c"; die "cafe VM NIC is not the tap with a local MAC"; }
+    || die "cafe VM NIC is not the tap with a local MAC"
 if grep -qE 'macvlan|vhost|NET_ADMIN' "$c"; then die "macvlan leftovers in the cafe compose file"; fi
 pw=$(cat /srv/gaming-room/pccafe/windows-password)
 (( ${#pw} >= 16 )) || die "cafe Windows password too short"
 grep -qF "PASSWORD: \"$pw\"" "$c" || die "cafe Windows password not used"
 grep -q 'localport=27036' "$bat" || die "cafe discovery firewall rule"
 grep -q 'localport=27037' "$bat" || die "cafe client firewall rule"
+grep -q 'RealTimeIsUniversal /t REG_DWORD /d 1' "$bat" || die "cafe clock not on UTC"
+grep -q 'tzutil /s "W. Europe Standard Time"' "$bat" || die "cafe time zone"
+if grep -qE '^ *parameters:' "$np"; then die "bridge parameters block netplan try's rollback"; fi
 [[ $(stat -c '%a %U' "$np") == "600 root" ]] || die "bridge netplan file not root-only"
 grep -q 'interfaces: \[eth0\]' "$np" || die "NIC not in the bridge"
 grep -qE 'macaddress: "([0-9a-f]{2}:){5}[0-9a-f]{2}"' "$np" || die "bridge does not keep the NIC's MAC"

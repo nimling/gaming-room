@@ -5,3 +5,8 @@ rem Runs once, at the end of the Windows install (dockur copies it to C:\OEM).
 rem Seats find the cafe server by UDP broadcast on 27036 and connect on TCP 27037.
 netsh advfirewall firewall add rule name="Steam PC Cafe discovery" dir=in action=allow protocol=UDP localport=27036
 netsh advfirewall firewall add rule name="Steam PC Cafe clients" dir=in action=allow protocol=TCP localport=27037
+
+rem The VM's hardware clock runs on UTC (dockur: -rtc base=localtime in a UTC
+rem container). Tell Windows so, and use local time on screen.
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /t REG_DWORD /d 1 /f
+tzutil /s "{{ pccafe_timezone }}"

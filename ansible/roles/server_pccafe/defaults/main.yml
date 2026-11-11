@@ -27,10 +27,13 @@ pccafe_bridge_nic: ""
 pccafe_tap: tap-cafe
 pccafe_adapter: virtio-net-pci
 # A locally administered MAC for the VM, stable per server, so the router
-# keeps giving Windows the same address.
+# keeps giving Windows the same address. To keep a VM's existing NIC, set
+# pccafe_mac to its MAC in the private inventory.
 pccafe_mac: >-
   {{ (['02'] + ((inventory_hostname ~ '-pccafe') | hash('md5')
      | batch(2) | map('join') | list)[:5]) | join(':') }}
+# Windows time zone (tzutil name).
+pccafe_timezone: W. Europe Standard Time
 # Windows login for the VM (web viewer on <server>:8006, or RDP). The password is
 # made on the server and kept in {{ pccafe_dir }}/windows-password (root only).
 pccafe_windows_user: cafe
