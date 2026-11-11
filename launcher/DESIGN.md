@@ -5,7 +5,7 @@ The launcher follows **Fluent 2**. It must look modern and be easy to use with k
 ## Ease of use comes first
 
 - **Two inputs to play.** Pick a game, press Play. Enter on a game, or A on a gamepad, also plays.
-- **No questions at launch.** Settings come from the seat's tier and the manifest. The only dialog in the whole app is the End session confirmation.
+- **No questions at launch.** Settings come from the seat's tier and the manifest. The app has two dialogs: the End session confirmation and the IP addresses list, which the player opens.
 - **Join where people are.** Every game shows the LAN games running now. Join goes to the busiest open game in one click.
 - **State is always visible.** A running game, people in voice, who is talking, the seat's tier.
 - **Getting out is one button.** End session is always in the status bar.
@@ -31,7 +31,8 @@ The launcher follows **Fluent 2**. It must look modern and be easy to use with k
 3. Running: Resume or Quit; the tile shows Running.
 4. Voice: Lobby flyout with who is talking; mute; push to talk on the mouse side button or V.
 5. End session: one confirmation, then the seat reset, then the nickname screen.
-6. Seat flyout: the tier, with a prototype switch to see how A, B and C change the tuning.
+6. IP addresses: a status bar button opens a list of every seat and the server. Pick one to copy its address.
+7. Seat flyout: the tier, with a prototype switch to see how A, B and C change the tuning.
 
 ## Stack recommendation
 

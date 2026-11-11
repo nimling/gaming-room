@@ -99,5 +99,9 @@ arcade_voice_server: ""
 # Empty joins the root channel (named Lobby on our server).
 arcade_voice_channel: ""
 arcade_voice_port: 64738
+# Seats and server shown on the launcher's IP addresses screen, as
+# [{name, address}]. A push run fills it from the inventory (each host's
+# seat_lan_address, else ansible_host); pull runs read it from local-vars.
+arcade_hosts: []
 # Screen size and refresh, for example 3440x1440@144; private inventory, per seat.
 seat_display: ""

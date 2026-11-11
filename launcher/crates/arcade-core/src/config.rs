@@ -14,6 +14,16 @@ pub struct Config {
     pub proton: Option<PathBuf>,
     /// Mumble server to join after the nickname step.
     pub voice: Option<Voice>,
+    /// Every seat and the server on the gaming VLAN, for the IP addresses
+    /// screen. Ansible fills it from the private inventory.
+    pub hosts: Vec<Host>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Host {
+    pub name: String,
+    pub address: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,6 +44,7 @@ impl Default for Config {
             games_dir: PathBuf::from("/usr/local/share/arcade/games"),
             proton: None,
             voice: None,
+            hosts: Vec::new(),
         }
     }
 }

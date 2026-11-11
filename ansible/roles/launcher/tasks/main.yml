@@ -100,6 +100,17 @@
   # In a dry run of a fresh seat the build account and build do not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+# Only a push run sees the whole inventory; it starts from the empty
+# default and adds each host that has an address. The pull role saves the
+# list in local-vars for pull runs.
+- name: Collect the seat and server addresses for the launcher (push runs)
+  ansible.builtin.set_fact:
+    arcade_hosts: "{{ arcade_hosts + [{'name': item, 'address': hostvars[item].seat_lan_address | default(hostvars[item].ansible_host)}] }}"
+  loop: "{{ (groups['server'] | default([]) | sort) + (groups['seats'] | default([]) | sort) }}"
+  when:
+    - (ansible_connection | default('ssh')) != 'local'
+    - hostvars[item].seat_lan_address is defined or hostvars[item].ansible_host is defined
+
 - name: Write the launcher settings
   ansible.builtin.template:
     src: arcade.yaml.j2

@@ -24,6 +24,7 @@ all:
         seat-01:
           # Real address and MAC go in inventory.yml only.
           # ansible_host: 192.0.2.21
+          # seat_lan_address: 192.0.2.21    # shown on the IP addresses screen; default ansible_host
           # seat_mac: "00:00:5e:00:53:01"   # for wake-seats
         seat-02:
         seat-03:

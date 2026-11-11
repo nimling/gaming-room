@@ -25,6 +25,7 @@ arcade --games ../games list --all
 arcade --games ../games plan ut99 --nick Tester
 arcade --games ../games plan ut99 --nick Tester --profile C --join 192.0.2.20:7777
 arcade --games ../games plan openra-ra --nick Tester
+arcade ips
 
 step "Build the app"
 cargo build --locked -p arcade-app

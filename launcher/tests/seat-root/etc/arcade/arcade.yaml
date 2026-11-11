@@ -2,3 +2,7 @@
 games_dir: ../games
 voice:
   server: gaming-server
+hosts:
+  - { name: gaming-server, address: 192.0.2.10 }
+  - { name: seat-01, address: 192.0.2.21 }
+  - { name: seat-02, address: 192.0.2.22 }

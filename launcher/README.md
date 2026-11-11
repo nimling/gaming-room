@@ -28,6 +28,7 @@ arcade plan ut99 --profile C                  # what a launch would do
 arcade launch ut99 --join 192.0.2.20:7777     # start and join
 arcade launch ut99 --screenshot-after 20      # test mode: screenshot, then close
 arcade nick Kaptein                           # set the nickname
+arcade ips                                    # IP addresses of every seat and the server
 arcade end-session                            # reset the seat
 ```
 
@@ -38,7 +39,7 @@ arcade end-session                            # reset the seat
 | `/etc/seat/tier` | `seat-tier` (Phase 1) | Settings per tier |
 | `/etc/seat/hardware.json` | `seat-tier` | Graphics card shown in the seat panel |
 | `/etc/seat/display` | Not yet; Phase 3 Ansible role | Screen size, for example `2560x1440@144`. Default 1920x1080 at 60 Hz |
-| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server` |
+| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server`, `hosts` (name and address of every seat and the server, from the private inventory) |
 | `~/.config/arcade/nickname` | The launcher | Wiped by the seat reset |
 
 ## Develop and test

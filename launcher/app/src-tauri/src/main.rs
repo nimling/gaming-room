@@ -8,7 +8,7 @@
 
 use arcade_core::manifest::{self, Card, Manifest};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{nick, Config, Seat};
+use arcade_core::{lan, nick, Config, Seat};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::process::{Child, Command};
@@ -30,6 +30,7 @@ struct Boot {
     gpu: String,
     nickname: Option<String>,
     voice: Option<String>,
+    hosts: Vec<lan::Entry>,
     games: Vec<Card>,
 }
 
@@ -56,6 +57,7 @@ fn bootstrap(app: State<'_, Arcade>) -> Result<Boot, String> {
         gpu: seat.gpu.clone(),
         nickname: nick::load(&seat.home),
         voice: app.config.voice.as_ref().map(|v| v.channel.clone()),
+        hosts: lan::entries(&app.config, &seat.name),
         games,
     })
 }

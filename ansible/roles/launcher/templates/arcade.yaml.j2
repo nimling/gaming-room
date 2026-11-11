@@ -8,3 +8,10 @@ voice:
   server: "{{ arcade_voice_server }}"
   channel: "{{ arcade_voice_channel }}"
 {% endif %}
+{% if arcade_hosts %}
+hosts:
+{% for h in arcade_hosts %}
+  - name: {{ h.name | to_json }}
+    address: {{ h.address | to_json }}
+{% endfor %}
+{% endif %}
