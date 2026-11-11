@@ -49,6 +49,17 @@ ut99_iso_sha256: e184984ca88f001c5ddd52035d76cd64e266e26c74975161b5ed72366c74704
 ut99_bp4_url: https://files.oldunreal.net/utbonuspack4-zip.7z
 ut99_bp4_sha256: 5b7a1080724a122a596c226c50d4dc7c2d7636ceaf067e9c12112014a170ffba
 
+# Mods built into the game folder, so the server and every seat have the
+# same files. Each zip is laid out like the game folder. Pinned by sha256;
+# changing the list rebuilds the game (about a minute, from the cache).
+ut99_mods:
+  # Monster Hunt: co-op against the monsters of Unreal, 8 MH and 4 MA maps.
+  # SHA1 d887e9cf04aa484253bd99917e1649fd03f8d9d1 matches unrealarchive.org.
+  - name: monsterhunt613
+    file: MonsterHunt613.zip
+    url: https://github.com/shrimpza/monsterhunt/releases/download/releases%2Fv613/MonsterHunt613.zip
+    sha256: 5c23fa6ac2efc714784c8020c72d1acefb24027952835a7565d537c38fa86622
+
 # Dedicated LAN server, from the same files. Off until switched on in the
 # private inventory. It answers LAN browser queries on the gaming VLAN only.
 ut99_server_enabled: false
