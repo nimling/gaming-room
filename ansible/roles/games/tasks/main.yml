@@ -103,6 +103,15 @@
   # In a dry run the folder and the download do not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+# --- Free LAN games from the package repos ------------------------------------
+# Native, free and open source; each has a manifest in games/. pacman keeps
+# them current with the rest of the seat.
+- name: Install the free LAN games
+  community.general.pacman:
+    name: "{{ seat_free_games }}"
+    state: present
+  when: seat_free_games | length > 0
+
 # --- Games from the gaming server's share ------------------------------------
 - name: Install rsync for the game share
   community.general.pacman:

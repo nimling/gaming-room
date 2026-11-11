@@ -1,0 +1,27 @@
+# Teeworlds 0.7: free 2D shooter (deathmatch, CTF), native. CachyOS package
+# teeworlds. The client runs each argument as a console command, so the
+# settings go on the command line and the fresh home needs no file.
+# To check on the canary: no welcome screen, the nickname, fullscreen.
+id: teeworlds
+name: Teeworlds
+subtitle: 2D shooter, deathmatch and capture the flag
+group: classic
+runtime: native
+engine: Teeworlds 0.7
+players: { min: 2, max: 16 }
+launch:
+  command: ["teeworlds"]
+  args:
+    - "player_name {{ nickname }}"
+    - "cl_show_welcome 0"
+    - "gfx_fullscreen 1"
+    - "gfx_screen_width {{ width }}"
+    - "gfx_screen_height {{ height }}"
+# Address, or address:port; servers listen on 8303 by default.
+join:
+  args: ["connect {{ server }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: native, fps_cap: 60 }
+art: { hue: 28, glow: 52, motif: dots }
