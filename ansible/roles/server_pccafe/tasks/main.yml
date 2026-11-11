@@ -1,0 +1,5 @@
+---
+# Off unless pccafe_enabled is set in the private inventory.
+- name: Café | Windows VM for the Steam PC Café Server
+  ansible.builtin.include_tasks: vm.yml
+  when: pccafe_enabled
