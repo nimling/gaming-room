@@ -6,8 +6,10 @@
 #
 # Arguments: the GitHub user whose public SSH keys may log in, and the
 # seat's name. It installs and starts OpenSSH, adds those keys for the
-# account that ran sudo, sets the host name, and prints the address.
-# It changes nothing else; the seat playbook does the rest.
+# account that ran sudo, sets the host name, and lets that account use
+# sudo without a password until the first Ansible run deletes the rule
+# (/etc/sudoers.d/90-seat-bootstrap, listed in seat_temporary_sudoers).
+# It prints what Claude needs. The seat playbook does the rest.
 set -euo pipefail
 
 die() { echo "bootstrap: $*" >&2; exit 1; }
@@ -48,10 +50,30 @@ echo "Added $added key(s) for $user"
 
 hostnamectl set-hostname "$seat_name"
 systemctl enable --now sshd >/dev/null 2>&1
+# CachyOS turns ufw on by default and it drops SSH. Open SSH to the seat's
+# own network only (the gaming VLAN, where the server is). Phase 1 then makes
+# sshd key-only and limits who may log in.
+lan=$(ip -4 route show scope link | awk '!/linkdown/ {print $1; exit}')
+if [[ -n $lan ]] && command -v ufw >/dev/null 2>&1 && ufw status | grep -q 'Status: active'; then
+    ufw allow from "$lan" to any port 22 proto tcp >/dev/null && echo "Opened SSH in the firewall for $lan"
+fi
 
-address=$(ip -4 -brief address show scope global | awk '{print $3}' | cut -d/ -f1 | head -n 1)
+# Temporary: the first Ansible run uses this account with sudo, then deletes
+# this file as its very last task.
+rule=/etc/sudoers.d/90-seat-bootstrap
+printf '# Temporary, from bootstrap/seat.sh. The first Ansible run deletes it.\n%s ALL=(ALL) NOPASSWD: ALL\n' "$user" >"$rule.tmp"
+chmod 0440 "$rule.tmp"
+visudo -cf "$rule.tmp" >/dev/null || die "the sudo rule did not validate"
+mv "$rule.tmp" "$rule"
+
+route_dev=$(ip -4 route show default | awk '{print $5; exit}')
+address=$(ip -4 -brief address show dev "${route_dev:-lo}" | awk '{print $3}' | cut -d/ -f1 | head -n 1)
+mac=$(cat "/sys/class/net/${route_dev:-lo}/address" 2>/dev/null || true)
+fstype=$(findmnt -no FSTYPE /)
 echo
 echo "Done. Send this to Claude:"
 echo "  seat:    $seat_name"
 echo "  user:    $user"
 echo "  address: ${address:-unknown}"
+echo "  mac:     ${mac:-unknown}"
+echo "  disk:    $fstype"

@@ -48,18 +48,19 @@ ansible-playbook server.yml --check --diff         # the gaming server
 
 ### First run on a freshly installed seat
 
-1. At the seat, once: the bootstrap line in [`../bootstrap/seat.sh`](../bootstrap/seat.sh) (SSH on, GitHub keys, host name).
-2. At the seat, once, as the installer's user (here `nim`), so Ansible can use sudo without a password for this one run:
+1. At the seat, once, from the installer's account (here `nim`): the bootstrap line in [`../bootstrap/seat.sh`](../bootstrap/seat.sh). It turns on SSH with the GitHub keys, sets the host name, adds a temporary passwordless sudo rule (`/etc/sudoers.d/90-seat-bootstrap`), and prints the seat, user, address, MAC and filesystem.
+2. In `inventory.yml`: the seat's `ansible_host`, and `seat_mac` for `wake-seats`.
+3. First run as that user, keeping its SSH login for this one run. Pass the user with `-e`: the inventory's `ansible_user` (orchestrator) would win over `-u`.
 
    ```bash
-   echo 'nim ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/90-nim
+   ansible-playbook seat.yml -l seat-02 -e '{"ansible_user": "nim", "seat_extra_ssh_users": ["nim"]}' --check --diff
+   ansible-playbook seat.yml -l seat-02 -e '{"ansible_user": "nim", "seat_extra_ssh_users": ["nim"]}'
    ```
 
-3. In `inventory.yml`, for that seat only: `ansible_user: nim`, `seat_extra_ssh_users: [nim]` and `seat_temporary_sudoers: ["/etc/sudoers.d/90-nim"]`.
-4. Run `ansible-playbook seat.yml -l seat-01 --check --diff`, then without `--check`.
-   - A fresh seat may carry a months-old package list. The first run updates the whole system once, restarts sshd (an OpenSSH upgrade otherwise resets every new connection) and reboots if the kernel changed.
+   - A fresh seat may carry a months-old package list. The first run updates the whole system once and restarts sshd (an OpenSSH upgrade otherwise resets every new connection). If the kernel changed, it reboots at the end of the run, so the seat comes back with auto-login in place.
+   - CachyOS has ufw on and it drops SSH. The bootstrap opens SSH to the seat's own network; the base role then allows SSH from `seat_orchestrator_source`.
    - The last task deletes the temporary sudo rule. `nim` leaves `wheel` and SSH.
-5. Remove the three lines from step 3. From now on Ansible logs in as `orchestrator` with passwordless sudo, from the addresses in `seat_orchestrator_source` only.
+4. From now on Ansible logs in as `orchestrator` with passwordless sudo, from the addresses in `seat_orchestrator_source` only.
 
 Measured on seat-01 (RTX 3090, ext4): full system update about 2 minutes, configuration 84 seconds, second run 0 changes.
 
