@@ -63,6 +63,15 @@ seat_pull_enabled: true
 seat_openra_ra_mirrors: https://www.openra.net/packages/ra-quickinstall-mirrors.txt
 seat_openra_ra_sha1: 44241f68e69db9511db82cf83c174737ccda300b
 
+# Shared game files on the gaming server (roles/server_gameshare), as an
+# rsync URL such as rsync://gaming-server/games. Private inventory.
+# Empty: games from the share (MW2 with IW4x) are skipped.
+seat_gameshare: ""
+seat_mw2_dir: "{{ seat_classic_root }}/mw2"
+# true: compare every file by content, not size and date. Slower; use it to
+# repair a game folder that looks fine but crashes.
+seat_gameshare_verify: false
+
 # Launcher (roles/launcher)
 arcade_source_branch: "{{ seat_config_branch }}"
 arcade_build_root: /var/cache/arcade

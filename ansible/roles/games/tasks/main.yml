@@ -102,3 +102,7 @@
   when: openra_installed.stat.exists and not openra_ra_content.stat.exists
   # In a dry run the folder and the download do not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
+
+- name: MW2 with IW4x, from the gaming server
+  ansible.builtin.include_tasks: iw4x.yml
+  when: seat_gameshare | length > 0

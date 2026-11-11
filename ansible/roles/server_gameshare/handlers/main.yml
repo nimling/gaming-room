@@ -1,0 +1,6 @@
+---
+- name: Restart rsyncd
+  ansible.builtin.systemd_service:
+    name: rsync.service
+    state: restarted
+  when: not server_in_container

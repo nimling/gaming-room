@@ -9,7 +9,7 @@ Everything on a seat is described here. Seats apply it themselves with `ansible-
 | `base` | Base packages, `/etc/seat/seat.conf`, sshd (keys only, named users only), time sync, Wake-on-LAN |
 | `accounts` | `admin`, `player` and `orchestrator` accounts; removes old users from `wheel`; polkit rule for the player |
 | `tier` | `seat-tier` detects GPU memory and RAM at every boot and writes `/etc/seat/tier` (A, B or C) |
-| `games` | `/games` as a btrfs subvolume: `/games/steam` (player-writable), `/games/classic` (read-only) |
+| `games` | `/games` as a btrfs subvolume: `/games/steam` (player-writable), `/games/classic` (read-only); copies games from the server's share (`seat_gameshare`) and installs `iw4x-seat` |
 | `session` | Golden home, `seat-reset`, logout watcher, idle logout, auto-login (SDDM or Plasma Login Manager), token check, golden capture |
 | `updates` | `seat-update` (snapshot, then full update) and the update freeze |
 | `pull` | `seat-pull.timer`: `ansible-pull` at boot and nightly |
@@ -23,6 +23,7 @@ Launcher roles come in Phase 3.
 | `server_base` | Ubuntu check, Docker, sshd (keys only), `ufw`, time zone, KVM check |
 | `server_mumble` | Mumble in Docker; root channel "Lobby" |
 | `server_lancache` | Lancache and its DNS in Docker |
+| `server_gameshare` | Read-only rsync share for game files in `/srv/games`; installs IW4x on top of MW2 there |
 | `server_wol` | `wake-seats`, using `seat_mac` from the inventory |
 | `server_claude` | `claude` account with sudo and its own SSH key, Claude Code, GitHub CLI, Ansible, and `claude-orchestrator.service` (Remote Control in tmux) |
 

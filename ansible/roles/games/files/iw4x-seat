@@ -1,0 +1,73 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# Starts IW4x (Call of Duty: Modern Warfare 2, 2009, multiplayer) with Proton.
+#
+# The game folder in /games is shared and read-only, but IW4x writes its
+# settings and its player key into players/ next to the game. So every start
+# builds a private view of the folder in the player's home: real folders,
+# linked game files (cp -rs), and real copies of the .exe and .dll files so
+# Wine sees the game in this folder. The home reset throws it all away, so
+# each session starts clean and gets its own IW4x key.
+#
+#   iw4x-seat [game arguments]   start the game, for example +connect host
+#   iw4x-seat --check            check the install and say what is wrong
+set -euo pipefail
+
+src=${IW4X_GAME_DIR:-/games/classic/mw2}
+data=${XDG_DATA_HOME:-$HOME/.local/share}/arcade
+dir=$data/iw4x-game
+log=$data/iw4x.log
+
+problems=()
+[[ -f $src/iw4mp.exe ]] || problems+=("MW2 is missing: no iw4mp.exe in $src")
+[[ -f $src/iw4x.exe ]] || problems+=("IW4x raw files are missing: no iw4x.exe in $src")
+[[ -f $src/iw4x.dll ]] || problems+=("IW4x client is missing: no iw4x.dll in $src")
+[[ -d $src/zone ]] || problems+=("game data is missing: no zone/ folder in $src")
+command -v umu-run >/dev/null || problems+=("umu-run is not installed")
+
+if [[ ${1:-} == --check ]]; then
+    if [[ -f $src/.iw4x-version ]]; then
+        echo "installed: $(cat "$src/.iw4x-version")"
+    fi
+    if ((${#problems[@]})); then
+        printf 'problem: %s\n' "${problems[@]}"
+        exit 1
+    fi
+    echo "ok: ready to play"
+    exit 0
+fi
+if ((${#problems[@]})); then
+    printf 'iw4x-seat: %s\n' "${problems[@]}" >&2
+    exit 1
+fi
+
+# Fresh links at every start, so an update in /games shows up at once.
+# players/ (settings, key) stays for the rest of the session.
+mkdir -p "$dir"
+chmod -R u+w "$dir"
+find "$dir" -mindepth 1 -maxdepth 1 ! -name players -exec rm -rf -- {} +
+for entry in "$src"/*; do
+    name=${entry##*/}
+    [[ $name == players ]] && continue
+    case ${name,,} in
+        *.exe | *.dll) cp -- "$entry" "$dir/$name" ;;
+        *) cp -rs -- "$entry" "$dir/$name" ;;
+    esac
+done
+mkdir -p "$dir/players"
+# The copied folders take the read-only modes of /games; IW4x writes into
+# them (logs, downloaded maps). chmod -R leaves the linked files alone.
+chmod -R u+w "$dir"
+
+# Same prefix and Proton build as the launcher uses for other Windows games.
+export WINEPREFIX=${WINEPREFIX:-$data/prefixes/iw4x}
+export GAMEID=${GAMEID:-0}
+if [[ -z ${PROTONPATH:-} ]]; then
+    PROTONPATH=$(sed -n "s/^proton:[[:space:]]*//p" /etc/arcade/arcade.yaml 2>/dev/null | head -n 1 || true)
+    export PROTONPATH=${PROTONPATH:-GE-Proton}
+fi
+mkdir -p "$WINEPREFIX"
+
+cd "$dir"
+echo "iw4x-seat: $(date -Is) starting with $PROTONPATH: $*" >>"$log"
+exec umu-run ./iw4x.exe "$@" >>"$log" 2>&1
