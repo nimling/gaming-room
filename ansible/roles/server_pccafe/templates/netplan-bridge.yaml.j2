@@ -1,0 +1,16 @@
+# Managed by gaming-room Ansible (roles/server_pccafe).
+# The NIC joins {{ pccafe_bridge }}, and the bridge takes over its address (DHCP,
+# with the NIC's own MAC so the router's reservation holds). The PC Café VM's
+# tap ({{ pccafe_tap }}) is the bridge's other port.
+network:
+  version: 2
+  ethernets:
+    {{ pccafe_bridge_nic }}:
+      dhcp4: false
+  bridges:
+    {{ pccafe_bridge }}:
+      interfaces: [{{ pccafe_bridge_nic }}]
+      macaddress: "{{ ansible_facts[pccafe_bridge_nic | replace('-', '_')].macaddress }}"
+      dhcp4: true
+      # No bridge parameters (stp, forward-delay): `netplan try` refuses to roll back custom
+      # bridge parameters, and networkd's defaults (STP off) are what we want.

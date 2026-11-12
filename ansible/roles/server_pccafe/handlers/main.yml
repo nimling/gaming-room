@@ -1,0 +1,15 @@
+---
+# Same MAC on the bridge, so DHCP gives the server its old address back.
+- name: Apply the network settings
+  ansible.builtin.command: netplan apply
+  changed_when: true
+  when: not server_in_container
+
+- name: Restart the café tap
+  ansible.builtin.systemd_service:
+    name: pccafe-tap.service
+    state: restarted
+    daemon_reload: true
+  when: not server_in_container
+  # In a dry run the unit file is not written.
+  ignore_errors: "{{ ansible_check_mode }}"

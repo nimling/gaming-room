@@ -16,7 +16,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | UT99 dedicated server | `server_gameshare` | 7777-7781 and 8777 UDP | Ready: InstaGib on DM-Deck16][, `ut99_server_enabled` in the private inventory |
 | OpenRA game server | — | 1234 TCP | Next |
 | LAN game list for the launcher | — | — | Later |
-| Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM) on macvlan |
+| Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM), NIC on the host bridge `br0` |
 | Claude Code (orchestrator) | `server_claude` | — | Ready: `claude` account, Remote Control in tmux, own SSH key for the seats |
 
 All service ports bind to the server's LAN address only. Docker publishes ports past `ufw`, so the VLAN is the real boundary; `ufw` guards SSH and anything else on the host.
@@ -35,6 +35,21 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 - The cache DNS answers those names with the server's address and passes the rest to the VLAN gateway.
 - **Seats must use the server as DNS.** Set it as the DNS server in the gaming VLAN's DHCP settings in UniFi.
 - Cache on `/srv/lancache/cache`, 1000 GB by default (`lancache_cache_size`).
+
+## Steam PC Café
+
+- Off by default. Switch on with `pccafe_enabled: true` and `pccafe_bridge_nic: <NIC>` (for example `enp2s0`) in `ansible/inventory.yml`.
+- The server's NIC joins the bridge `br0`; the bridge takes over the server's address (same MAC, so the DHCP reservation holds). The VM's NIC is the tap `tap-cafe` on `br0`, so Windows gets its own address from the router, like a seat.
+- Web viewer: `http://<server>:8006`, from the gaming VLAN only. The Windows password is in `/srv/gaming-room/pccafe/windows-password` (root only).
+- Why not macvlan: QEMU's macvtap path stopped carrying the VM's traffic on this server once Windows' driver took over.
+- **First switch to the bridge, by hand** (rolls back by itself after 2 minutes unless confirmed):
+
+  ```bash
+  ansible-playbook server.yml --check --diff     # shows the new netplan file
+  sudo install -m 600 <rendered file> /etc/netplan/60-gaming-room-bridge.yaml
+  sudo netplan try --timeout 120                 # check route, DNS, a seat; then Enter
+  ansible-playbook server.yml                    # tap, firewall, VM
+  ```
 
 ## First day
 

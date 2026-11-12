@@ -130,7 +130,7 @@ Only the central server must run Windows, but Valve's documentation does not say
 
 **Unknown:** whether the Linux Steam client can use the café pool; whether Valve accepts an internal company room; what café licenses cost.
 
-**Spike:** ask Valve; if yes or no answer, stand up `dockur/windows` with macvlan, sign one CachyOS seat in, launch one café-licensed title. Go only if a Linux seat can launch a café license.
+**Spike:** ask Valve; if yes or no answer, stand up `dockur/windows` on a host bridge, sign one CachyOS seat in, launch one café-licensed title. Go only if a Linux seat can launch a café license.
 
 **If no-go:** Lancache plus personal accounts; DRM-free copies Nimtech owns for shared LAN classics, after checking each license.
 

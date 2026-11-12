@@ -18,7 +18,7 @@ if ! getent hosts archive.ubuntu.com >/dev/null; then
         /etc/apt/sources.list.d/ubuntu.sources
 fi
 apt-get update -qq
-apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 iproute2 >/dev/null
+apt-get install -y -qq ansible ansible-lint yamllint shellcheck openssh-server sudo python3 python3-apt iproute2 >/dev/null
 mkdir -p /run/sshd
 
 cp -a /repo /work
@@ -50,16 +50,16 @@ all:
           server_upstream_dns: 192.0.2.1
           ut99_server_enabled: true
           pccafe_enabled: true
-          pccafe_ip_range: 192.0.2.248/30
-          pccafe_gateway: 192.0.2.1
-          pccafe_parent_nic: eth0
+          pccafe_bridge_nic: eth0
     seats:
       hosts:
         seat-01:
           seat_mac: "00:00:5e:00:53:01"
         seat-02:
 EOF
-run() { (cd ansible && ansible-playbook server.yml -i /tmp/inventory.yml); }
+run() { (cd ansible && ansible-playbook server.yml -i /tmp/inventory.yml "$@"); }
+run --check >/tmp/check.log 2>&1 || { tail -n 30 /tmp/check.log; die "dry run on a fresh server failed"; }
+ok "dry run"
 run
 ok "first run"
 
@@ -104,18 +104,29 @@ ok "build script, tools and dedicated server unit"
 step "Steam PC Cafe VM"
 c=/srv/gaming-room/pccafe/compose.yaml
 bat=/srv/gaming-room/pccafe/oem/install.bat
+np=/etc/netplan/60-gaming-room-bridge.yaml
+tap=/etc/systemd/system/pccafe-tap.service
 [[ $(stat -c '%a %U' "$c") == "600 root" ]] || die "cafe compose file not root-only"
 grep -q 'image: dockurr/windows:6.06' "$c" || die "cafe image not pinned"
-grep -q 'driver: macvlan' "$c" || die "cafe network is not macvlan"
-grep -q 'parent: eth0' "$c" || die "cafe macvlan parent NIC"
-grep -q 'ip_range: 192.0.2.248/30' "$c" || die "cafe container address range"
-grep -q 'DHCP: "Y"' "$c" || die "cafe VM does not ask the router for its address"
+grep -q 'network_mode: host' "$c" || die "cafe container not on the host network"
+grep -q 'NETWORK: "N"' "$c" || die "dockur still sets up its own network"
+grep -qE 'ifname=tap-cafe,script=no,downscript=no -device virtio-net-pci,id=net0,netdev=hostnet0,mac=02(:[0-9a-f]{2}){5}"' "$c" \
+    || die "cafe VM NIC is not the tap with a local MAC"
+if grep -qE 'macvlan|vhost|NET_ADMIN' "$c"; then die "macvlan leftovers in the cafe compose file"; fi
 pw=$(cat /srv/gaming-room/pccafe/windows-password)
 (( ${#pw} >= 16 )) || die "cafe Windows password too short"
 grep -qF "PASSWORD: \"$pw\"" "$c" || die "cafe Windows password not used"
 grep -q 'localport=27036' "$bat" || die "cafe discovery firewall rule"
 grep -q 'localport=27037' "$bat" || die "cafe client firewall rule"
-ok "cafe VM compose file, network, password and firewall script"
+grep -q 'RealTimeIsUniversal /t REG_DWORD /d 1' "$bat" || die "cafe clock not on UTC"
+grep -q 'tzutil /s "W. Europe Standard Time"' "$bat" || die "cafe time zone"
+if grep -qE '^ *parameters:' "$np"; then die "bridge parameters block netplan try's rollback"; fi
+[[ $(stat -c '%a %U' "$np") == "600 root" ]] || die "bridge netplan file not root-only"
+grep -q 'interfaces: \[eth0\]' "$np" || die "NIC not in the bridge"
+grep -qE 'macaddress: "([0-9a-f]{2}:){5}[0-9a-f]{2}"' "$np" || die "bridge does not keep the NIC's MAC"
+grep -q 'ExecStart=-/usr/sbin/ip tuntap add dev tap-cafe mode tap user 0' "$tap" || die "tap unit"
+grep -q 'master br0 up' "$tap" || die "tap not on the bridge"
+ok "cafe VM compose file, bridge, tap, password and firewall script"
 
 step "Claude on the server"
 id claude >/dev/null || die "no claude account"

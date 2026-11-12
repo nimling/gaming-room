@@ -1,0 +1,18 @@
+# Managed by gaming-room Ansible (roles/server_pccafe).
+# The PC Café VM's network cable: a tap on {{ pccafe_bridge }}. Owned by root, so
+# QEMU in the container (root, no NET_ADMIN) can open it.
+[Unit]
+Description=Tap for the PC Café VM on {{ pccafe_bridge }}
+After=sys-subsystem-net-devices-{{ pccafe_bridge }}.device
+Wants=sys-subsystem-net-devices-{{ pccafe_bridge }}.device
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/usr/sbin/ip tuntap add dev {{ pccafe_tap }} mode tap user 0
+ExecStart=/usr/sbin/ip link set dev {{ pccafe_tap }} master {{ pccafe_bridge }} up
+ExecStop=/usr/sbin/ip link delete dev {{ pccafe_tap }}
+
+[Install]
+WantedBy=multi-user.target

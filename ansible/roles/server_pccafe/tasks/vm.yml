@@ -2,11 +2,11 @@
 - name: Café | check the settings
   ansible.builtin.assert:
     that:
-      - pccafe_ip_range is match('^[0-9.]+/[0-9]+$')
-      - pccafe_parent_nic | length > 0
+      - pccafe_bridge_nic | length > 0
+      - (pccafe_bridge_nic | replace('-', '_')) in ansible_facts
     fail_msg: >-
-      Set pccafe_ip_range in the private inventory: a few free addresses on the
-      gaming VLAN outside the router's DHCP pool, for example 192.0.2.248/30.
+      Set pccafe_bridge_nic in the private inventory: the server's NIC on the
+      gaming VLAN, for example enp2s0.
 
 - name: Café | check that KVM is available
   ansible.builtin.stat:
@@ -46,6 +46,68 @@
   register: pccafe_password
   # In a dry run of a fresh server the file does not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Network: NIC into a bridge, VM tap on the bridge ---------------------------
+- name: Café | netplan folder
+  ansible.builtin.file:
+    path: /etc/netplan
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Sorts after the installer's 00-*.yaml and overrides the NIC's DHCP. The
+# handler runs `netplan apply`; the first switch is better done by hand with
+# `netplan try` (docs: server/README.md).
+- name: Café | put the NIC into a bridge
+  ansible.builtin.template:
+    src: netplan-bridge.yaml.j2
+    dest: /etc/netplan/60-gaming-room-bridge.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Apply the network settings
+
+- name: Café | install the tap unit
+  ansible.builtin.template:
+    src: pccafe-tap.service.j2
+    dest: /etc/systemd/system/pccafe-tap.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the café tap
+
+# The bridge must exist before the tap joins it.
+- name: Café | apply network changes now
+  ansible.builtin.meta: flush_handlers
+
+- name: Café | run the tap at boot
+  ansible.builtin.systemd_service:
+    name: pccafe-tap.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not server_in_container
+  # In a dry run the unit file is not written.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Forwarded bridge traffic only meets the firewall if br_netfilter is loaded
+# (Docker can load it). Then this keeps the VLAN <-> VM traffic flowing.
+- name: Café | let traffic cross the bridge
+  community.general.ufw:
+    rule: allow
+    route: true
+    interface_in: "{{ pccafe_bridge }}"
+    interface_out: "{{ pccafe_bridge }}"
+  when: not server_in_container
+
+- name: Café | web viewer, from the gaming VLAN only
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "8006"
+    proto: tcp
+  when: not server_in_container
 
 - name: Café | write the script Windows runs after its install
   ansible.builtin.template:
