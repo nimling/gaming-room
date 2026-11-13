@@ -166,7 +166,7 @@ printf '[DefaultPlayer]\nName=Player\n' >/srv/games/ut2004/System/DefUser.ini
 run -e @/tmp/engine-vars.yml >/tmp/gs.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/gs.log | tail -n 20; die "run with UT2004 present failed"; }
 u=/etc/systemd/system/gs-ut2004-instagib.service
 grep -qx 'User=gameserver' "$u" || die "preset does not run as gameserver"
-grep -qx 'ExecStart="./ucc-bin" "server" "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib" "port=7800" "ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini" "userini=/var/lib/gameservers/ut2004-instagib/User.ini" "-nohomedir"' "$u" \
+grep -qx 'ExecStart="/srv/games/ut2004/System/ucc-bin" "server" "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib" "port=7800" "ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini" "userini=/var/lib/gameservers/ut2004-instagib/User.ini" "-nohomedir"' "$u" \
     || { grep ExecStart "$u"; die "preset command"; }
 grep -qx 'ReadWritePaths=/var/lib/gameservers/ut2004-instagib' "$u" || die "preset can write outside its folder"
 grep -q '^\[Install\]' "$u" && die "on-demand preset starts at boot"

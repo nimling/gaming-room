@@ -5,3 +5,6 @@
     state: restarted
     daemon_reload: true
   when: gameservers_enabled and not server_in_container
+  # In a dry run the unit file is not written. Other roles flush handlers
+  # (the café's network step), so this can run in any dry run.
+  ignore_errors: "{{ ansible_check_mode }}"
