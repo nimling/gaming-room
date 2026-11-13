@@ -85,6 +85,23 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+
+step "Idle screens go dark and stay dark"
+pd=/home/.golden/player/.config/powerdevilrc
+grep -qx 'TurnOffDisplayWhenIdle=true' "$pd" || die "screen does not turn off when idle"
+grep -qx 'TurnOffDisplayIdleTimeoutSec=300' "$pd" || die "screen does not turn off after 5 minutes"
+grep -qx 'DimDisplayIdleTimeoutSec=240' "$pd" || die "screen does not dim before it turns off"
+# seat-idle-action with a stub systemctl: an unused session is left alone,
+# a used one is reset.
+mkdir -p /tmp/idle-bin /tmp/idle-home; chown player /tmp/idle-home
+printf '#!/bin/sh\necho "$*" >>/tmp/idle-calls\n' >/tmp/idle-bin/systemctl; chmod 755 /tmp/idle-bin/systemctl
+idle() { sudo -u player env PATH="/tmp/idle-bin:$PATH" HOME=/tmp/idle-home /usr/local/libexec/seat-idle-action; }
+rm -f /tmp/idle-calls; idle
+[[ ! -e /tmp/idle-calls ]] || die "idle reset of a session nobody used (would wake the screen)"
+sudo -u player mkdir -p /tmp/idle-home/.cache/arcade; sudo -u player touch /tmp/idle-home/.cache/arcade/session-used
+idle
+grep -q 'start --no-block seat-reset.service' /tmp/idle-calls || die "used session not reset after idle"
+ok "screen off after 5 min; idle reset only after someone used the seat"
 for prog in openttd teeworlds xonotic-sdl; do command -v "$prog" >/dev/null || die "$prog not installed"; done
 ok "free LAN games installed"
 [[ $(readlink /home/.golden/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam games would land in the home"

@@ -13,7 +13,14 @@ fi
 
 warn_after=$(( SEAT_IDLE_SECONDS - SEAT_IDLE_WARNING_SECONDS ))
 warn_ms=$(( SEAT_IDLE_WARNING_SECONDS * 1000 ))
+# Marks the session as used at the first input after a few idle seconds.
+# The home reset removes it, so a fresh session starts unused.
+used=${XDG_CACHE_HOME:-$HOME/.cache}/arcade/session-used
+mkdir -p "${used%/*}"
 
+# Only a used session gets the warning and the reset: resetting an unused
+# one would only turn its screen back on (the new session wakes it).
 exec swayidle -w \
-    timeout "$warn_after" "notify-send --urgency=critical --expire-time=$warn_ms 'Session ends soon' 'No input for a while. Move the mouse to keep playing.'" \
+    timeout 5 true resume "touch '$used'" \
+    timeout "$warn_after" "[ -e '$used' ] && notify-send --urgency=critical --expire-time=$warn_ms 'Session ends soon' 'No input for a while. Move the mouse to keep playing.'" \
     timeout "$SEAT_IDLE_SECONDS" /usr/local/libexec/seat-idle-action
