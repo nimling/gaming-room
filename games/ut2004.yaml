@@ -1,0 +1,39 @@
+# Unreal Tournament 2004 on OldUnreal 3374, native Linux.
+# The server builds the game (roles/server_gameshare); each seat copies it
+# read-only to /games/classic/ut2004 (roles/games). The golden home starts
+# with the game's own default settings (roles/launcher), and the keys below
+# go on top at every start.
+id: ut2004
+name: Unreal Tournament 2004
+subtitle: Onslaught, Assault, Bombing Run, CTF, Deathmatch
+group: classic
+runtime: native
+engine: OldUnreal 3374
+path: /games/classic/ut2004
+players: { min: 2, max: 32 }
+launch:
+  workdir: System
+  command: ["./UT2004"]
+# Address, or address:port; servers listen on 7777 by default.
+join:
+  args: ["{{ server }}"]
+# InstaGib is built in: one shot, one frag.
+host:
+  map: DM-Rankin
+  args: ["{{ map }}?Listen?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib"]
+config:
+  - ini: "~/.ut2004/System/User.ini"
+    set:
+      DefaultPlayer:
+        Name: "{{ nickname }}"
+  - ini: "~/.ut2004/System/UT2004.ini"
+    set:
+      SDLDrv.SDLClient:
+        StartupFullscreen: "True"
+        FullscreenViewportX: "{{ width }}"
+        FullscreenViewportY: "{{ height }}"
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 144 }
+art: { hue: 18, glow: 40, motif: hex }
