@@ -1,0 +1,23 @@
+# Managed by gaming-room Ansible (roles/server_gameservers).
+[Unit]
+Description=Game server control service (start, stop, players)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ gameservers_api_user }}
+Group={{ gameservers_api_user }}
+ExecStart=/usr/local/lib/gameservers/gameservers-api
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

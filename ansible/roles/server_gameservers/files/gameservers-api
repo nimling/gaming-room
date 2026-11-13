@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+# Managed by gaming-room Ansible (roles/server_gameservers).
+"""Control service for the on-demand game servers.
+
+Lists the presets from /etc/gameservers/presets.json, starts and stops their
+services (gs-<id>.service, allowed by a polkit rule for this account only),
+asks running servers how many players they have, and stops on-demand ones
+that stayed empty. Only the gaming VLAN can reach it (firewall).
+
+  GET  /api/servers               presets with state, players and map
+  POST /api/servers/<id>/start    start a preset
+  POST /api/servers/<id>/stop     stop a preset
+
+Nothing in a request is passed to a command: the id must match a preset.
+"""
+
+import json
+import os
+import re
+import socket
+import struct
+import subprocess
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+CONFIG = os.environ.get("GAMESERVERS_CONFIG", "/etc/gameservers/presets.json")
+ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
+
+
+# --- Player queries ---------------------------------------------------------
+
+
+def _udp(host, port, payload, timeout):
+    """Send one datagram and collect replies until the timeout."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(timeout)
+        s.sendto(payload, (host, port))
+        parts = []
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                break
+            s.settimeout(left)
+            try:
+                data, _ = s.recvfrom(65535)
+            except socket.timeout:
+                break
+            parts.append(data)
+            # GameSpy replies end with \final\; the others are one packet.
+            if not data.startswith(b"\\") or b"\\final\\" in data:
+                break
+        return parts
+
+
+def parse_gamespy(blob):
+    """UT99's GameSpy \\status\\ reply: \\key\\value pairs."""
+    fields = blob.decode("latin-1").split("\\")[1:]
+    out = dict(zip(fields[0::2], fields[1::2]))
+    return {
+        "players": int(out.get("numplayers", 0)),
+        "max_players": int(out.get("maxplayers", 0)),
+        "map": out.get("mapname", ""),
+    }
+
+
+def _ut2_string(data, pos):
+    """A UT2004 query string: length byte (with the trailing NUL), then text.
+    A length with the top bit set means UCS-2 text of (length & 0x7f) chars."""
+    n = data[pos]
+    pos += 1
+    if n & 0x80:
+        chars = n & 0x7F
+        raw = data[pos : pos + chars * 2]
+        return raw.decode("utf-16-le", "replace").rstrip("\x00"), pos + chars * 2
+    raw = data[pos : pos + n]
+    return raw.decode("latin-1").rstrip("\x00"), pos + n
+
+
+def parse_ut2004(data):
+    """UT2004's own server-info reply (request 0x80 0 0 0 0)."""
+    pos = 5  # 4-byte header + 1-byte reply type
+    pos += 4  # server id
+    _, pos = _ut2_string(data, pos)  # ip
+    pos += 8  # game port, query port
+    _, pos = _ut2_string(data, pos)  # server name
+    map_name, pos = _ut2_string(data, pos)
+    _, pos = _ut2_string(data, pos)  # game type
+    players, max_players = struct.unpack_from("<ii", data, pos)
+    return {"players": players, "max_players": max_players, "map": map_name}
+
+
+def parse_quake3(data):
+    """A Quake 3 getstatus reply: info string, then one line per player."""
+    text = data.decode("latin-1")
+    lines = text.split("\n")
+    fields = lines[1].split("\\")[1:] if len(lines) > 1 else []
+    info = dict(zip(fields[0::2], fields[1::2]))
+    players = [line for line in lines[2:] if line.strip()]
+    return {
+        "players": len(players),
+        "max_players": int(info.get("sv_maxclients", 0) or 0),
+        "map": info.get("mapname", ""),
+    }
+
+
+def query(kind, host, port, timeout=1.0):
+    """Players, max players and map, or None when the server does not answer."""
+    try:
+        if kind == "ut99":
+            parts = _udp(host, port, b"\\status\\", timeout)
+            return parse_gamespy(b"".join(parts)) if parts else None
+        if kind == "ut2004":
+            parts = _udp(host, port, b"\x80\x00\x00\x00\x00", timeout)
+            return parse_ut2004(parts[0]) if parts else None
+        if kind == "quake3":
+            parts = _udp(host, port, b"\xff\xff\xff\xffgetstatus\n", timeout)
+            return parse_quake3(parts[0]) if parts else None
+    except (OSError, ValueError, IndexError, struct.error):
+        return None
+    return None
+
+
+# --- Services -----------------------------------------------------------------
+
+
+def unit(preset_id):
+    return f"gs-{preset_id}.service"
+
+
+def systemctl(*args):
+    return subprocess.run(
+        ["systemctl", *args], capture_output=True, text=True, timeout=30, check=False
+    )
+
+
+class Manager:
+    def __init__(self, config, systemctl_fn=systemctl, query_fn=query, clock=time.monotonic):
+        self.config = config
+        self.presets = {p["id"]: p for p in config["presets"]}
+        self.systemctl = systemctl_fn
+        self.query = query_fn
+        self.clock = clock
+        self.last_busy = {}  # id -> time a player was last seen (or started)
+        self.lock = threading.Lock()
+
+    def active(self, pid):
+        return self.systemctl("is-active", "--quiet", unit(pid)).returncode == 0
+
+    def status(self, pid):
+        p = self.presets[pid]
+        state = "running" if self.active(pid) else "stopped"
+        info = None
+        if state == "running":
+            info = self.query(p["query"]["type"], "127.0.0.1", p["query"]["port"])
+        return {
+            "id": pid,
+            "name": p["name"],
+            "game": p["game"],
+            "address": f"{self.config['address']}:{p['port']}",
+            "always_on": bool(p.get("always_on")),
+            "state": state,
+            "players": None if info is None else info["players"],
+            "max_players": None if info is None else info["max_players"],
+            "map": None if info is None else info["map"],
+        }
+
+    def list(self):
+        return [self.status(pid) for pid in self.presets]
+
+    def start(self, pid):
+        with self.lock:
+            if self.active(pid):
+                return 200, {"ok": True, "state": "running"}
+            running = [
+                q for q in self.presets
+                if not self.presets[q].get("always_on") and self.active(q)
+            ]
+            if len(running) >= self.config["max_running"]:
+                return 409, {
+                    "ok": False,
+                    "error": f"{len(running)} servers are already running; stop one first",
+                }
+            r = self.systemctl("start", "--no-block", unit(pid))
+            if r.returncode != 0:
+                return 500, {"ok": False, "error": (r.stderr or "start failed").strip()}
+            self.last_busy[pid] = self.clock()
+            return 202, {"ok": True, "state": "starting"}
+
+    def stop(self, pid):
+        r = self.systemctl("stop", "--no-block", unit(pid))
+        if r.returncode != 0:
+            return 500, {"ok": False, "error": (r.stderr or "stop failed").strip()}
+        self.last_busy.pop(pid, None)
+        return 202, {"ok": True, "state": "stopping"}
+
+    def reap(self):
+        """Stop on-demand servers that had no players for idle_minutes.
+        A server that does not answer counts as busy: never stop a game
+        because a query failed."""
+        idle_for = self.config["idle_minutes"] * 60
+        now = self.clock()
+        stopped = []
+        for pid, p in self.presets.items():
+            if p.get("always_on") or not self.active(pid):
+                self.last_busy.pop(pid, None)
+                continue
+            info = self.query(p["query"]["type"], "127.0.0.1", p["query"]["port"])
+            if info is None or info["players"] > 0:
+                self.last_busy[pid] = now
+                continue
+            since = self.last_busy.setdefault(pid, now)
+            if now - since >= idle_for:
+                self.stop(pid)
+                stopped.append(pid)
+        return stopped
+
+
+# --- HTTP ---------------------------------------------------------------------
+
+
+def make_handler(manager):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "gameservers"
+
+        def _send(self, code, body):
+            data = json.dumps(body).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self):
+            if self.path.rstrip("/") == "/api/servers":
+                return self._send(200, manager.list())
+            return self._send(404, {"ok": False, "error": "not found"})
+
+        def do_POST(self):
+            m = re.fullmatch(r"/api/servers/([^/]+)/(start|stop)", self.path)
+            if not m:
+                return self._send(404, {"ok": False, "error": "not found"})
+            pid, verb = m.groups()
+            if not ID_RE.match(pid) or pid not in manager.presets:
+                return self._send(404, {"ok": False, "error": "no such server"})
+            code, body = manager.start(pid) if verb == "start" else manager.stop(pid)
+            return self._send(code, body)
+
+        def log_message(self, fmt, *args):
+            sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+
+    return Handler
+
+
+def main():
+    with open(CONFIG, encoding="utf-8") as f:
+        config = json.load(f)
+    manager = Manager(config)
+
+    def reaper():
+        while True:
+            time.sleep(60)
+            try:
+                for pid in manager.reap():
+                    print(f"stopped {pid}: no players for {config['idle_minutes']} min", flush=True)
+            except Exception as e:  # keep the reaper alive
+                print(f"reaper: {e}", file=sys.stderr, flush=True)
+
+    threading.Thread(target=reaper, daemon=True).start()
+    httpd = ThreadingHTTPServer((config["listen"], config["port"]), make_handler(manager))
+    print(f"listening on {config['listen']}:{config['port']}", flush=True)
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

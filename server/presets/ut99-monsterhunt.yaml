@@ -1,0 +1,31 @@
+# Co-op against the monsters of Unreal (Monster Hunt 613, built into the
+# game folder by roles/server_gameshare).
+id: ut99-monsterhunt
+name: UT99 Monster Hunt
+game: ut99
+needs: ut99/System/MonsterHunt.u
+port: 7790
+# GameSpy query on the game port + 1.
+query: { type: ut99, port: 7791 }
+# Game and query ports; 8777-8786 for the LAN beacon (the always-on UT99
+# server already holds 8777, so this one takes the next free port).
+firewall_udp: ["7790:7792", "8777:8786"]
+workdir: ut99/System64
+command:
+  - ./ucc-bin
+  - server
+  - "MH-NaliVillage][?game=MonsterHunt.MonsterHunt"
+  - port=7790
+  - "ini={home}/UnrealTournament.ini"
+  - "userini={home}/User.ini"
+seed:
+  - { from: ut99/System64/Default.ini, to: UnrealTournament.ini }
+  - { from: ut99/System64/DefUser.ini, to: User.ini }
+ini:
+  - file: UnrealTournament.ini
+    set:
+      Engine.GameEngine:
+        # Clients load the mod's package when they join.
+        ServerPackages: [MonsterHunt]
+      Engine.GameReplicationInfo:
+        ServerName: Nimtech Monster Hunt

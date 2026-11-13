@@ -1,0 +1,17 @@
+---
+# On-demand game servers (server/presets/README.md). Off until switched on
+# in the private inventory.
+gameservers_enabled: false
+# Presets: one file each in server/presets/.
+gameservers_preset_dir: "{{ playbook_dir }}/../server/presets"
+# The account the game servers run as; each preset keeps its settings in
+# /var/lib/gameservers/<id>.
+gameservers_user: gameserver
+# The control service (list, start, stop) and its account.
+gameservers_api_user: gameserver-api
+gameservers_api_port: 8790
+# On-demand servers stop after this many minutes without players.
+gameservers_idle_minutes: 15
+# At most this many on-demand servers at once (always-on ones not counted).
+gameservers_max_running: 4
+gameservers_state_root: /var/lib/gameservers

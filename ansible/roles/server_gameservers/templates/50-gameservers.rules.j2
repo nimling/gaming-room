@@ -1,0 +1,13 @@
+// Managed by gaming-room Ansible (roles/server_gameservers).
+// The control service may start and stop the game server units, nothing else.
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "{{ gameservers_api_user }}") {
+        var unit = action.lookup("unit");
+        var verb = action.lookup("verb");
+        if (unit && /^gs-[a-z0-9-]+\.service$/.test(unit) &&
+            (verb == "start" || verb == "stop")) {
+            return polkit.Result.YES;
+        }
+    }
+});

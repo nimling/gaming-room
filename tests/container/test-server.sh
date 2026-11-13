@@ -49,6 +49,7 @@ all:
           server_vlan_cidr: 192.0.2.0/24
           server_upstream_dns: 192.0.2.1
           ut99_server_enabled: true
+          gameservers_enabled: true
           pccafe_enabled: true
           pccafe_bridge_nic: eth0
     seats:
@@ -150,6 +151,44 @@ step "Unreal Tournament 2004"
 [[ ! -e /srv/games/ut2004 ]] || die "UT2004 built in the container (downloads should be off)"
 command -v unshield >/dev/null || die "unshield missing"
 ok "build script and tools"
+
+step "On-demand game servers"
+python3 -m unittest discover -s tests/gameservers >/tmp/gs-unit.log 2>&1 || { cat /tmp/gs-unit.log; die "control service unit tests"; }
+ok "control service unit tests"
+[[ ! -e /etc/systemd/system/gs-ut2004-instagib.service ]] || die "preset service installed without its game"
+grep -q '"presets": \[\]' /etc/gameservers/presets.json || die "presets listed without their game"
+# A stand-in UT2004 makes its presets ready.
+install -d -o nimadmin /srv/games/ut2004/System
+install -m 755 -o nimadmin /dev/null /srv/games/ut2004/System/ucc-bin
+printf '[Engine.GameInfo]\nMaxPlayers=16\n[IpDrv.MasterServerUplink]\nDoUplink=True\n' >/srv/games/ut2004/System/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/games/ut2004/System/DefUser.ini
+run >/tmp/gs.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/gs.log | tail -n 20; die "run with UT2004 present failed"; }
+u=/etc/systemd/system/gs-ut2004-instagib.service
+grep -qx 'User=gameserver' "$u" || die "preset does not run as gameserver"
+grep -qx 'ExecStart="./ucc-bin" "server" "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib" "port=7800" "ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini" "userini=/var/lib/gameservers/ut2004-instagib/User.ini" "-nohomedir"' "$u" \
+    || { grep ExecStart "$u"; die "preset command"; }
+grep -qx 'ReadWritePaths=/var/lib/gameservers/ut2004-instagib' "$u" || die "preset can write outside its folder"
+grep -q '^\[Install\]' "$u" && die "on-demand preset starts at boot"
+[[ -e /etc/systemd/system/gs-ut2004-onslaught.service && ! -e /etc/systemd/system/gs-ut99-monsterhunt.service ]] || die "wrong set of preset services"
+ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini
+[[ $(stat -c %U "$ini") == gameserver ]] || die "preset settings not owned by gameserver"
+grep -qx 'MaxPlayers=16' "$ini" || die "preset did not start from the game's defaults"
+grep -qx 'VotingHandlerType=xVoting.xVotingHandler' "$ini" || die "map voting not set"
+grep -qx 'DoUplink=False' "$ini" || die "internet uplink not off"
+python3 - <<'PY' || die "preset list for the control service"
+import json
+c = json.load(open("/etc/gameservers/presets.json"))
+assert c["address"] == "192.0.2.10" and c["port"] == 8790, c
+assert [p["id"] for p in c["presets"]] == ["ut2004-instagib", "ut2004-onslaught"], c["presets"]
+assert c["presets"][0]["query"] == {"type": "ut2004", "port": 7801}, c["presets"][0]
+PY
+grep -q 'subject.user == "gameserver-api"' /etc/polkit-1/rules.d/50-gameservers.rules || die "polkit rule"
+grep -q '/\^gs-\[a-z0-9-\]+\\.service\$/' /etc/polkit-1/rules.d/50-gameservers.rules || die "polkit rule not limited to gs-*.service"
+grep -qx 'User=gameserver-api' /etc/systemd/system/gameservers-api.service || die "control service account"
+[[ -x /usr/local/lib/gameservers/gameservers-api ]] || die "control service not installed"
+again=$(run)
+echo "$again" | grep -Eq "changed=0 +unreachable=0 +failed=0" || { echo "$again" | grep -B3 changed: | head -20; die "game server run not idempotent"; }
+ok "presets wait for their game; services, settings, polkit and control service; idempotent"
 
 step "Steam PC Cafe VM"
 c=/srv/gaming-room/pccafe/compose.yaml

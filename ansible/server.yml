@@ -12,6 +12,7 @@
     - server_mumble
     - server_lancache
     - server_gameshare
+    - server_gameservers
     - server_wol
     - server_claude
     - server_pccafe

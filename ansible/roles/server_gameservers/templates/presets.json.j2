@@ -1,0 +1,8 @@
+{{ {
+  'address': server_lan_ip,
+  'listen': server_lan_ip,
+  'port': gameservers_api_port,
+  'idle_minutes': gameservers_idle_minutes,
+  'max_running': gameservers_max_running,
+  'presets': gameservers_ready | map('dict2items') | map('selectattr', 'key', 'in', ['id', 'name', 'game', 'port', 'query', 'always_on']) | map('items2dict') | list
+} | to_nice_json }}

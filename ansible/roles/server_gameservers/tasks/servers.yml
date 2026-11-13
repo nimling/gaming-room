@@ -1,0 +1,254 @@
+---
+- name: Game servers | start with no presets
+  ansible.builtin.set_fact:
+    gameservers_presets: []
+
+- name: Game servers | read the presets
+  ansible.builtin.set_fact:
+    gameservers_presets: "{{ gameservers_presets + [lookup('ansible.builtin.file', item) | from_yaml] }}"
+  loop: "{{ query('ansible.builtin.fileglob', gameservers_preset_dir ~ '/*.yaml') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"
+
+- name: Game servers | check the presets
+  ansible.builtin.assert:
+    that:
+      - item.id is match('^[a-z0-9][a-z0-9-]{0,40}$')
+      - item.name is defined and item.game is defined and item.needs is defined
+      - item.port | int > 0 and item.query.port | int > 0
+      - item.query.type in ['ut99', 'ut2004', 'quake3']
+      - item.command | length > 0 and item.workdir is defined
+      - gameservers_presets | selectattr('port', 'equalto', item.port) | list | length == 1
+      - gameservers_presets | selectattr('id', 'equalto', item.id) | list | length == 1
+    fail_msg: "Preset {{ item.id | default('?') }} is incomplete, or its id or port is used twice (server/presets/README.md)."
+    quiet: true
+  loop: "{{ gameservers_presets }}"
+  loop_control:
+    label: "{{ item.id | default('?') }}"
+
+- name: Game servers | look for each preset's game on the server
+  ansible.builtin.stat:
+    path: "{{ gameshare_root }}/{{ item.needs }}"
+  loop: "{{ gameservers_presets }}"
+  loop_control:
+    label: "{{ item.id }}"
+  register: gameservers_needs
+
+- name: Game servers | keep the presets whose game is here
+  ansible.builtin.set_fact:
+    gameservers_ready: >-
+      {{ gameservers_needs.results | selectattr('stat.exists') | map(attribute='item') | list }}
+    # One item per key to set; a list value gives one item per value.
+    gameservers_ini_items: >-
+      {%- set out = [] -%}
+      {%- for p in gameservers_needs.results | selectattr('stat.exists') | map(attribute='item') -%}
+      {%- for f in p.ini | default([]) -%}
+      {%- for section, keys in f.set.items() -%}
+      {%- for key, value in keys.items() -%}
+      {%- set many = value is iterable and value is not string -%}
+      {%- for v in (value if many else [value]) -%}
+      {%- set _ = out.append({'id': p.id, 'file': f.file, 'section': section, 'key': key, 'value': v | string, 'many': many}) -%}
+      {%- endfor -%}{%- endfor -%}{%- endfor -%}{%- endfor -%}{%- endfor -%}
+      {{- out -}}
+
+- name: Game servers | say which presets wait for their game
+  ansible.builtin.debug:
+    msg: "Waiting for its game ({{ gameshare_root }}/{{ item.needs }}): {{ item.id }}"
+  loop: "{{ gameservers_presets | rejectattr('id', 'in', gameservers_ready | map(attribute='id') | list) | list }}"
+  loop_control:
+    label: "{{ item.id }}"
+
+# --- Accounts and settings ------------------------------------------------------
+- name: Game servers | install polkit
+  ansible.builtin.apt:
+    name: polkitd
+    state: present
+
+- name: Game servers | create the accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    system: true
+    home: "{{ item.home }}"
+    create_home: false
+    shell: /usr/sbin/nologin
+    password_lock: true
+  loop:
+    - { name: "{{ gameservers_user }}", home: "{{ gameservers_state_root }}" }
+    - { name: "{{ gameservers_api_user }}", home: /nonexistent }
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Game servers | create the settings folders
+  ansible.builtin.file:
+    path: "{{ gameservers_state_root }}/{{ item }}"
+    state: directory
+    owner: "{{ gameservers_user }}"
+    group: "{{ gameservers_user }}"
+    mode: "0750"
+  loop: "{{ [''] + (gameservers_ready | map(attribute='id') | list) }}"
+  # In a dry run of a fresh server the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Once: after that, the server's own changes (bans, stats) stay.
+- name: Game servers | start each preset from the game's default settings
+  ansible.builtin.copy:
+    src: "{{ gameshare_root }}/{{ item.1.from }}"
+    dest: "{{ gameservers_state_root }}/{{ item.0.id }}/{{ item.1.to }}"
+    remote_src: true
+    force: false
+    owner: "{{ gameservers_user }}"
+    group: "{{ gameservers_user }}"
+    mode: "0640"
+  loop: "{{ gameservers_ready | subelements('seed', skip_missing=true) }}"
+  loop_control:
+    label: "{{ item.0.id }}: {{ item.1.to }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Game servers | set each preset's keys
+  community.general.ini_file:
+    path: "{{ gameservers_state_root }}/{{ item.id }}/{{ item.file }}"
+    section: "{{ item.section }}"
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+    exclusive: "{{ not item.many }}"
+    no_extra_spaces: true
+    owner: "{{ gameservers_user }}"
+    group: "{{ gameservers_user }}"
+    mode: "0640"
+  loop: "{{ gameservers_ini_items }}"
+  loop_control:
+    label: "{{ item.id }}: [{{ item.section }}] {{ item.key }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Services -------------------------------------------------------------------
+- name: Game servers | install one service per preset
+  ansible.builtin.template:
+    src: gs.service.j2
+    dest: "/etc/systemd/system/gs-{{ p.id }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ gameservers_ready }}"
+  loop_control:
+    loop_var: p
+    label: "{{ p.id }}"
+  register: gameservers_units
+
+- name: Game servers | find services of presets that are gone
+  ansible.builtin.find:
+    paths: /etc/systemd/system
+    patterns: "gs-*.service"
+  register: gameservers_unit_files
+
+- name: Game servers | stop and remove them
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ gone }}"
+  vars:
+    gone: >-
+      {{ gameservers_unit_files.files | map(attribute='path') | map('basename')
+         | reject('in', gameservers_ready | map(attribute='id') | map('regex_replace', '^', 'gs-') | map('regex_replace', '$', '.service') | list)
+         | list }}
+  when: not server_in_container
+  failed_when: false
+
+- name: Game servers | delete the unit files of presets that are gone
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}"
+    state: absent
+  loop: >-
+    {{ gameservers_unit_files.files | map(attribute='path') | map('basename')
+       | reject('in', gameservers_ready | map(attribute='id') | map('regex_replace', '^', 'gs-') | map('regex_replace', '$', '.service') | list)
+       | list }}
+
+- name: Game servers | reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: gameservers_units.changed and not server_in_container
+
+- name: Game servers | run the always-on presets
+  ansible.builtin.systemd_service:
+    name: "gs-{{ item.id }}.service"
+    enabled: true
+    state: started
+  loop: "{{ gameservers_ready | selectattr('always_on', 'defined') | selectattr('always_on') | list }}"
+  loop_control:
+    label: "{{ item.id }}"
+  when: not server_in_container
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Control service ------------------------------------------------------------
+- name: Game servers | create the control service folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: [/usr/local/lib/gameservers, /etc/gameservers]
+
+- name: Game servers | install the control service
+  ansible.builtin.copy:
+    src: gameservers-api
+    dest: /usr/local/lib/gameservers/gameservers-api
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart the game server control service
+
+- name: Game servers | write the preset list for it
+  ansible.builtin.template:
+    src: presets.json.j2
+    dest: /etc/gameservers/presets.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the game server control service
+
+- name: Game servers | let it start and stop the preset services, nothing else
+  ansible.builtin.template:
+    src: 50-gameservers.rules.j2
+    dest: /etc/polkit-1/rules.d/50-gameservers.rules
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Game servers | install its unit
+  ansible.builtin.template:
+    src: gameservers-api.service.j2
+    dest: /etc/systemd/system/gameservers-api.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the game server control service
+
+- name: Game servers | run it
+  ansible.builtin.systemd_service:
+    name: gameservers-api.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not server_in_container
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Firewall, from the gaming VLAN only -----------------------------------------
+- name: Game servers | firewall for the control service
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "{{ gameservers_api_port }}"
+    proto: tcp
+  when: not server_in_container
+
+- name: Game servers | firewall for each preset
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "{{ item.1 }}"
+    proto: udp
+  loop: "{{ gameservers_ready | subelements('firewall_udp') }}"
+  loop_control:
+    label: "{{ item.0.id }}: {{ item.1 }}"
+  when: not server_in_container
