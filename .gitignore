@@ -20,3 +20,4 @@ secrets/
 # Launcher build output
 launcher/target/
 launcher/app/src-tauri/gen/
+__pycache__/
