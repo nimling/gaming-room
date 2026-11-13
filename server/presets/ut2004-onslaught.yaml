@@ -21,6 +21,11 @@ seed:
 ini:
   - file: UT2004.ini
     set:
+      # The defaults (7777/7778) belong to the always-on UT99 server; the
+      # port= argument alone does not move the query port.
+      URL:
+        Port: "7820"
+        QueryPort: "7821"
       Engine.GameReplicationInfo:
         ServerName: Nimtech Onslaught
       Engine.GameInfo:

@@ -146,12 +146,30 @@ class Manager:
         self.last_busy = {}  # id -> time a player was last seen (or started)
         self.lock = threading.Lock()
 
+    def state(self, pid):
+        """running, starting, failing (crash loop), stopping, failed or stopped."""
+        r = self.systemctl("show", "--property=ActiveState,SubState", unit(pid))
+        props = dict(
+            line.split("=", 1) for line in (getattr(r, "stdout", "") or "").splitlines() if "=" in line
+        )
+        active, sub = props.get("ActiveState", "inactive"), props.get("SubState", "")
+        if active == "active":
+            return "running"
+        if active == "activating":
+            return "failing" if sub == "auto-restart" else "starting"
+        if active == "deactivating":
+            return "stopping"
+        if active == "failed":
+            return "failed"
+        return "stopped"
+
     def active(self, pid):
-        return self.systemctl("is-active", "--quiet", unit(pid)).returncode == 0
+        """Running or on its way: counts against the limit and needs a stop."""
+        return self.state(pid) in ("running", "starting", "failing", "stopping")
 
     def status(self, pid):
         p = self.presets[pid]
-        state = "running" if self.active(pid) else "stopped"
+        state = self.state(pid)
         info = None
         if state == "running":
             info = self.query(p["query"]["type"], "127.0.0.1", p["query"]["port"])
@@ -214,8 +232,16 @@ class Manager:
         now = self.clock()
         stopped = []
         for pid, p in self.presets.items():
-            if p.get("always_on") or not self.active(pid):
+            state = self.state(pid)
+            if p.get("always_on") or state not in ("running", "failing"):
                 self.last_busy.pop(pid, None)
+                continue
+            # A crash loop never gets players: it is stopped like an empty one.
+            if state == "failing":
+                since = self.last_busy.setdefault(pid, now)
+                if now - since >= idle_for:
+                    self.stop(pid)
+                    stopped.append(pid)
                 continue
             info = self.query(p["query"]["type"], "127.0.0.1", p["query"]["port"])
             if info is None or info["players"] > 0:

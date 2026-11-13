@@ -96,6 +96,7 @@ CONFIG = {
 class FakeSystem:
     def __init__(self):
         self.active = {"keep"}
+        self.states = {}
         self.calls = []
         self.players = {}
         self.now = 0.0
@@ -103,12 +104,14 @@ class FakeSystem:
     def systemctl(self, *args):
         self.calls.append(args)
         name = args[-1][len("gs-"):-len(".service")]
-        if args[0] == "is-active":
-            return SimpleNamespace(returncode=0 if name in self.active else 3, stderr="", stdout="")
+        if args[0] == "show" and args[1].startswith("--property=ActiveState"):
+            state = self.states.get(name) or (("active", "running") if name in self.active else ("inactive", "dead"))
+            return SimpleNamespace(returncode=0, stderr="", stdout=f"ActiveState={state[0]}\nSubState={state[1]}\n")
         if args[0] == "start":
             self.active.add(name)
         if args[0] == "stop":
             self.active.discard(name)
+            self.states.pop(name, None)
         return SimpleNamespace(returncode=0, stderr="", stdout="")
 
     def query(self, kind, host, port, timeout=1.0):
@@ -180,8 +183,10 @@ class Lifecycle(unittest.TestCase):
             fake.calls.append(args)
             if args[0] == "start":
                 return SimpleNamespace(returncode=1, stderr="Job failed.\n", stdout="")
-            if args[0] == "show":
+            if args[0] == "show" and args[1] == "--property=LoadError":
                 return SimpleNamespace(returncode=0, stderr="", stdout="bad-setting Unit configuration has fatal error\n")
+            if args[0] == "show":
+                return SimpleNamespace(returncode=0, stderr="", stdout="ActiveState=inactive\nSubState=dead\n")
             return SimpleNamespace(returncode=3, stderr="", stdout="")
 
         m.systemctl = broken
@@ -189,6 +194,24 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(code, 500)
         self.assertIn("Job failed.", body["error"])
         self.assertIn("unit file: bad-setting Unit configuration has fatal error", body["error"])
+
+    def test_crash_loop_shows_as_failing_and_is_stopped(self):
+        m, fake = manager()
+        m.start("a")
+        fake.states["a"] = ("activating", "auto-restart")
+        a = next(s for s in m.list() if s["id"] == "a")
+        self.assertEqual(a["state"], "failing")
+        self.assertEqual(m.start("b")[0], 409)  # still counts against the limit
+        fake.now = 15 * 60
+        self.assertEqual(m.reap(), ["a"])
+
+    def test_starting_is_not_stopped(self):
+        m, fake = manager()
+        m.start("a")
+        fake.states["a"] = ("activating", "start")
+        fake.now = 10 * 60 * 60
+        self.assertEqual(m.reap(), [])
+        self.assertEqual(next(s for s in m.list() if s["id"] == "a")["state"], "starting")
 
     def test_list_reports_address_and_players(self):
         m, fake = manager()
