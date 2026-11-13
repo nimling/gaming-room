@@ -88,6 +88,44 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
 
+step "Bought games on open-source engines"
+[[ -d /srv/games/quake3 && -d /srv/games/jka ]] || die "share folders for bought games missing"
+[[ $(stat -c %U /srv/games/quake3) == nimadmin ]] || die "quake3 share folder not owned by the login user"
+[[ ! -e /srv/games/quake3/.engine-version ]] || die "engine added without the bought data"
+# With the data copied in, the next run adds the engine. Stand-in engine
+# parts are served from inside the container, laid out like the real ones
+# (a flat zip with non-executable programs, and a zip with a top folder),
+# so the test needs no third-party download.
+install -d -o nimadmin /srv/games/quake3/baseq3
+echo "stand-in for the bought pak0" >/srv/games/quake3/baseq3/pak0.pk3
+mkdir -p /tmp/parts/eng /tmp/parts/pr/quake3-latest-pk3s/baseq3 /tmp/www
+for f in quake3e.x64 quake3e-vulkan.x64 quake3e.ded.x64; do echo engine >"/tmp/parts/eng/$f"; done
+echo pak >/tmp/parts/pr/quake3-latest-pk3s/baseq3/pak8.pk3
+(cd /tmp/parts/eng && python3 -m zipfile -c /tmp/www/engine.zip quake3e.x64 quake3e-vulkan.x64 quake3e.ded.x64)
+(cd /tmp/parts/pr && python3 -m zipfile -c /tmp/www/pr.zip quake3-latest-pk3s)
+(cd /tmp/www && exec python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1) &
+sleep 1
+engine_sum=$(sha256sum /tmp/www/engine.zip | cut -d' ' -f1)
+pr_sum=$(sha256sum /tmp/www/pr.zip | cut -d' ' -f1)
+cat >/tmp/engine-vars.yml <<VARS
+gameshare_engine_games:
+  - name: quake3
+    data: baseq3/pak0.pk3
+    guide: docs/bought-games.md
+    programs: [quake3e.x64, quake3e-vulkan.x64, quake3e.ded.x64]
+    parts:
+      - { name: quake3e-test, url: "http://127.0.0.1:8099/engine.zip", ext: .zip, sha256: $engine_sum }
+      - { name: pointrelease-test, url: "http://127.0.0.1:8099/pr.zip", ext: .zip, sha256: $pr_sum, subdir: quake3-latest-pk3s }
+VARS
+run -e @/tmp/engine-vars.yml >/tmp/engine.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/engine.log | tail -n 20; die "run with the Quake 3 data failed"; }
+[[ -x /srv/games/quake3/quake3e.x64 ]] || die "Quake3e not added, or not executable"
+[[ -e /srv/games/quake3/baseq3/pak8.pk3 ]] || die "Quake 3 point release not added"
+grep -q '^quake3e-test=' /srv/games/quake3/.engine-version || die "engine version not recorded"
+[[ ! -e /srv/games/quake3/.unpacked ]] || die "unpack marker leaked into the game folder"
+again=$(run -e @/tmp/engine-vars.yml)
+echo "$again" | grep -Eq "changed=0 +unreachable=0 +failed=0" || { echo "$again" | grep -B3 changed: | head -20; die "engine run not idempotent"; }
+ok "engine waits for the data, then is added; idempotent"
+
 step "Unreal Tournament"
 [[ -x /usr/local/sbin/ut99-build ]] || die "UT99 build script missing"
 [[ ! -e /srv/games/ut99 ]] || die "UT99 built in the container (downloads should be off)"

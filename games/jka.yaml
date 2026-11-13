@@ -1,0 +1,50 @@
+# Star Wars Jedi Knight: Jedi Academy multiplayer on the OpenJK engine,
+# native Linux. The game data (base/assets0-3.pk3) comes from a bought copy;
+# the server adds OpenJK (docs/bought-games.md). Each seat copies the
+# finished folder read-only to /games/classic/jka.
+# Every setting goes on the command line.
+# To check on the canary: no dialogs, the nickname, fullscreen.
+id: jka
+name: Jedi Academy
+subtitle: Lightsaber duels and Force powers
+group: classic
+runtime: native
+engine: OpenJK
+path: /games/classic/jka
+players: { min: 2, max: 16 }
+launch:
+  command: ["./openjk.x86_64"]
+  args:
+    - "+set"
+    - "fs_basepath"
+    - "{{ path }}"
+    - "+set"
+    - "name"
+    - "{{ nickname }}"
+    - "+set"
+    - "r_fullscreen"
+    - "1"
+    - "+set"
+    - "r_mode"
+    - "-1"
+    - "+set"
+    - "r_customwidth"
+    - "{{ width }}"
+    - "+set"
+    - "r_customheight"
+    - "{{ height }}"
+    - "+set"
+    - "com_maxfps"
+    - "{{ fps_cap }}"
+# Address, or address:port; servers listen on 29070 by default.
+join:
+  args: ["+connect", "{{ server }}"]
+# Free for all with sabers only.
+host:
+  map: mp/ffa3
+  args: ["+set", "g_gametype", "0", "+set", "g_weaponDisable", "524279", "+set", "sv_maxclients", "16", "+map", "{{ map }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 125 }
+art: { hue: 210, glow: 140, motif: streaks }

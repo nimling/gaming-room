@@ -1,0 +1,117 @@
+---
+# --- One bought game on an open-source engine ----------------------------------
+# A person copies the bought game data into the share by hand (see the
+# game's guide). Once it is there, this adds the pinned engine files on
+# top, and seats copy the finished folder. Called once per entry in
+# gameshare_engine_games, as engine_game.
+- name: "Engine game | look for the bought game data: {{ engine_game.name }}"
+  ansible.builtin.stat:
+    path: "{{ gameshare_root }}/{{ engine_game.name }}/{{ engine_game.data }}"
+  register: engine_game_data
+
+- name: "Engine game | say what is missing: {{ engine_game.name }}"
+  ansible.builtin.debug:
+    msg: >-
+      No {{ engine_game.data }} in {{ gameshare_root }}/{{ engine_game.name }} yet,
+      so the engine was not added. Copy the game data there first; see
+      {{ engine_game.guide }}.
+  when: not engine_game_data.stat.exists
+
+- name: "Engine game | create the download cache and unpack folders: {{ engine_game.name }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: >-
+    {{ [gameshare_engine_cache]
+       + (engine_game.parts | map(attribute='name') | map('regex_replace', '$', '.d')
+          | map('regex_replace', '^', gameshare_engine_cache ~ '/') | list) }}
+  when: engine_game_data.stat.exists
+
+- name: "Engine game | download the pinned parts: {{ engine_game.name }}"
+  ansible.builtin.get_url:
+    url: "{{ part.url }}"
+    dest: "{{ gameshare_engine_cache }}/{{ part.name }}{{ part.ext }}"
+    checksum: "sha256:{{ part.sha256 }}"
+    mode: "0644"
+  loop: "{{ engine_game.parts }}"
+  loop_control:
+    loop_var: part
+    label: "{{ part.name }}"
+  when: engine_game_data.stat.exists
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Engine game | unpack each part once: {{ engine_game.name }}"
+  ansible.builtin.unarchive:
+    src: "{{ gameshare_engine_cache }}/{{ part.name }}{{ part.ext }}"
+    dest: "{{ gameshare_engine_cache }}/{{ part.name }}.d"
+    remote_src: true
+    creates: "{{ gameshare_engine_cache }}/{{ part.name }}.unpacked"
+  loop: "{{ engine_game.parts }}"
+  loop_control:
+    loop_var: part
+    label: "{{ part.name }}"
+  register: engine_game_unpacked
+  when: engine_game_data.stat.exists
+  # In a dry run the download does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Engine game | mark each part as unpacked: {{ engine_game.name }}"
+  ansible.builtin.file:
+    path: "{{ gameshare_engine_cache }}/{{ part.name }}.unpacked"
+    state: touch
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve
+  loop: "{{ engine_game.parts }}"
+  loop_control:
+    loop_var: part
+    label: "{{ part.name }}"
+  when: engine_game_data.stat.exists
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Copies only what differs; the bought data next to it is left alone.
+- name: "Engine game | put the engine next to the game data: {{ engine_game.name }}"
+  ansible.builtin.copy:
+    src: "{{ gameshare_engine_cache }}/{{ part.name }}.d/{{ part.subdir | default('') }}/"
+    dest: "{{ gameshare_root }}/{{ engine_game.name }}/"
+    remote_src: true
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
+    mode: preserve
+  loop: "{{ engine_game.parts }}"
+  loop_control:
+    loop_var: part
+    label: "{{ part.name }}"
+  when: engine_game_data.stat.exists
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Some release zips do not keep the execute bit.
+- name: "Engine game | make the engine programs runnable: {{ engine_game.name }}"
+  ansible.builtin.file:
+    path: "{{ gameshare_root }}/{{ engine_game.name }}/{{ item }}"
+    mode: "0755"
+  loop: "{{ engine_game.programs }}"
+  when: engine_game_data.stat.exists
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: "Engine game | record the engine version: {{ engine_game.name }}"
+  ansible.builtin.copy:
+    dest: "{{ gameshare_root }}/{{ engine_game.name }}/.engine-version"
+    content: "{% for p in engine_game.parts %}{{ p.name }}={{ p.sha256[:12] }}\n{% endfor %}"
+    owner: "{{ gameshare_owner }}"
+    group: "{{ gameshare_owner }}"
+    mode: "0644"
+  when: engine_game_data.stat.exists
+
+# rsyncd runs as nobody, and files copied in from elsewhere are not always
+# world-readable.
+- name: "Engine game | make the files readable for the rsync daemon: {{ engine_game.name }}"
+  ansible.builtin.file:
+    path: "{{ gameshare_root }}/{{ engine_game.name }}"
+    recurse: true
+    mode: "u+rwX,go+rX"
+  when: engine_game_data.stat.exists

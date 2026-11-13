@@ -111,6 +111,17 @@ seat_shared_games:
     # The patch also ships ARM64 and POWER builds.
     exclude: [/SystemARM64/, /SystemPPC64LE/]
     chmod: D755,Fu=rwX,Fgo=rX
+  # Bought games on open-source engines (docs/bought-games.md).
+  - name: quake3
+    dest: "{{ seat_classic_root }}/quake3"
+    required: [baseq3/pak0.pk3, quake3e.x64, .engine-version]
+    exclude: []
+    chmod: D755,Fu=rwX,Fgo=rX
+  - name: jka
+    dest: "{{ seat_classic_root }}/jka"
+    required: [base/assets0.pk3, openjk.x86_64, .engine-version]
+    exclude: []
+    chmod: D755,Fu=rwX,Fgo=rX
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false
