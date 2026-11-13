@@ -51,6 +51,7 @@ A game must get the whole machine, so the launcher sleeps whenever it is not in 
 - Spotify is read only while the launcher is awake, and the page changes only when the song does.
 - No backdrop blur on things that are always on screen. Blur stays on short-lived layers (flyouts, dialogs, the first-start screen).
 - Game art is painted once and kept; moving between games repaints only what changed.
+- Moving to another game animates for at most 250 ms. On a seat every animated frame is a full redraw of the screen, so the length of the fades sets the CPU cost of browsing. Only the selected tile's lift animates; its shadow snaps. A held arrow key or stick skips the fades.
 
 ## Seat files it reads
 
