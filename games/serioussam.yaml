@@ -1,0 +1,25 @@
+# Serious Sam Classic: The Second Encounter, on tx00100xt's Linux port of
+# the open-sourced Serious Engine (native). The game data comes from a
+# bought copy; the server adds the engine (docs/bought-games.md). Each seat
+# copies the folder read-only to /games/classic/serioussam.
+# The game keeps player profiles, saves and temp files next to its program,
+# so game-view starts it from a writable view in the player's home (reset
+# at End session).
+# LAN: Network → Join or Start a server in the game; co-op up to 16.
+# To check on the canary: first-start dialogs, player name, fullscreen,
+# a co-op LAN game.
+id: serioussam
+name: Serious Sam
+subtitle: The Second Encounter, 16-player co-op
+group: classic
+runtime: native
+engine: Serious Engine 1.10
+path: /games/classic/serioussam/SamTSE
+players: { min: 1, max: 16 }
+launch:
+  command: ["game-view", "serioussam", "SamTSE/Bin/SeriousSam"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: native, fps_cap: 120 }
+art: { hue: 30, glow: 60, motif: contour }

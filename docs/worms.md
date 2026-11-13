@@ -24,7 +24,7 @@ Decide the licence model before it goes to all seats: one copy per seat, or the 
 
 ## 2. Seats
 
-Seats copy the game at their next pull once `/srv/games/worms/WA.exe` exists. The launcher starts it with `proton-view`, which builds a writable view of the read-only folder in the player's home, because the game saves teams and settings next to itself. End session throws that view away.
+Seats copy the game at their next pull once `/srv/games/worms/WA.exe` exists. The launcher starts it with `game-view`, which builds a writable view of the read-only folder in the player's home, because the game saves teams and settings next to itself. End session throws that view away.
 
 ## LAN play
 
