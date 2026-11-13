@@ -32,9 +32,15 @@ config:
       Engine.Engine:
         RenderDevice: OpenGLDrv.OpenGLRenderDevice
         ViewportManager: SDLDrv.SDLClient
-      # Skip the intro movie map; start in the quiet menu map.
+      # Skip the intro movie map; start in the quiet menu map. The name
+      # here is the one the game sends when it joins a server.
       URL:
         LocalMap: NoIntro.ut2
+        Name: "{{ nickname }}"
+      # The game writes this itself after the first start; set it so it
+      # never shows a first-run screen.
+      FirstRun:
+        FirstRun: "3374"
       SDLDrv.SDLClient:
         StartupFullscreen: "True"
         FullscreenViewportX: "{{ width }}"
