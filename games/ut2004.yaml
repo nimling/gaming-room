@@ -28,10 +28,19 @@ config:
         Name: "{{ nickname }}"
   - ini: "~/.ut2004/System/UT2004.ini"
     set:
+      # The shipped Default.ini is the Windows one (Direct3D 9, WinDrv).
+      Engine.Engine:
+        RenderDevice: OpenGLDrv.OpenGLRenderDevice
+        ViewportManager: SDLDrv.SDLClient
+      # Skip the intro movie map; start in the quiet menu map.
+      URL:
+        LocalMap: NoIntro.ut2
       SDLDrv.SDLClient:
         StartupFullscreen: "True"
         FullscreenViewportX: "{{ width }}"
         FullscreenViewportY: "{{ height }}"
+      Engine.LevelInfo:
+        MaxClientFrameRate: "{{ fps_cap }}"
 profiles:
   A: { resolution: native, fps_cap: refresh }
   B: { resolution: native, fps_cap: 144 }

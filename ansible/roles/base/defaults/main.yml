@@ -105,7 +105,8 @@ seat_shared_games:
   - name: ut2004
     dest: "{{ seat_classic_root }}/ut2004"
     required: [System/UT2004, .ut2004-version]
-    exclude: []
+    # The patch also ships ARM64 and POWER builds.
+    exclude: [/SystemARM64/, /SystemPPC64LE/]
     chmod: D755,Fu=rwX,Fgo=rX
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
