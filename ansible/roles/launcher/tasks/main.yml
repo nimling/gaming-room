@@ -90,6 +90,8 @@
     method: system
     state: present
   when: arcade_spotify
+  # In a dry run of a seat without Flatpak, the package is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Spotify | install the app
   community.general.flatpak:
