@@ -6,6 +6,14 @@ subtitle: Your own library, on this seat
 group: steam
 runtime: steam
 engine: Proton for Windows games
+# Shown in the launcher's game details view.
+why: >-
+  Play anything from your own Steam library on a fast seat, next to your
+  friends. Games you install stay on the seat for the next person.
+highlights:
+  - Your own account and library
+  - Repeat downloads come from the room cache
+  - Windows games run with Proton
 launch:
   command: ["steam"]
 art: { hue: 222, glow: 200, motif: dots }

@@ -9,12 +9,26 @@ subtitle: Build a transport empire, together or against each other
 group: classic
 runtime: native
 engine: OpenTTD 15
+# Shown in the launcher's game details view.
+why: >-
+  A calm game for the whole evening. Build a railway empire together in one
+  company, or compete for the best routes. People can join a running game at
+  any time.
+highlights:
+  - Co-op or competitive, up to 16 players
+  - Join a running game any time
+  - Free and light on every seat
 players: { min: 1, max: 16 }
 launch:
   command: ["openttd"]
 config:
+  # Without [version], OpenTTD treats the file as old and resets
+  # private.cfg on start (empty name, survey question back). 7 is the
+  # ini_version OpenTTD 15 writes.
   - ini: "~/.config/openttd/openttd.cfg"
     set:
+      version:
+        ini_version: "7"
       misc:
         fullscreen: "true"
         resolution: "{{ width }},{{ height }}"

@@ -25,7 +25,7 @@ cp -a /repo /work
 cd /work
 
 step "Lint"
-shellcheck bootstrap/seat.sh tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
+shellcheck bootstrap/seat.sh ansible/roles/server_gameshare/files/ut2004-build tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
 ok "shellcheck"
 yamllint ansible
 ok "yamllint"
@@ -116,6 +116,12 @@ grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/va
 { command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
 command -v bzip2 >/dev/null || die "bzip2 missing"
 ok "build script, tools and dedicated server unit"
+
+step "Unreal Tournament 2004"
+[[ -x /usr/local/sbin/ut2004-build ]] || die "UT2004 build script missing"
+[[ ! -e /srv/games/ut2004 ]] || die "UT2004 built in the container (downloads should be off)"
+command -v unshield >/dev/null || die "unshield missing"
+ok "build script and tools"
 
 step "Steam PC Cafe VM"
 c=/srv/gaming-room/pccafe/compose.yaml

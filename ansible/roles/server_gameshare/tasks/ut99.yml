@@ -101,6 +101,9 @@
           ut99_dir, gameshare_owner, ut99_version_line]
          + (ut99_mods | map(attribute='file') | map('regex_replace', '^', ut99_cache ~ '/') | list) }}
   changed_when: true
+  # The build swaps the folder; the running server would keep the old,
+  # deleted one and fail at the next map change.
+  notify: Restart the UT99 server
   when: ut99_build and (ut99_built.content | default('') | b64decode | trim) != ut99_version_line
 
 # --- Dedicated LAN server ------------------------------------------------------

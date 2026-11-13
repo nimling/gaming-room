@@ -8,6 +8,15 @@ subtitle: 2D shooter, deathmatch and capture the flag
 group: classic
 runtime: native
 engine: Teeworlds 0.7
+# Shown in the launcher's game details view.
+why: >-
+  Cute, chaotic and easy to learn in a minute. Two-dimensional deathmatch and
+  capture the flag with grappling hooks, good for mixed groups and quick
+  rounds.
+highlights:
+  - Learn it in a minute
+  - Capture the flag and deathmatch, up to 16 players
+  - Free and light on every seat
 players: { min: 2, max: 16 }
 launch:
   command: ["teeworlds"]

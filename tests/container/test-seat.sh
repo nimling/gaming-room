@@ -44,6 +44,11 @@ mkdir -p /srv/share/quake3/baseq3 /srv/share/jka/base
 touch /srv/share/quake3/baseq3/pak0.pk3; install -m 755 /dev/null /srv/share/quake3/quake3e.x64
 echo "quake3e-test=0" >/srv/share/quake3/.engine-version
 touch /srv/share/jka/base/assets0.pk3   # no engine yet: the seat must wait
+mkdir -p /srv/share/ut2004/System /srv/share/ut2004/Maps
+install -m 755 /dev/null /srv/share/ut2004/System/UT2004; touch /srv/share/ut2004/Maps/DM-Rankin.ut2
+printf '[URL]\nMap=NvidiaLogo.ut2\n' >/srv/share/ut2004/System/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut2004/System/DefUser.ini
+echo "iso=test patch=3374" >/srv/share/ut2004/.ut2004-version
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -109,6 +114,14 @@ grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 u
 [[ -x /games/classic/quake3/quake3e.x64 && -e /games/classic/quake3/baseq3/pak0.pk3 ]] || die "Quake 3 not copied from the share, or not executable"
 [[ ! -e /games/classic/jka ]] || die "Jedi Academy copied before the server added the engine"
 ok "mw2, ut99 and quake3 mirrored; UT99 defaults seeded; jka waits"
+[[ -e /games/classic/ut2004/Maps/DM-Rankin.ut2 && -x /games/classic/ut2004/System/UT2004 ]] || die "UT2004 not copied from the share, or not executable"
+grep -qx 'Map=NvidiaLogo.ut2' /home/.golden/player/.ut2004/System/UT2004.ini || die "UT2004 defaults not in the golden home"
+grep -qx 'Name=Player' /home/.golden/player/.ut2004/System/User.ini || die "UT2004 user defaults not in the golden home"
+ok "mw2, ut99 and ut2004 mirrored; UT99 and UT2004 defaults seeded"
+
+step "Self-update"
+grep -q 'ansible-pull --clean ' /etc/systemd/system/seat-pull.service || die "seat-pull can get stuck on its shallow clone (no --clean)"
+ok "seat-pull resets its checkout to the branch"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json
