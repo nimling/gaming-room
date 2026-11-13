@@ -102,6 +102,11 @@ seat_shared_games:
     exclude: []
     # Native Linux game: keep the execute bit on its programs.
     chmod: D755,Fu=rwX,Fgo=rX
+  # Bought Windows game, run through proton-view (docs/worms.md).
+  - name: worms
+    dest: "{{ seat_classic_root }}/worms"
+    required: [WA.exe]
+    exclude: []
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false

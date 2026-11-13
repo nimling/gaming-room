@@ -1,0 +1,25 @@
+# Worms Armageddon 3.8, bought, through Proton. Team17's 3.8 update runs
+# well under Proton. The bought game folder is copied to the server by hand
+# (docs/worms.md); each seat copies it read-only to /games/classic/worms.
+# The game writes teams and settings into its own folder, so proton-view
+# starts it from a writable view in the player's home (reset at End
+# session).
+# LAN games: Network → LAN in the game (UDP broadcast on 17010-17012, open
+# on the gaming VLAN).
+# To check on the canary: first-start dialogs, fullscreen, a LAN game.
+id: worms
+name: Worms Armageddon
+subtitle: Turn-based mayhem with sheep and holy hand grenades
+group: classic
+runtime: native
+engine: Proton
+path: /games/classic/worms
+players: { min: 2, max: 6 }
+gamemode: false
+launch:
+  command: ["proton-view", "worms", "WA.exe"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: refresh }
+  C: { resolution: native, fps_cap: 60 }
+art: { hue: 48, glow: 120, motif: dots }

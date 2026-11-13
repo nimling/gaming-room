@@ -17,6 +17,8 @@
   loop:
     - "{{ gameshare_root }}"
     - "{{ iw4x_dir }}"
+    # Bought games copied in by hand (docs/worms.md).
+    - "{{ gameshare_root }}/worms"
 
 - name: Serve the game share read-only over rsync
   ansible.builtin.template:

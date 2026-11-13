@@ -1,0 +1,79 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# Starts a Windows game from /games/classic/<name> with Proton, for games
+# that write into their own folder (settings, teams, logs).
+#
+# The game folder in /games is shared and read-only. So every start builds a
+# private view of it in the player's home: real folders, linked game files
+# (cp -rs), and real copies of .exe, .dll and .ini files so Wine and the
+# game can use them. The home reset throws it all away. The same steps as
+# iw4x-seat, for any game.
+#
+#   proton-view <name> <program.exe> [game arguments]
+#   proton-view <name> <program.exe> --check
+set -euo pipefail
+
+if (( $# < 2 )); then
+    echo "usage: proton-view NAME PROGRAM.exe [ARGS...]" >&2
+    exit 2
+fi
+name=$1 program=$2
+shift 2
+src=/games/classic/$name
+data=${XDG_DATA_HOME:-$HOME/.local/share}/arcade
+dir=$data/$name-game
+log=$data/$name.log
+
+problems=()
+[[ -f $src/$program ]] || problems+=("the game is missing: no $program in $src")
+command -v umu-run >/dev/null || problems+=("umu-run is not installed")
+proton=${PROTONPATH:-$(sed -n "s/^proton:[[:space:]]*//p" /etc/arcade/arcade.yaml 2>/dev/null | head -n 1 || true)}
+if [[ $proton == /* && ! -x $proton/proton ]]; then
+    problems+=("Proton is missing: no $proton/proton")
+fi
+if [[ ${1:-} == --check ]]; then
+    if ((${#problems[@]})); then
+        printf 'problem: %s\n' "${problems[@]}"
+        exit 1
+    fi
+    echo "ok: ready to play"
+    exit 0
+fi
+if ((${#problems[@]})); then
+    printf 'proton-view: %s\n' "${problems[@]}" >&2
+    exit 1
+fi
+
+# The view lives for the session: files the game wrote stay until End
+# session; only missing entries are added, so an update in /games shows up
+# at the next session.
+mkdir -p "$dir"
+shopt -s nullglob dotglob
+for entry in "$src"/*; do
+    base=${entry##*/}
+    [[ -e $dir/$base || -L $dir/$base ]] && continue
+    case ${base,,} in
+        *.exe | *.dll | *.ini) cp -- "$entry" "$dir/$base" ;;
+        *) cp -rs -- "$entry" "$dir/$base" ;;
+    esac
+done
+# The copied folders take the read-only modes of /games; the game writes
+# into them. chmod -R leaves the linked files alone.
+chmod -R u+w "$dir"
+
+export WINEPREFIX=${WINEPREFIX:-$data/prefixes/$name}
+export GAMEID=${GAMEID:-0}
+export PROTONPATH=${proton:-GE-Proton}
+# The session normally sets these (/etc/environment.d/60-arcade-proton.conf).
+export UMU_FOLDERS_PATH=${UMU_FOLDERS_PATH:-/games/runtime/umu}
+# Proton runs inside the Steam Runtime container, which does not see /games
+# unless asked; the view here links into it.
+case ":${PRESSURE_VESSEL_FILESYSTEMS_RO:-}:" in
+    *:/games:*) ;;
+    *) export PRESSURE_VESSEL_FILESYSTEMS_RO=${PRESSURE_VESSEL_FILESYSTEMS_RO:+$PRESSURE_VESSEL_FILESYSTEMS_RO:}/games ;;
+esac
+mkdir -p "$WINEPREFIX"
+
+cd "$dir"
+echo "proton-view: $(date -Is) $name with $PROTONPATH: $program $*" >>"$log"
+exec umu-run "./$program" "$@" >>"$log" 2>&1
