@@ -5,6 +5,11 @@
 # never reaches the compositor and would otherwise look like no input.
 set -euo pipefail
 
+# Nobody has touched this session since it started (seat-idle marks the
+# first input): it is already clean, and a reset would only wake the screen.
+if [[ ! -e ${XDG_CACHE_HOME:-$HOME/.cache}/arcade/session-used ]]; then
+    exit 0
+fi
 if systemd-inhibit --list --no-legend 2>/dev/null | grep -qw idle; then
     exit 0
 fi

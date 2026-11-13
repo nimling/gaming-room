@@ -14,11 +14,10 @@
     owner: "{{ gameshare_owner }}"
     group: "{{ gameshare_owner }}"
     mode: "0755"
-  loop:
-    - "{{ gameshare_root }}"
-    - "{{ iw4x_dir }}"
-    # Bought games copied in by hand (docs/worms.md).
-    - "{{ gameshare_root }}/worms"
+  # Worms: bought folder copied in by hand (docs/worms.md).
+  loop: >-
+    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms']
+       + (gameshare_engine_games | map(attribute='name') | map('regex_replace', '^', gameshare_root ~ '/') | list) }}
 
 - name: Serve the game share read-only over rsync
   ansible.builtin.template:
@@ -154,6 +153,16 @@
     recurse: true
     mode: "u+rwX,go+rX"
   when: iw4x_base_game.stat.exists
+
+- name: TrackMania Nations Forever
+  ansible.builtin.include_tasks: tmnf.yml
+
+- name: Bought games on open-source engines
+  ansible.builtin.include_tasks: engine_game.yml
+  loop: "{{ gameshare_engine_games }}"
+  loop_control:
+    loop_var: engine_game
+    label: "{{ engine_game.name }}"
 
 - name: Unreal Tournament
   ansible.builtin.include_tasks: ut99.yml

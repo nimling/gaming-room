@@ -33,7 +33,8 @@ See [server/README.md](../server/README.md). Install the collections first: `ans
 
 - At boot, `seat-reset-boot.service` replaces `/home/player` with a btrfs snapshot of `/home/.golden/player`.
 - The login manager logs the player in. Newer CachyOS uses KDE's Plasma Login Manager (`/etc/plasmalogin.conf`); older installs use SDDM.
-- **End session** (launcher), **20 min idle** (`seat-idle`) and a **KDE log out** (`seat-logout-watch.service`) all lead to `seat-reset`. It stops the login manager, ends the player's processes, replaces the home, removes Proton prefixes and temp files, and starts the login manager again. On ext4 it copies the golden home instead of taking a snapshot; on seat-01 a reset takes about 1.2 seconds.
+- **End session** (launcher), **20 min idle** (`seat-idle`, only once someone has used the session) and a **KDE log out** (`seat-logout-watch.service`) all lead to `seat-reset`. It stops the login manager, ends the player's processes, replaces the home, removes Proton prefixes and temp files, and starts the login manager again. On ext4 it copies the golden home instead of taking a snapshot; on seat-01 a reset takes about 1.2 seconds.
+- **Screens** turn off after 5 minutes without input (`seat_screen_off_minutes`, in the golden home's `powerdevilrc`). An unused session is not reset, because the new session would turn the screen back on.
 - `seat-reset` refuses to touch the home if the golden home is missing.
 - Changes to the golden home: log in as the player, set things up, sign out of every account, then run `sudo seat-golden-capture` as admin. It refuses while any login token is left (`seat-token-check`).
 

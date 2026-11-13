@@ -83,7 +83,7 @@ The player's home is thrown away and recreated from a golden snapshot at every l
 2. **Auto-login:** SDDM logs in `player` and the launcher opens full screen.
 3. **Who are you?** The launcher asks for a nickname once and writes it into Mumble and every game.
 4. **Play:** classic games start directly. Steam opens only if the person signs in.
-5. **End session:** the End session button, or 20 min idle after a 60 s warning. Games close, `steam -shutdown` runs, and `seat-reset.service` runs.
+5. **End session:** the End session button, or 20 min idle after a 60 s warning (only if someone used the session; an idle seat's screen turns off after 5 min and stays off). Games close, `steam -shutdown` runs, and `seat-reset.service` runs.
 6. **Ready again:** back at step 2 with a clean home.
 
 | Data | Where it lives | After End session |

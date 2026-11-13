@@ -99,7 +99,9 @@
     path: "/home/.golden/{{ seat_player_user }}/.config/autostart/cachyos-hello.desktop"
     state: absent
 
-- name: Keep the seat awake during a session (KDE suspends after 15 minutes)
+# KDE would suspend after 15 minutes; the seat stays awake for the nightly
+# pull and Wake-on-LAN. The screen turns off on its own after a few minutes.
+- name: Keep the seat awake during a session, but turn the screen off when idle
   ansible.builtin.copy:
     dest: "/home/.golden/{{ seat_player_user }}/.config/powerdevilrc"
     owner: "{{ seat_player_user }}"
@@ -108,6 +110,17 @@
     content: |
       [AC][SuspendAndShutdown]
       AutoSuspendAction=0
+
+      [AC][Display]
+      {% if seat_screen_off_minutes | int > 0 %}
+      DimDisplayWhenIdle=true
+      DimDisplayIdleTimeoutSec={{ [(seat_screen_off_minutes | int) * 60 - 60, 30] | max }}
+      TurnOffDisplayWhenIdle=true
+      TurnOffDisplayIdleTimeoutSec={{ (seat_screen_off_minutes | int) * 60 }}
+      {% else %}
+      DimDisplayWhenIdle=false
+      TurnOffDisplayWhenIdle=false
+      {% endif %}
 
 - name: Turn off the screen lock for the player (no password to unlock with)
   ansible.builtin.copy:

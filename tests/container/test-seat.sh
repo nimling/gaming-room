@@ -41,6 +41,11 @@ printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
 echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
 mkdir -p /srv/share/worms/User/Teams; touch /srv/share/worms/WA.exe /srv/share/worms/User/Teams/WG.WGT
+mkdir -p /srv/share/tmnf/Packs; touch /srv/share/tmnf/TmForever.exe /srv/share/tmnf/Packs/Stadium.pak; echo "setup=test" >/srv/share/tmnf/.tmnf-version
+mkdir -p /srv/share/quake3/baseq3 /srv/share/jka/base
+touch /srv/share/quake3/baseq3/pak0.pk3; install -m 755 /dev/null /srv/share/quake3/quake3e.x64
+echo "quake3e-test=0" >/srv/share/quake3/.engine-version
+touch /srv/share/jka/base/assets0.pk3   # no engine yet: the seat must wait
 mkdir -p /srv/share/ut2004/System /srv/share/ut2004/Maps
 install -m 755 /dev/null /srv/share/ut2004/System/UT2004; touch /srv/share/ut2004/Maps/DM-Rankin.ut2
 printf '[URL]\nMap=NvidiaLogo.ut2\n' >/srv/share/ut2004/System/Default.ini
@@ -86,6 +91,23 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+
+step "Idle screens go dark and stay dark"
+pd=/home/.golden/player/.config/powerdevilrc
+grep -qx 'TurnOffDisplayWhenIdle=true' "$pd" || die "screen does not turn off when idle"
+grep -qx 'TurnOffDisplayIdleTimeoutSec=300' "$pd" || die "screen does not turn off after 5 minutes"
+grep -qx 'DimDisplayIdleTimeoutSec=240' "$pd" || die "screen does not dim before it turns off"
+# seat-idle-action with a stub systemctl: an unused session is left alone,
+# a used one is reset.
+mkdir -p /tmp/idle-bin /tmp/idle-home; chown player /tmp/idle-home
+printf '#!/bin/sh\necho "$*" >>/tmp/idle-calls\n' >/tmp/idle-bin/systemctl; chmod 755 /tmp/idle-bin/systemctl
+idle() { sudo -u player env PATH="/tmp/idle-bin:$PATH" HOME=/tmp/idle-home /usr/local/libexec/seat-idle-action; }
+rm -f /tmp/idle-calls; idle
+[[ ! -e /tmp/idle-calls ]] || die "idle reset of a session nobody used (would wake the screen)"
+sudo -u player mkdir -p /tmp/idle-home/.cache/arcade; sudo -u player touch /tmp/idle-home/.cache/arcade/session-used
+idle
+grep -q 'start --no-block seat-reset.service' /tmp/idle-calls || die "used session not reset after idle"
+ok "screen off after 5 min; idle reset only after someone used the seat"
 for prog in openttd teeworlds xonotic-sdl; do command -v "$prog" >/dev/null || die "$prog not installed"; done
 ok "free LAN games installed"
 [[ $(readlink /home/.golden/player/.local/share/Steam/steamapps) == /games/steam/steamapps ]] || die "Steam games would land in the home"
@@ -120,6 +142,11 @@ view=$(sudo -u player env PATH="/tmp/bin:$PATH" PROTONPATH=GE-Proton HOME=/tmp/p
 [[ -L /tmp/pv/.local/share/arcade/worms-game/User/Teams/WG.WGT && -w /tmp/pv/.local/share/arcade/worms-game/User/Teams ]] || die "proton-view view not linked or not writable"
 grep -q 'umu-run ./WA.exe' <<<"$view" || die "proton-view did not start the game with umu-run"
 ok "mw2, ut99 and worms mirrored; UT99 defaults seeded; proton-view builds a writable view"
+[[ -e /games/classic/tmnf/Packs/Stadium.pak && ! -x /games/classic/tmnf/TmForever.exe ]] || die "TrackMania not copied from the share, or files executable"
+ok "mw2, ut99 and tmnf mirrored; UT99 defaults seeded"
+[[ -x /games/classic/quake3/quake3e.x64 && -e /games/classic/quake3/baseq3/pak0.pk3 ]] || die "Quake 3 not copied from the share, or not executable"
+[[ ! -e /games/classic/jka ]] || die "Jedi Academy copied before the server added the engine"
+ok "mw2, ut99 and quake3 mirrored; UT99 defaults seeded; jka waits"
 [[ -e /games/classic/ut2004/Maps/DM-Rankin.ut2 && -x /games/classic/ut2004/System/UT2004 ]] || die "UT2004 not copied from the share, or not executable"
 grep -qx 'Map=NvidiaLogo.ut2' /home/.golden/player/.ut2004/System/UT2004.ini || die "UT2004 defaults not in the golden home"
 grep -qx 'Name=Player' /home/.golden/player/.ut2004/System/User.ini || die "UT2004 user defaults not in the golden home"
