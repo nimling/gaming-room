@@ -3,6 +3,7 @@
 
 use anyhow::{bail, Context, Result};
 use arcade_core::manifest::{self, Manifest, Tier};
+use arcade_core::music::{self, Control};
 use arcade_core::plan::{self, Mode, Plan, Request};
 use arcade_core::{lan, nick, ptt, Config, Display, Seat};
 use clap::{Args, Parser, Subcommand};
@@ -62,6 +63,9 @@ enum Cmd {
     /// KeyB, or MouseForward; "default" for side button and V). Quit
     /// Mumble first: it rewrites its settings when it quits.
     Ptt { key: Option<String> },
+    /// Show what Spotify plays, or press a mini player button: open,
+    /// play-pause, next or previous. Run it in the player's session.
+    Music { action: Option<String> },
     /// Close everything and reset the seat for the next person
     EndSession,
 }
@@ -219,6 +223,14 @@ fn run() -> Result<ExitCode> {
                 println!("{k}");
             }
             None => println!("{}", ptt::load(&seat.home).as_deref().unwrap_or("default")),
+        },
+        Cmd::Music { action } => match action.as_deref() {
+            Some("open") => music::open()?,
+            Some(a) => music::control(Control::parse(a)?)?,
+            None => match music::now_playing() {
+                Some(np) => println!("{} · {} · {}", np.status, np.title, np.artist),
+                None => bail!("Spotify is not open"),
+            },
         },
         Cmd::EndSession => {
             let status = Command::new("systemctl")

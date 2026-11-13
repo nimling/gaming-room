@@ -33,6 +33,7 @@ The launcher follows **Fluent 2**. It must look modern and be easy to use with k
 5. End session: one confirmation, then the seat reset, then the nickname screen.
 6. IP addresses: a status bar button opens a list of every seat and the server. Pick one to copy its address.
 7. Seat flyout: the tier, with a prototype switch to see how A, B and C change the tuning.
+8. Music: a status bar button shows the song Spotify plays. Its flyout has previous, play or pause, next, and Open Spotify.
 
 ## Stack recommendation
 

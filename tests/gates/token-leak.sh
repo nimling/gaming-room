@@ -1,6 +1,6 @@
 #!/bin/bash
 # Gate 1: logout leaves no login tokens.
-# Procedure on the seat: sign in to Steam and a browser, press End session.
+# Procedure on the seat: sign in to Steam, Spotify and a browser, press End session.
 # Then run as root, for example from the server:
 #   ssh seat-01 sudo bash -s < tests/gates/token-leak.sh
 # Add --reset to trigger the reset from here instead of pressing End session:

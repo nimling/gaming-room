@@ -90,6 +90,7 @@ The player's home is thrown away and recreated from a golden snapshot at every l
 | --- | --- | --- |
 | Steam login and Steam Guard tokens | `~/.local/share/Steam`, `~/.steam` | Wiped (home reset) |
 | Epic, GOG (Heroic), Battle.net, Discord, browser logins | `~` | Wiped (home reset) |
+| Spotify login and song cache | `~/.var/app/com.spotify.Client` | Wiped (home reset) |
 | Classic game settings and Wine prefixes | `~` | Back to golden defaults |
 | Proton prefixes (Steam saves on Windows games) | `/games/steam/steamapps/compatdata` | Wiped; Steam Cloud restores saves |
 | Installed Steam games | `/games/steam/steamapps/common` | Kept |
@@ -105,6 +106,7 @@ A thin launcher of our own on top of proven runners: the launcher owns the exper
 - **Tuned:** settings rendered from templates at launch, using the seat's tier and display.
 - **Old low-resolution games:** inside `gamescope` with integer scaling.
 - **Windows-only titles:** `umu-run` with a pinned GE-Proton, prefix preinstalled in the golden home.
+- **Music:** the official Spotify app from Flathub, opened from the launcher. A mini player in the status bar shows the song and has play, pause, next and previous. People sign in with their own account; a shared Nimtech account is not allowed by Spotify's terms. Playing music inside the launcher window is not possible: Spotify needs Widevine DRM, and the window's WebKitGTK has none.
 
 ## Game catalogue
 

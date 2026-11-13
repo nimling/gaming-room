@@ -30,8 +30,13 @@ arcade launch ut99 --screenshot-after 20      # test mode: screenshot, then clos
 arcade nick Kaptein                           # set the nickname
 arcade ips                                    # IP addresses of every seat and the server
 arcade ptt KeyB                               # push to talk on B (quit Mumble first)
+arcade music next                             # Spotify: open, play-pause, next, previous; none shows the song
 arcade end-session                            # reset the seat
 ```
+
+## Music
+
+The Music button opens Spotify: the official client from Flathub, installed by the launcher role. The player signs in with their own account; the seat reset signs them out. The launcher reads and steers Spotify over MPRIS with `playerctl`, so the mini player works while a game covers the Spotify window. There is no in-launcher player: Spotify needs Widevine DRM, which the launcher's WebKitGTK window does not have.
 
 ## Seat files it reads
 

@@ -288,6 +288,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .seg button { min-width: 48px; height: 28px; border: 0; border-radius: 3px; background: transparent; color: var(--fg-2); font-weight: 600; cursor: pointer; }
 .seg button:hover { background: var(--ctrl-hover); }
 .seg button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
+.music-text { overflow: hidden; text-overflow: ellipsis; max-width: 32ch; }
+.np { margin-top: 12px; min-width: 0; }
+.np-title { font: 600 14px/20px var(--font-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-artist { color: var(--fg-2); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.transport { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.transport .btn { min-width: 44px; justify-content: center; }
 .fine { margin: 10px 0 0; color: var(--fg-3); font-size: 12px; line-height: 16px; }
 .people { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .person { display: flex; align-items: center; gap: 10px; padding: 6px 4px; }
@@ -407,7 +413,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 @media (max-width: 520px) {
   .shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .actions .btn.lg { flex: 1 1 auto; }
-  .voice .talker, .me-name { display: none; }
+  .voice .talker, .me-name, .music-text { display: none; }
   .statusbar .end-label, .statusbar .ips-label { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -463,6 +469,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     <button class="voice" data-fly="voice" aria-haspopup="dialog">
       <i class="dot"></i><span id="voice-text">Lobby · <b id="voice-n">7</b> people</span><span class="talker" id="talker"></span>
     </button>
+    <button class="voice" data-fly="music" aria-haspopup="dialog" title="Music">
+      <span id="music-ico"></span><span class="music-text" id="music-text">Spotify</span>
+    </button>
     <button class="btn subtle" data-action="ips" aria-haspopup="dialog" title="IP addresses of every seat">
       <svg class="ico s16" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="9" rx="1.5"/><path d="M10 12v3M6 17h8"/></svg>
       <span class="ips-label">IP addresses</span>
@@ -507,6 +516,22 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     <button class="btn" data-action="mute" id="fly-mute">Mute my mic</button>
   </div>
   <p class="fine" id="ptt-fine">Push to talk: hold the mouse side button or <kbd>V</kbd>. It works everywhere, also inside games.</p>
+</div>
+
+<div class="flyout up" id="fly-music" role="dialog" aria-label="Music" data-modal="false" hidden>
+  <div class="fly-title">Spotify</div>
+  <div class="fly-sub" id="music-sub">Not open</div>
+  <div class="np" id="np" hidden><div class="np-title" id="np-title"></div><div class="np-artist" id="np-artist"></div></div>
+  <div class="transport" role="group" aria-label="Playback">
+    <button class="btn subtle" data-action="music-prev" id="music-prev" aria-label="Previous song"></button>
+    <button class="btn accent" data-action="music-toggle" id="music-toggle" aria-label="Play"></button>
+    <button class="btn subtle" data-action="music-next" id="music-next" aria-label="Next song"></button>
+  </div>
+  <div class="fly-sep"></div>
+  <div class="stack">
+    <button class="btn" data-action="music-open" id="music-open">Open Spotify</button>
+  </div>
+  <p class="fine">Sign in with your own account. Ending the session signs you out.</p>
 </div>
 
 <div class="flyout" id="fly-me" role="dialog" aria-label="You" data-modal="false" hidden>
@@ -631,6 +656,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     user: '<circle cx="10" cy="7" r="3.2"/><path d="M4 17c.7-3 3.1-4.8 6-4.8s5.3 1.8 6 4.8"/>',
     key: '<circle cx="7" cy="12" r="3.5"/><path d="M9.5 9.5 16 3M13.5 5.5l2 2"/>',
     check: '<path d="M4.5 10.5 8 14l7.5-8"/>',
+    music: '<path d="M7.5 15V4.5l9-2V13"/><circle cx="5.5" cy="15" r="2"/><circle cx="14.5" cy="13" r="2"/>',
+    pause: '<rect x="5.5" y="4" width="3" height="12" rx=".6" fill="currentColor" stroke="none"/><rect x="11.5" y="4" width="3" height="12" rx=".6" fill="currentColor" stroke="none"/>',
+    prev: '<path d="M5 4.5v11"/><path d="M15.5 5.2v9.6a.6.6 0 0 1-.9.5L7.8 10.5a.6.6 0 0 1 0-1l6.8-4.8a.6.6 0 0 1 .9.5z" fill="currentColor" stroke="none"/>',
+    next: '<path d="M15 4.5v11"/><path d="M4.5 5.2v9.6a.6.6 0 0 0 .9.5l6.8-4.8a.6.6 0 0 0 0-1L5.4 4.7a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/>',
   };
   const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 20 20" aria-hidden="true">${ICON[n]}</svg>`;
   const RING = '<svg class="ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>';
@@ -665,6 +694,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   let HOSTS = [{ name: 'gaming-server', address: '192.0.2.10', this_seat: false },
     ...Array.from({ length: 10 }, (_, i) => ({ name: `Seat ${String(i + 1).padStart(2, '0')}`, address: `192.0.2.${21 + i}`, this_seat: i === 3 }))];
   let PEOPLE = ['Kaptein', 'Lyn', 'Mora', 'Pixel', 'Ola', 'Tuva'];
+  /* What Spotify plays: { status, title, artist }, or null when it is not open. */
+  let MUSIC = null;
+  const SAMPLE_SONGS = [['Kids', 'MGMT'], ['Midnight City', 'M83'], ['Sandstorm', 'Darude']];
 
   const state = { nick: 'Nima', ptt: null, pttDraft: null, capturing: false, tier: 'B', filter: 'all', sel: 'ut99', running: null, muted: false, talker: null, lastReset: new Date(Date.now() - 47 * 60000) };
   const game = id => GAMES.find(g => g.id === id);
@@ -887,6 +919,19 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#mic-label').innerHTML = state.muted ? 'Muted' : live ? 'Talking' : `Hold ${pttKbd(state.ptt)} to talk`;
     $('#ptt-fine').innerHTML = `Push to talk: hold ${pttKbd(state.ptt)}. It works everywhere, also inside games.`;
     $('#fly-mute').textContent = state.muted ? 'Unmute my mic' : 'Mute my mic';
+  }
+  function renderMusic() {
+    const m = MUSIC, playing = !!m && m.status === 'Playing', song = !!m && !!m.title;
+    $('#music-ico').innerHTML = ico(playing ? 'play' : 'music', 's16');
+    $('#music-text').textContent = song ? `${m.title} · ${m.artist}` : 'Spotify';
+    $('#music-sub').textContent = !m ? 'Not open' : !song ? 'Pick something to play in Spotify' : playing ? 'Playing' : 'Paused';
+    $('#np').hidden = !song;
+    $('#np-title').textContent = song ? m.title : ''; $('#np-artist').textContent = song ? m.artist : '';
+    $('#music-prev').innerHTML = ico('prev', 's16'); $('#music-next').innerHTML = ico('next', 's16');
+    $('#music-toggle').innerHTML = ico(playing ? 'pause' : 'play', 's16');
+    $('#music-toggle').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    ['#music-prev', '#music-toggle', '#music-next'].forEach(id => { $(id).disabled = !m; });
+    $('#music-open').textContent = m ? 'Show Spotify' : 'Open Spotify';
   }
   function renderTier() {
     $('#tier-label').textContent = state.tier; $('#spec-tier').textContent = state.tier;
@@ -1181,6 +1226,32 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     openWelcome('first');
   }
 
+  async function refreshMusic() {
+    if (!LIVE) return;
+    try { MUSIC = await invoke('music_status'); } catch (err) { MUSIC = null; }
+    renderMusic();
+  }
+  async function openMusic() {
+    closeFlyouts();
+    if (!LIVE) { MUSIC = MUSIC || { status: 'Paused', title: SAMPLE_SONGS[0][0], artist: SAMPLE_SONGS[0][1] }; renderMusic(); toast('Spotify opens on a seat. Press the Super key to come back.'); return; }
+    try { await invoke('music_open'); toast('Opening Spotify. Press the Super key to come back.'); }
+    catch (err) { toast(`Spotify did not start: ${esc(err)}`); }
+  }
+  async function musicControl(action) {
+    if (!LIVE) {
+      if (!MUSIC) return;
+      if (action === 'play-pause') MUSIC.status = MUSIC.status === 'Playing' ? 'Paused' : 'Playing';
+      else {
+        const i = SAMPLE_SONGS.findIndex(s => s[0] === MUSIC.title), n = SAMPLE_SONGS.length;
+        const [title, artist] = SAMPLE_SONGS[(i + (action === 'next' ? 1 : n - 1)) % n];
+        MUSIC = { status: 'Playing', title, artist };
+      }
+      renderMusic(); return;
+    }
+    try { await invoke('music_control', { action }); } catch (err) { toast(esc(err)); }
+    setTimeout(refreshMusic, 300);
+  }
+
   function toggleMute() { state.muted = !state.muted; renderMic(); renderPeople(); }
 
   /* ---------- Events ---------- */
@@ -1214,6 +1285,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       case 'ptt-change': if (!state.capturing) startCapture(); break;
       case 'ptt-reset': state.pttDraft = null; renderPtt(); $('#ptt-change').focus(); break;
       case 'mute': toggleMute(); break;
+      case 'music-open': openMusic(); break;
+      case 'music-toggle': musicControl('play-pause'); break;
+      case 'music-prev': musicControl('previous'); break;
+      case 'music-next': musicControl('next'); break;
     }
   });
   document.addEventListener('dblclick', e => { const t = e.target.closest('.tile'); if (t) play(t.dataset.id); });
@@ -1294,6 +1369,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#spec-gpu').textContent = b.gpu; $('#spec-display').textContent = b.display;
     $('#wl-kicker').textContent = `${b.seat_name} · Nimtech Arcade`;
     $('#voice-text').textContent = b.voice != null ? `Voice · ${b.voice || 'Lobby'}` : 'Voice not set up';
+    refreshMusic(); setInterval(refreshMusic, 3000);
     setInterval(async () => {
       if (!state.running) return;
       try { if (!(await invoke('running'))) quit(true); } catch (err) { /* keep state */ }
@@ -1312,7 +1388,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     }
     makeNoise(); tick();
     $('#spec-reset').textContent = hhmm(state.lastReset);
-    renderTier(); renderMe(); renderMic(); renderShelf(); renderHero(false);
+    renderTier(); renderMe(); renderMic(); renderMusic(); renderShelf(); renderHero(false);
     ro.observe($('#hero')); ro.observe($('#shelf'));
     if (!state.nick) openWelcome('first');
   }
