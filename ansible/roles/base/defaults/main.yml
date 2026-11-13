@@ -122,12 +122,17 @@ seat_shared_games:
     required: [base/assets0.pk3, openjk.x86_64, .engine-version]
     exclude: []
     chmod: D755,Fu=rwX,Fgo=rX
+  - name: serioussam
+    dest: "{{ seat_classic_root }}/serioussam"
+    required: [SamTSE/SE1_00.gro, SamTSE/Bin/SeriousSam, .engine-version]
+    exclude: []
+    chmod: D755,Fu=rwX,Fgo=rX
   # Windows game, run through Proton: plain read-only files.
   - name: tmnf
     dest: "{{ seat_classic_root }}/tmnf"
     required: [TmForever.exe, .tmnf-version]
     exclude: []
-  # Bought Windows game, run through proton-view (docs/worms.md).
+  # Bought Windows game, run through game-view (docs/worms.md).
   - name: worms
     dest: "{{ seat_classic_root }}/worms"
     required: [WA.exe]

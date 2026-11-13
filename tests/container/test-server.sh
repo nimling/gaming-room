@@ -95,7 +95,7 @@ command -v innoextract >/dev/null || die "innoextract missing"
 ok "unpack script and tools"
 
 step "Bought games on open-source engines"
-[[ -d /srv/games/quake3 && -d /srv/games/jka ]] || die "share folders for bought games missing"
+[[ -d /srv/games/quake3 && -d /srv/games/jka && -d /srv/games/serioussam ]] || die "share folders for bought games missing"
 [[ $(stat -c %U /srv/games/quake3) == nimadmin ]] || die "quake3 share folder not owned by the login user"
 [[ ! -e /srv/games/quake3/.engine-version ]] || die "engine added without the bought data"
 # With the data copied in, the next run adds the engine. Stand-in engine

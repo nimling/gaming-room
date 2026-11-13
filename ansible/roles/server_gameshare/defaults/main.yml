@@ -78,6 +78,19 @@ gameshare_engine_games:
         url: https://github.com/JACoders/OpenJK/releases/download/latest/OpenJK-linux-x86_64.tar.gz
         ext: .tar.gz
         sha256: 8116857544cc8ca90713edae43db0b13108cb044af7ea7312c739a677464c297
+  # Serious Sam Classic: The Second Encounter (and The First Encounter):
+  # tx00100xt's Linux port of the open-sourced Serious Engine 1.10; data
+  # from bought copies: SamTSE/*.gro + Help, SamTFE/*.gro + Help + Levels.
+  - name: serioussam
+    data: SamTSE/SE1_00.gro
+    guide: docs/bought-games.md
+    programs: [SamTSE/Bin/SeriousSam, SamTFE/Bin/SeriousSam]
+    parts:
+      - name: serioussamclassic-1.10.7
+        url: https://github.com/tx00100xt/SeriousSamClassic/releases/download/1.10.7/SeriousSamClassic-1.10.7-lnx-amd64-bin.tar.xz
+        ext: .tar.xz
+        sha256: ac57ac0cf6c73dbee3aaf7830271b8a1c1949ae4a4c8783f0faafc18596bfb0b
+        subdir: x64
 
 # --- Unreal Tournament (GOTY) on OldUnreal 469e -------------------------------
 # Free from Epic and OldUnreal; no CD key. The server builds the game once

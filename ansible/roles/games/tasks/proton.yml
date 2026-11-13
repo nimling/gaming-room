@@ -90,12 +90,17 @@
     group: root
     mode: "0644"
 
-# Windows games that write into their own folder start through this; it
-# builds a writable view of the read-only game folder in the player's home.
-- name: Proton | install the start script for writable game folders
+# Games that write into their own folder start through this; it builds a
+# writable view of the read-only game folder in the player's home.
+- name: Install the start script for writable game folders
   ansible.builtin.copy:
-    src: proton-view
-    dest: /usr/local/bin/proton-view
+    src: game-view
+    dest: /usr/local/bin/game-view
     owner: root
     group: root
     mode: "0755"
+
+- name: Remove the old name of that script
+  ansible.builtin.file:
+    path: /usr/local/bin/proton-view
+    state: absent
