@@ -8,6 +8,15 @@ subtitle: Allies against Soviets, on OpenRA
 group: classic
 runtime: native
 engine: OpenRA
+# Shown in the launcher's game details view.
+why: >-
+  The real-time strategy game many of us grew up with, on a modern engine. Two
+  against two, or the whole room against the computer, makes a perfect
+  half-hour break from shooters.
+highlights:
+  - Team games or co-op against the computer
+  - Up to 8 players
+  - Free, with no account or licence needed
 players: { min: 1, max: 8 }
 launch:
   command: ["openra-ra"]

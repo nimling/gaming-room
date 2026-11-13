@@ -387,22 +387,26 @@ pub fn shell_line(plan: &Plan) -> String {
 }
 
 /// Sends a signal to a game's whole process group. True if any process got it.
-fn signal_group(child: &Child, signal: &str) -> bool {
-    Command::new("kill")
-        .args([signal, "--", &format!("-{}", child.id())])
-        .status()
-        .is_ok_and(|s| s.success())
+/// A system call, not a `kill` process: the launcher checks this every few
+/// seconds while a game runs, and must cost the game nothing.
+fn signal_group(child: &Child, signal: libc::c_int) -> bool {
+    let Ok(pid) = libc::pid_t::try_from(child.id()) else {
+        return false;
+    };
+    // SAFETY: kill(2) only sends a signal. The game was spawned with
+    // process_group(0), so -pid is its own group, never the launcher's.
+    unsafe { libc::kill(-pid, signal) == 0 }
 }
 
 /// True while the game, or anything it started, is still running.
 pub fn alive(child: &mut Child) -> bool {
-    matches!(child.try_wait(), Ok(None)) || signal_group(child, "-0")
+    matches!(child.try_wait(), Ok(None)) || signal_group(child, 0)
 }
 
 /// Stops a game and everything it started: SIGTERM to the process group,
 /// up to three seconds to close, then SIGKILL for whatever is left.
 pub fn stop(child: &mut Child) {
-    signal_group(child, "-TERM");
+    signal_group(child, libc::SIGTERM);
     for _ in 0..30 {
         if !alive(child) {
             break;
@@ -410,7 +414,7 @@ pub fn stop(child: &mut Child) {
         thread::sleep(Duration::from_millis(100));
     }
     if alive(child) {
-        signal_group(child, "-KILL");
+        signal_group(child, libc::SIGKILL);
     }
     let _ = child.wait();
 }

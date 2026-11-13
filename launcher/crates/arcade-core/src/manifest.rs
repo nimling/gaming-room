@@ -94,7 +94,20 @@ pub struct Manifest {
     pub lowest_tier: Option<Tier>,
     #[serde(default)]
     pub art: Option<Art>,
+    /// Why this game is good in a LAN room: a short paragraph for the
+    /// game details view.
+    #[serde(default)]
+    pub why: Option<String>,
+    /// A few short points for the game details view.
+    #[serde(default)]
+    pub highlights: Vec<String>,
 }
+
+/// Longest `why` text, in characters.
+pub const WHY_MAX: usize = 400;
+/// Most highlights, and the longest one in characters.
+pub const HIGHLIGHTS_MAX: usize = 5;
+pub const HIGHLIGHT_MAX: usize = 80;
 
 fn yes() -> bool {
     true
@@ -204,6 +217,9 @@ pub struct Card {
     pub installed: bool,
     pub can_join: bool,
     pub can_host: bool,
+    /// Empty when the manifest has no `why`.
+    pub why: String,
+    pub highlights: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -343,6 +359,12 @@ impl Manifest {
             installed: self.installed(),
             can_join: self.join.is_some(),
             can_host: self.host.is_some(),
+            why: self
+                .why
+                .as_deref()
+                .map(|w| w.split_whitespace().collect::<Vec<_>>().join(" "))
+                .unwrap_or_default(),
+            highlights: self.highlights.iter().map(|h| h.trim().into()).collect(),
         }
     }
 
@@ -398,6 +420,31 @@ impl Manifest {
         if let Some(a) = &self.art {
             if !MOTIFS.contains(&a.motif.as_str()) {
                 out.push(format!("art.motif must be one of {}", MOTIFS.join(", ")));
+            }
+        }
+        if let Some(w) = &self.why {
+            let n = w.trim().chars().count();
+            if n == 0 {
+                out.push("why is empty; leave it out instead".into());
+            } else if n > WHY_MAX {
+                out.push(format!("why has {n} characters; keep it to {WHY_MAX}"));
+            }
+        }
+        if self.highlights.len() > HIGHLIGHTS_MAX {
+            out.push(format!(
+                "highlights has {} points; keep it to {HIGHLIGHTS_MAX}",
+                self.highlights.len()
+            ));
+        }
+        for h in &self.highlights {
+            let n = h.trim().chars().count();
+            if n == 0 {
+                out.push("highlights has an empty point".into());
+            } else if n > HIGHLIGHT_MAX {
+                out.push(format!(
+                    "highlight {:?} has {n} characters; keep it to {HIGHLIGHT_MAX}",
+                    h.trim()
+                ));
             }
         }
 
@@ -580,6 +627,44 @@ profiles:
         assert_eq!(c.players, "2–16");
         assert_eq!(c.tuned, "1920×1080 · 144 fps cap");
         assert!(c.can_join && !c.can_host);
+    }
+
+    #[test]
+    fn why_and_highlights_are_optional() {
+        let m: Manifest = serde_yaml::from_str(UT).unwrap();
+        let c = m.card(Tier::B, &display());
+        assert!(c.why.is_empty() && c.highlights.is_empty());
+    }
+
+    #[test]
+    fn why_and_highlights_reach_the_card() {
+        let text = format!(
+            "{UT}why: >-\n  Fast frags,\n  instant fun.\nhighlights:\n  - \" InstaGib \"\n  - Bots fill empty slots\n"
+        );
+        let m: Manifest = serde_yaml::from_str(&text).unwrap();
+        assert!(m
+            .problems(Path::new("games/ut99.yaml"), Path::new("games"))
+            .is_empty());
+        let c = m.card(Tier::B, &display());
+        assert_eq!(c.why, "Fast frags, instant fun.");
+        assert_eq!(c.highlights, ["InstaGib", "Bots fill empty slots"]);
+    }
+
+    #[test]
+    fn why_and_highlights_are_checked() {
+        let mut m: Manifest = serde_yaml::from_str(UT).unwrap();
+        m.why = Some("  ".into());
+        m.highlights = vec![String::new(), "x".repeat(HIGHLIGHT_MAX + 1)];
+        let p = m.problems(Path::new("games/ut99.yaml"), Path::new("games"));
+        assert!(p.iter().any(|s| s.contains("why is empty")), "{p:?}");
+        assert!(p.iter().any(|s| s.contains("empty point")), "{p:?}");
+        assert!(p.iter().any(|s| s.contains("keep it to 80")), "{p:?}");
+
+        m.why = Some("w".repeat(WHY_MAX + 1));
+        m.highlights = vec!["ok".into(); HIGHLIGHTS_MAX + 1];
+        let p = m.problems(Path::new("games/ut99.yaml"), Path::new("games"));
+        assert!(p.iter().any(|s| s.contains("keep it to 400")), "{p:?}");
+        assert!(p.iter().any(|s| s.contains("keep it to 5")), "{p:?}");
     }
 
     #[test]

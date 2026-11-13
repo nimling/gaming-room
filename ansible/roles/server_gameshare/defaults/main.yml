@@ -71,6 +71,27 @@ ut99_mods:
     url: https://github.com/shrimpza/monsterhunt/releases/download/releases%2Fv613/MonsterHunt613.zip
     sha256: 5c23fa6ac2efc714784c8020c72d1acefb24027952835a7565d537c38fa86622
 
+# --- Unreal Tournament 2004 on OldUnreal 3374 --------------------------------
+# Free again: Epic approved OldUnreal's release; no CD key. The server builds
+# the game from the Editor's Choice DVD image and the 3374 Linux patch
+# (files/ut2004-build, the same steps as OldUnreal's install-ut2004.sh), and
+# seats copy the result.
+ut2004_dir: "{{ gameshare_root }}/ut2004"
+# Downloads and builds the game. Off in the container test (3 GB download).
+ut2004_build: "{{ not server_in_container }}"
+ut2004_cache: /var/cache/ut2004
+# Pinned. To update, change the tag, file and checksum (GitHub lists the
+# digest per release asset), run server.yml, and seats pick it up at their
+# next pull:
+#   gh api repos/OldUnreal/UT2004Patches/releases/tags/<tag> --jq '.assets[] | {name, digest}'
+ut2004_patch_version: 3374-rc3
+ut2004_patch_file: OldUnreal-UT2004Patch3374-Linux-fc0484d6.tar.bz2
+ut2004_patch_url: "https://github.com/OldUnreal/UT2004Patches/releases/download/{{ ut2004_patch_version }}/{{ ut2004_patch_file }}"
+ut2004_patch_sha256: d79eb45fda3ace2b7a68e6a0b9730b7d6602004b111e0b16f3f7cc28f3111572
+ut2004_iso_url: https://files.oldunreal.net/UT2004.ISO
+ut2004_iso_fallback_url: https://files2.oldunreal.net/UT2004.ISO
+ut2004_iso_sha256: 43e9182ae20bcbc0f6f4588fee6c1b336c261f1465403118a1973b09b1a22541
+
 # Dedicated LAN server, from the same files. Off until switched on in the
 # private inventory. It answers LAN browser queries on the gaming VLAN only.
 ut99_server_enabled: false

@@ -41,6 +41,11 @@ printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
 echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
 mkdir -p /srv/share/tmnf/Packs; touch /srv/share/tmnf/TmForever.exe /srv/share/tmnf/Packs/Stadium.pak; echo "setup=test" >/srv/share/tmnf/.tmnf-version
+mkdir -p /srv/share/ut2004/System /srv/share/ut2004/Maps
+install -m 755 /dev/null /srv/share/ut2004/System/UT2004; touch /srv/share/ut2004/Maps/DM-Rankin.ut2
+printf '[URL]\nMap=NvidiaLogo.ut2\n' >/srv/share/ut2004/System/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut2004/System/DefUser.ini
+echo "iso=test patch=3374" >/srv/share/ut2004/.ut2004-version
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -105,6 +110,14 @@ grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTourna
 grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
 [[ -e /games/classic/tmnf/Packs/Stadium.pak && ! -x /games/classic/tmnf/TmForever.exe ]] || die "TrackMania not copied from the share, or files executable"
 ok "mw2, ut99 and tmnf mirrored; UT99 defaults seeded"
+[[ -e /games/classic/ut2004/Maps/DM-Rankin.ut2 && -x /games/classic/ut2004/System/UT2004 ]] || die "UT2004 not copied from the share, or not executable"
+grep -qx 'Map=NvidiaLogo.ut2' /home/.golden/player/.ut2004/System/UT2004.ini || die "UT2004 defaults not in the golden home"
+grep -qx 'Name=Player' /home/.golden/player/.ut2004/System/User.ini || die "UT2004 user defaults not in the golden home"
+ok "mw2, ut99 and ut2004 mirrored; UT99 and UT2004 defaults seeded"
+
+step "Self-update"
+grep -q 'ansible-pull --clean ' /etc/systemd/system/seat-pull.service || die "seat-pull can get stuck on its shallow clone (no --clean)"
+ok "seat-pull resets its checkout to the branch"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json

@@ -1,0 +1,81 @@
+---
+# --- Unreal Tournament 2004 on OldUnreal 3374 ---------------------------------
+# Built once here from the pinned downloads; seats copy the finished folder.
+- name: UT2004 | install the unpack tools
+  ansible.builtin.apt:
+    name:
+      - 7zip
+      - bzip2
+      - unshield
+    state: present
+
+- name: UT2004 | create the download cache
+  ansible.builtin.file:
+    path: "{{ ut2004_cache }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# 3 GB. OldUnreal's mirrors first, then the same DVD image on archive.org.
+- name: UT2004 | download the DVD (3 GB)
+  when: ut2004_build
+  block:
+    - name: UT2004 | download the DVD from OldUnreal
+      ansible.builtin.get_url:
+        url: "{{ ut2004_iso_url }}"
+        dest: "{{ ut2004_cache }}/UT2004.iso"
+        checksum: "sha256:{{ ut2004_iso_sha256 }}"
+        mode: "0644"
+        timeout: 300
+  rescue:
+    - name: UT2004 | download the DVD from OldUnreal's second mirror instead
+      ansible.builtin.get_url:
+        url: "{{ ut2004_iso_fallback_url }}"
+        dest: "{{ ut2004_cache }}/UT2004.iso"
+        checksum: "sha256:{{ ut2004_iso_sha256 }}"
+        mode: "0644"
+        timeout: 300
+      # In a dry run of a fresh server the cache folder does not exist yet.
+      ignore_errors: "{{ ansible_check_mode }}"
+
+- name: UT2004 | download the OldUnreal patch
+  ansible.builtin.get_url:
+    url: "{{ ut2004_patch_url }}"
+    dest: "{{ ut2004_cache }}/{{ ut2004_patch_file }}"
+    checksum: "sha256:{{ ut2004_patch_sha256 }}"
+    mode: "0644"
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: ut2004_build
+
+- name: UT2004 | install the build script
+  ansible.builtin.copy:
+    src: ut2004-build
+    dest: /usr/local/sbin/ut2004-build
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: UT2004 | read the built version
+  ansible.builtin.slurp:
+    src: "{{ ut2004_dir }}/.ut2004-version"
+  register: ut2004_built
+  failed_when: false
+
+- name: UT2004 | work out the wanted version
+  ansible.builtin.set_fact:
+    ut2004_version_line: "iso={{ ut2004_iso_sha256[:12] }} patch={{ ut2004_patch_version }}={{ ut2004_patch_sha256[:12] }}"
+
+# Several minutes: unpacks 3 GB and about 6 GB of cabinets.
+- name: UT2004 | build the game folder
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/ut2004-build
+      - "{{ ut2004_cache }}/UT2004.iso"
+      - "{{ ut2004_cache }}/{{ ut2004_patch_file }}"
+      - "{{ ut2004_dir }}"
+      - "{{ gameshare_owner }}"
+      - "{{ ut2004_version_line }}"
+  changed_when: true
+  when: ut2004_build and (ut2004_built.content | default('') | b64decode | trim) != ut2004_version_line

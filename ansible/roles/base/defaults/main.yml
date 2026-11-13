@@ -102,6 +102,12 @@ seat_shared_games:
     exclude: []
     # Native Linux game: keep the execute bit on its programs.
     chmod: D755,Fu=rwX,Fgo=rX
+  - name: ut2004
+    dest: "{{ seat_classic_root }}/ut2004"
+    required: [System/UT2004, .ut2004-version]
+    # The patch also ships ARM64 and POWER builds.
+    exclude: [/SystemARM64/, /SystemPPC64LE/]
+    chmod: D755,Fu=rwX,Fgo=rX
   # Windows game, run through Proton: plain read-only files.
   - name: tmnf
     dest: "{{ seat_classic_root }}/tmnf"
