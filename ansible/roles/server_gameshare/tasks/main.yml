@@ -155,3 +155,6 @@
 
 - name: Unreal Tournament
   ansible.builtin.include_tasks: ut99.yml
+
+- name: Unreal Tournament 2004
+  ansible.builtin.include_tasks: ut2004.yml

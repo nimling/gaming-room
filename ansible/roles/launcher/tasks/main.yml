@@ -267,6 +267,35 @@
     - { src: DefUser.ini, dest: User.ini }
   when: ut99_on_seat.stat.exists
 
+- name: UT2004 | look for the game on the seat
+  ansible.builtin.stat:
+    path: "{{ seat_classic_root }}/ut2004/System/Default.ini"
+  register: ut2004_on_seat
+
+- name: UT2004 | create its settings folder in the golden home
+  ansible.builtin.file:
+    path: "/home/.golden/{{ seat_player_user }}/{{ item }}"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0755"
+  loop: [.ut2004, .ut2004/System]
+  when: ut2004_on_seat.stat.exists
+
+# The launcher sets a few keys on top at every start (games/ut2004.yaml).
+- name: UT2004 | start the golden home from the game's default settings
+  ansible.builtin.copy:
+    src: "{{ seat_classic_root }}/ut2004/System/{{ item.src }}"
+    dest: "/home/.golden/{{ seat_player_user }}/.ut2004/System/{{ item.dest }}"
+    remote_src: true
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_player_user }}"
+    mode: "0644"
+  loop:
+    - { src: Default.ini, dest: UT2004.ini }
+    - { src: DefUser.ini, dest: User.ini }
+  when: ut2004_on_seat.stat.exists
+
 # --- Voice: Mumble joins with no wizard or dialog -----------------------------
 # Mumble 1.5 shows three dialogs on a fresh home: the audio wizard, the
 # certificate wizard and "unknown server certificate". The settings file

@@ -1,0 +1,91 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/server_gameshare).
+# Builds Unreal Tournament 2004 (Editor's Choice DVD) with OldUnreal's Linux
+# patch into a folder, the same steps as OldUnreal's install-ut2004.sh, then
+# swaps it into place.
+#   ut2004-build <iso> <patch.tar.bz2> <dest> <owner> <version line>
+# Unlike OldUnreal's installer this keeps the bundled libraries (OpenAL,
+# SDL3, libomp): seats run a different distribution than the server.
+set -euo pipefail
+
+if (( $# != 5 )); then
+    echo "usage: ut2004-build ISO PATCH DEST OWNER VERSION" >&2
+    exit 2
+fi
+iso=$1 patch=$2 dest=$3 owner=$4 version=$5
+sevenzip=$(command -v 7z || command -v 7zz || true)
+[[ -n $sevenzip ]] || { echo "ut2004-build: 7z (package 7zip) is not installed" >&2; exit 1; }
+command -v unshield >/dev/null || { echo "ut2004-build: unshield is not installed" >&2; exit 1; }
+parent=$(dirname "$dest")
+mkdir -p "$parent"
+work=$(mktemp -d "$parent/.ut2004-build.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+stage=$work/.stage
+game=$work/game
+mkdir -p "$stage/cabs" "$game"
+
+# The DVD holds InstallShield cabinets in Disk1..DiskN; unshield needs them
+# side by side.
+"$sevenzip" x -y -bd -o"$stage/iso" "$iso" 'Disk*/*.cab' 'Disk*/*.hdr' >/dev/null
+for f in "$stage"/iso/Disk*/*.cab "$stage"/iso/Disk*/*.hdr; do
+    ln -s "$f" "$stage/cabs/$(basename "$f")"
+done
+unshield -d "$stage/data" x "$stage/cabs/data1.cab" >/dev/null
+
+# Cabinet groups and where they go in the game folder.
+while IFS='|' read -r from to; do
+    [[ -d "$stage/data/$from" ]] || { echo "ut2004-build: $from missing on the DVD" >&2; exit 1; }
+    mkdir -p "$game/$to"
+    cp -a "$stage/data/$from/." "$game/$to/"
+done <<'MAP'
+All_Animations|Animations
+All_Benchmark|Benchmark
+All_ForceFeedback|ForceFeedback
+All_Help|Help
+All_KarmaData|KarmaData
+All_Maps|Maps
+All_Music|Music
+All_StaticMeshes|StaticMeshes
+All_Textures|Textures
+All_Web|Web
+All_UT2004.EXE|System
+English_Manual|Manual
+English_Sounds_Speech_System_Help|.
+MAP
+if [[ -d "$stage/data/US_License.int" ]]; then
+    cp -a "$stage/data/US_License.int/." "$game/System/"
+fi
+# Windows programs; the patch brings the Linux ones.
+rm -f "$game"/System/*.exe "$game"/System/*.bat "$game"/System/*.dll
+
+tar -xjf "$patch" -C "$game"
+
+# The DVD has a few packages with other casing than the patch's; on Linux
+# both would exist and the old one could load.
+for f in Bonuspack.u Gui2K4.u Gameplay.u Ipdrv.u Skaarjpack.u StreamLineFX.u \
+         UT2K4Assault.u UT2K4AssaultFull.u XVoting.u xWebAdmin.u; do
+    rm -f "$game/System/$f"
+done
+
+for f in System/UT2004 System/ucc-bin System/Default.ini System/DefUser.ini Maps/DM-Rankin.ut2; do
+    [[ -e "$game/$f" ]] || { echo "ut2004-build: $f missing after the build" >&2; exit 1; }
+done
+
+echo "$version" > "$game/.ut2004-version"
+chown -R "$owner:$owner" "$game"
+# rsyncd runs as nobody.
+chmod -R u+rwX,go+rX "$game"
+chmod 0755 "$game"
+
+if [[ -e $dest ]]; then
+    mv "$dest" "$work/old"
+fi
+if ! mv "$game" "$dest"; then
+    # Put the previous build back so the share is never left without the game.
+    [[ -e $work/old ]] && mv "$work/old" "$dest"
+    echo "ut2004-build: could not move the new build into $dest" >&2
+    exit 1
+fi
+trap - EXIT
+rm -rf "$work"
+echo "ut2004-build: $dest ready ($version)"
