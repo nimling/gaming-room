@@ -162,7 +162,8 @@ install -d -o nimadmin /srv/games/ut2004/System
 install -m 755 -o nimadmin /dev/null /srv/games/ut2004/System/ucc-bin
 printf '[Engine.GameInfo]\nMaxPlayers=16\n[IpDrv.MasterServerUplink]\nDoUplink=True\n' >/srv/games/ut2004/System/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/games/ut2004/System/DefUser.ini
-run >/tmp/gs.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/gs.log | tail -n 20; die "run with UT2004 present failed"; }
+# Same stand-in engine parts as above, so this run needs no third-party download.
+run -e @/tmp/engine-vars.yml >/tmp/gs.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/gs.log | tail -n 20; die "run with UT2004 present failed"; }
 u=/etc/systemd/system/gs-ut2004-instagib.service
 grep -qx 'User=gameserver' "$u" || die "preset does not run as gameserver"
 grep -qx 'ExecStart="./ucc-bin" "server" "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib" "port=7800" "ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini" "userini=/var/lib/gameservers/ut2004-instagib/User.ini" "-nohomedir"' "$u" \
@@ -186,7 +187,7 @@ grep -q 'subject.user == "gameserver-api"' /etc/polkit-1/rules.d/50-gameservers.
 grep -q '/\^gs-\[a-z0-9-\]+\\.service\$/' /etc/polkit-1/rules.d/50-gameservers.rules || die "polkit rule not limited to gs-*.service"
 grep -qx 'User=gameserver-api' /etc/systemd/system/gameservers-api.service || die "control service account"
 [[ -x /usr/local/lib/gameservers/gameservers-api ]] || die "control service not installed"
-again=$(run)
+again=$(run -e @/tmp/engine-vars.yml)
 echo "$again" | grep -Eq "changed=0 +unreachable=0 +failed=0" || { echo "$again" | grep -B3 changed: | head -20; die "game server run not idempotent"; }
 ok "presets wait for their game; services, settings, polkit and control service; idempotent"
 
