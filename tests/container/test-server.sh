@@ -25,7 +25,7 @@ cp -a /repo /work
 cd /work
 
 step "Lint"
-shellcheck bootstrap/seat.sh ansible/roles/server_gameshare/files/ut2004-build tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
+shellcheck bootstrap/seat.sh ansible/roles/server_gameshare/files/ut2004-build ansible/roles/server_gameshare/files/tmnf-build tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
 ok "shellcheck"
 yamllint ansible
 ok "yamllint"
@@ -87,6 +87,12 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
+
+step "TrackMania Nations Forever"
+[[ -x /usr/local/sbin/tmnf-build ]] || die "TrackMania unpack script missing"
+[[ ! -e /srv/games/tmnf ]] || die "TrackMania unpacked in the container (downloads should be off)"
+command -v innoextract >/dev/null || die "innoextract missing"
+ok "unpack script and tools"
 
 step "Bought games on open-source engines"
 [[ -d /srv/games/quake3 && -d /srv/games/jka ]] || die "share folders for bought games missing"

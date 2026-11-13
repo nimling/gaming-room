@@ -122,6 +122,11 @@ seat_shared_games:
     required: [base/assets0.pk3, openjk.x86_64, .engine-version]
     exclude: []
     chmod: D755,Fu=rwX,Fgo=rX
+  # Windows game, run through Proton: plain read-only files.
+  - name: tmnf
+    dest: "{{ seat_classic_root }}/tmnf"
+    required: [TmForever.exe, .tmnf-version]
+    exclude: []
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false

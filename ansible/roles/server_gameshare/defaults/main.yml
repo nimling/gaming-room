@@ -29,6 +29,17 @@ iw4x_client_url: "https://github.com/iw4x/iw4x-client/releases/download/{{ iw4x_
 iw4x_rawfiles_url: "https://github.com/iw4x/iw4x-rawfiles/releases/download/{{ iw4x_rawfiles_version }}/release.zip"
 iw4x_cache: /var/cache/iw4x
 
+# --- TrackMania Nations Forever ----------------------------------------------
+# Free from Nadeo. The server unpacks Nadeo's installer (files/tmnf-build);
+# seats run TmForever.exe through Proton.
+tmnf_dir: "{{ gameshare_root }}/tmnf"
+# Downloads and unpacks the game. Off in the container test (530 MB).
+tmnf_build: "{{ not server_in_container }}"
+tmnf_cache: /var/cache/tmnf
+# Nadeo's installer on Ubisoft's CDN, version 2.11.26 (last changed 2020).
+tmnf_setup_url: https://nadeo-download.cdn.ubi.com/trackmaniaforever/tmnationsforever_setup.exe
+tmnf_setup_sha256: 2f659138ed4409da404970841e18f03d29921beaf6a424824c8312ddb20f6355
+
 # --- Bought games on open-source engines ---------------------------------------
 # A person copies the bought game data into {{ gameshare_root }}/<name> (see
 # each guide). Then server.yml adds the pinned engine on top

@@ -153,6 +153,9 @@
     mode: "u+rwX,go+rX"
   when: iw4x_base_game.stat.exists
 
+- name: TrackMania Nations Forever
+  ansible.builtin.include_tasks: tmnf.yml
+
 - name: Bought games on open-source engines
   ansible.builtin.include_tasks: engine_game.yml
   loop: "{{ gameshare_engine_games }}"

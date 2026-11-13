@@ -1,0 +1,54 @@
+---
+# --- TrackMania Nations Forever (free from Nadeo) --------------------------------
+# Unpacked once here from Nadeo's installer; seats copy the finished folder
+# and run it through Proton.
+- name: TrackMania | install the unpack tools
+  ansible.builtin.apt:
+    name:
+      - 7zip
+      - innoextract
+    state: present
+
+- name: TrackMania | create the download cache
+  ansible.builtin.file:
+    path: "{{ tmnf_cache }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: TrackMania | download Nadeo's installer (530 MB)
+  ansible.builtin.get_url:
+    url: "{{ tmnf_setup_url }}"
+    dest: "{{ tmnf_cache }}/tmnationsforever_setup.exe"
+    checksum: "sha256:{{ tmnf_setup_sha256 }}"
+    mode: "0644"
+    timeout: 300
+  # In a dry run of a fresh server the cache folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+  when: tmnf_build
+
+- name: TrackMania | install the unpack script
+  ansible.builtin.copy:
+    src: tmnf-build
+    dest: /usr/local/sbin/tmnf-build
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: TrackMania | read the unpacked version
+  ansible.builtin.slurp:
+    src: "{{ tmnf_dir }}/.tmnf-version"
+  register: tmnf_built
+  failed_when: false
+
+- name: TrackMania | unpack the game folder
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/tmnf-build
+      - "{{ tmnf_cache }}/tmnationsforever_setup.exe"
+      - "{{ tmnf_dir }}"
+      - "{{ gameshare_owner }}"
+      - "setup={{ tmnf_setup_sha256[:12] }}"
+  changed_when: true
+  when: tmnf_build and (tmnf_built.content | default('') | b64decode | trim) != ('setup=' ~ tmnf_setup_sha256[:12])
