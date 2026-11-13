@@ -12,6 +12,15 @@ subtitle: IW4x multiplayer, 2009
 group: classic
 runtime: native
 engine: IW4x on Proton
+# Shown in the launcher's game details view.
+why: >-
+  The shooter most of the room already knows. Short, fast rounds and small
+  maps keep everyone in the action, and a match is easy to join between other
+  games.
+highlights:
+  - Quick rounds on small, busy maps
+  - Up to 18 players
+  - Join a room server straight from the launcher
 path: /games/classic/mw2
 players: { min: 2, max: 18 }
 launch:

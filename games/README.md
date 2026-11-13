@@ -35,6 +35,8 @@ cargo run -q -p arcade-cli -- --games ../games plan ut99 --profile C --nick Test
 | `gamemode` | | `true` by default. Starts the game with `gamemoderun`. |
 | `lowest_tier` | | Weakest tier the game runs well on. Weaker seats do not show it. |
 | `art` | | Placeholder art: `{ hue, glow, motif }`. Motifs: rings, grid, hex, contour, streaks, dots. |
+| `why` | | Why the game is good in a LAN room: 1 to 3 short sentences, at most 400 characters. Shown in the game details view. |
+| `highlights` | | Up to 5 short points for the details view, each at most 80 characters. |
 
 ## Templates
 

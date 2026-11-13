@@ -38,6 +38,20 @@ arcade end-session                            # reset the seat
 
 The Music button opens Spotify: the official client from Flathub, installed by the launcher role. The player signs in with their own account; the seat reset signs them out. The launcher reads and steers Spotify over MPRIS with `playerctl`, so the mini player works while a game covers the Spotify window. There is no in-launcher player: Spotify needs Widevine DRM, which the launcher's WebKitGTK window does not have.
 
+## Game details
+
+Clicking a game opens its details: what it is, why it is good in a LAN room (`why` and `highlights` in the manifest), how it runs on this seat, and Play, Host and Join. The Details button on the big banner opens the same view from the keyboard or a gamepad. Enter on a game still starts it at once.
+
+## Staying light
+
+A game must get the whole machine, so the launcher sleeps whenever it is not in front:
+
+- When its window loses focus or is hidden (a game, Spotify or anything else in front), every timer stops, the gamepad is not read and CSS animations pause. It wakes on focus, a key or a click, and refreshes once.
+- The core watches the running game in a thread and sends a `game-ended` event. The screen does not ask every two seconds, and the check is a system call, not a `kill` process.
+- Spotify is read only while the launcher is awake, and the page changes only when the song does.
+- No backdrop blur on things that are always on screen. Blur stays on short-lived layers (flyouts, dialogs, the first-start screen).
+- Game art is painted once and kept; moving between games repaints only what changed.
+
 ## Seat files it reads
 
 | File | Written by | Used for |

@@ -7,6 +7,14 @@ subtitle: Fast arena shooter, free and open source
 group: classic
 runtime: native
 engine: Darkplaces
+# Shown in the launcher's game details view.
+why: >-
+  A fast arena shooter in the spirit of Quake and Unreal, free for everyone.
+  Many game modes keep the room busy, and big servers fit everybody at once.
+highlights:
+  - Up to 24 players on one server
+  - Host a game from the launcher
+  - Free and open source
 players: { min: 2, max: 24 }
 launch:
   command: ["xonotic-sdl"]
