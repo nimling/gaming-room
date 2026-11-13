@@ -185,16 +185,26 @@ class Manager:
                 }
             r = self.systemctl("start", "--no-block", unit(pid))
             if r.returncode != 0:
-                return 500, {"ok": False, "error": (r.stderr or "start failed").strip()}
+                return 500, {"ok": False, "error": self.why(pid, r)}
             self.last_busy[pid] = self.clock()
             return 202, {"ok": True, "state": "starting"}
 
     def stop(self, pid):
         r = self.systemctl("stop", "--no-block", unit(pid))
         if r.returncode != 0:
-            return 500, {"ok": False, "error": (r.stderr or "stop failed").strip()}
+            return 500, {"ok": False, "error": self.why(pid, r)}
         self.last_busy.pop(pid, None)
         return 202, {"ok": True, "state": "stopping"}
+
+    def why(self, pid, result):
+        """A readable reason for a failed start or stop: systemctl's own
+        message, and the unit's load error if its file is broken."""
+        parts = [p.strip() for p in (result.stderr, result.stdout) if p and p.strip()]
+        show = self.systemctl("show", "--property=LoadError", "--value", unit(pid))
+        load_error = (getattr(show, "stdout", "") or "").strip()
+        if load_error:
+            parts.append(f"unit file: {load_error}")
+        return "; ".join(parts) or f"systemctl exited with {result.returncode}"
 
     def reap(self):
         """Stop on-demand servers that had no players for idle_minutes.

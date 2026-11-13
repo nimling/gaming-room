@@ -1,6 +1,9 @@
 # Managed by gaming-room Ansible (roles/server_gameservers).
 # Preset: server/presets/{{ p.id }}.yaml
 {% set home = gameservers_state_root ~ '/' ~ p.id %}
+{% set workdir = gameshare_root ~ '/' ~ p.workdir %}
+{# systemd needs an absolute program path: ./prog is taken from the workdir. #}
+{% set args = [workdir ~ p.command[0][1:] if p.command[0].startswith('./') else p.command[0]] + p.command[1:] %}
 [Unit]
 Description=Game server: {{ p.name }}
 After=network-online.target
@@ -10,8 +13,8 @@ Wants=network-online.target
 User={{ gameservers_user }}
 Group={{ gameservers_user }}
 Environment=HOME={{ home }}
-WorkingDirectory={{ gameshare_root }}/{{ p.workdir }}
-ExecStart={% for a in p.command %}"{{ a | replace('{home}', home) | replace('\\', '\\\\') | replace('"', '\\"') | replace('%', '%%') }}"{{ ' ' if not loop.last }}{% endfor %}
+WorkingDirectory={{ workdir }}
+ExecStart={% for a in args %}"{{ a | replace('{home}', home) | replace('\\', '\\\\') | replace('"', '\\"') | replace('%', '%%') }}"{{ ' ' if not loop.last }}{% endfor %}
 
 Restart=on-failure
 RestartSec=10

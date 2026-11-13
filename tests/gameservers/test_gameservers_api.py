@@ -104,12 +104,12 @@ class FakeSystem:
         self.calls.append(args)
         name = args[-1][len("gs-"):-len(".service")]
         if args[0] == "is-active":
-            return SimpleNamespace(returncode=0 if name in self.active else 3, stderr="")
+            return SimpleNamespace(returncode=0 if name in self.active else 3, stderr="", stdout="")
         if args[0] == "start":
             self.active.add(name)
         if args[0] == "stop":
             self.active.discard(name)
-        return SimpleNamespace(returncode=0, stderr="")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
 
     def query(self, kind, host, port, timeout=1.0):
         for p in CONFIG["presets"]:
@@ -172,6 +172,23 @@ class Lifecycle(unittest.TestCase):
         fake.now = 10 * 60 * 60
         self.assertEqual(m.reap(), [])
         self.assertIn("keep", fake.active)
+
+    def test_failed_start_says_why(self):
+        m, fake = manager()
+
+        def broken(*args):
+            fake.calls.append(args)
+            if args[0] == "start":
+                return SimpleNamespace(returncode=1, stderr="Job failed.\n", stdout="")
+            if args[0] == "show":
+                return SimpleNamespace(returncode=0, stderr="", stdout="bad-setting Unit configuration has fatal error\n")
+            return SimpleNamespace(returncode=3, stderr="", stdout="")
+
+        m.systemctl = broken
+        code, body = m.start("a")
+        self.assertEqual(code, 500)
+        self.assertIn("Job failed.", body["error"])
+        self.assertIn("unit file: bad-setting Unit configuration has fatal error", body["error"])
 
     def test_list_reports_address_and_players(self):
         m, fake = manager()
