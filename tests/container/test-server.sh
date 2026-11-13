@@ -95,7 +95,7 @@ step "Bought games on open-source engines"
 # With the data copied in, the next run adds the engine (downloads ~30 MB).
 install -d -o nimadmin /srv/games/quake3/baseq3
 echo "stand-in for the bought pak0" >/srv/games/quake3/baseq3/pak0.pk3
-run >/dev/null
+run >/tmp/engine.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/engine.log | tail -n 20; die "run with the Quake 3 data failed"; }
 [[ -x /srv/games/quake3/quake3e.x64 ]] || die "Quake3e not added, or not executable"
 [[ -e /srv/games/quake3/baseq3/pak8.pk3 ]] || die "Quake 3 point release not added"
 grep -q '^quake3e-2026-10-14=' /srv/games/quake3/.engine-version || die "engine version not recorded"
