@@ -47,6 +47,9 @@ seat_headset_sidetone: 0
 seat_idle_logout_enabled: true
 seat_idle_logout_minutes: 20
 seat_idle_warning_seconds: 60
+# Screen off after this many minutes without input (KDE's default is 10);
+# dimmed one minute before. 0 keeps the screen on.
+seat_screen_off_minutes: 5
 seat_sddm_session: plasma
 
 # Hardware tiers (MiB). A 16 GB machine reports ~15.5 GiB, hence the margins.
