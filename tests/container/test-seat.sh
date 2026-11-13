@@ -104,6 +104,10 @@ grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTourna
 grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
 ok "mw2 and ut99 mirrored; UT99 defaults seeded"
 
+step "Self-update"
+grep -q 'ansible-pull --clean ' /etc/systemd/system/seat-pull.service || die "seat-pull can get stuck on its shallow clone (no --clean)"
+ok "seat-pull resets its checkout to the branch"
+
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json
 mumble_cert=/home/.golden/player/Documents/MumbleAutomaticCertificateBackup.p12

@@ -6,4 +6,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/ansible-pull --url {{ seat_config_repo }} --checkout {{ seat_config_branch }} --directory /var/lib/seat-config --inventory localhost, --extra-vars target=localhost --connection local ansible/seat.yml
+# --clean: ansible-pull keeps a shallow clone (depth 1). When the branch moves
+# on, the new tip does not connect to the old grafted commit, and without
+# --clean git refuses to advance ("local commits will be lost"). The checkout
+# is managed, never edited by hand, so resetting it is safe.
+ExecStart=/usr/bin/ansible-pull --clean --url {{ seat_config_repo }} --checkout {{ seat_config_branch }} --directory /var/lib/seat-config --inventory localhost, --extra-vars target=localhost --connection local ansible/seat.yml
