@@ -88,6 +88,22 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
 
+step "Bought games on open-source engines"
+[[ -d /srv/games/quake3 && -d /srv/games/jka ]] || die "share folders for bought games missing"
+[[ $(stat -c %U /srv/games/quake3) == nimadmin ]] || die "quake3 share folder not owned by the login user"
+[[ ! -e /srv/games/quake3/.engine-version ]] || die "engine added without the bought data"
+# With the data copied in, the next run adds the engine (downloads ~30 MB).
+install -d -o nimadmin /srv/games/quake3/baseq3
+echo "stand-in for the bought pak0" >/srv/games/quake3/baseq3/pak0.pk3
+run >/dev/null
+[[ -x /srv/games/quake3/quake3e.x64 ]] || die "Quake3e not added, or not executable"
+[[ -e /srv/games/quake3/baseq3/pak8.pk3 ]] || die "Quake 3 point release not added"
+grep -q '^quake3e-2026-10-14=' /srv/games/quake3/.engine-version || die "engine version not recorded"
+[[ ! -e /srv/games/quake3/.unpacked ]] || die "unpack marker leaked into the game folder"
+again=$(run)
+echo "$again" | grep -Eq "changed=0 +unreachable=0 +failed=0" || { echo "$again" | grep -B3 changed: | head -20; die "engine run not idempotent"; }
+ok "engine waits for the data, then is added; idempotent"
+
 step "Unreal Tournament"
 [[ -x /usr/local/sbin/ut99-build ]] || die "UT99 build script missing"
 [[ ! -e /srv/games/ut99 ]] || die "UT99 built in the container (downloads should be off)"

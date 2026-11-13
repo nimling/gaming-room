@@ -40,6 +40,10 @@ install -m 755 /dev/null /srv/share/ut99/System64/ut-bin; touch '/srv/share/ut99
 printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
 echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
+mkdir -p /srv/share/quake3/baseq3 /srv/share/jka/base
+touch /srv/share/quake3/baseq3/pak0.pk3; install -m 755 /dev/null /srv/share/quake3/quake3e.x64
+echo "quake3e-test=0" >/srv/share/quake3/.engine-version
+touch /srv/share/jka/base/assets0.pk3   # no engine yet: the seat must wait
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -102,7 +106,9 @@ step "Games from the share"
 [[ ! -x /games/classic/mw2/iw4x.exe ]] || die "MW2 files became executable"
 grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTournament.ini || die "UT99 defaults not in the golden home"
 grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
-ok "mw2 and ut99 mirrored; UT99 defaults seeded"
+[[ -x /games/classic/quake3/quake3e.x64 && -e /games/classic/quake3/baseq3/pak0.pk3 ]] || die "Quake 3 not copied from the share, or not executable"
+[[ ! -e /games/classic/jka ]] || die "Jedi Academy copied before the server added the engine"
+ok "mw2, ut99 and quake3 mirrored; UT99 defaults seeded; jka waits"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json
