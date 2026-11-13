@@ -9,6 +9,14 @@ subtitle: Deathmatch, CTF, Assault, Domination
 group: classic
 runtime: native
 engine: OldUnreal 469e
+# Shown in the launcher's game details view.
+why: >-
+  The LAN party classic. A match starts in seconds, and InstaGib (one shot,
+  one frag) makes new players and veterans equal from the first round.
+highlights:
+  - Host an InstaGib match from the launcher
+  - Drop in and out of a match any time
+  - Up to 16 players
 path: /games/classic/ut99
 players: { min: 2, max: 16 }
 launch:
