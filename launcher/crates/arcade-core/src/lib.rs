@@ -6,6 +6,7 @@ pub mod config;
 pub mod ini;
 pub mod lan;
 pub mod manifest;
+pub mod music;
 pub mod nick;
 pub mod plan;
 pub mod ptt;

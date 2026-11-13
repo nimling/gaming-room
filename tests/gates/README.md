@@ -21,7 +21,7 @@ From the gaming server:
 ```bash
 tests/gates/rebuild-time.sh seat-01 -u admin --ask-become-pass   # fresh install
 ssh seat-01 sudo bash -s < tests/gates/player-lockdown.sh
-# On the seat: sign in to Steam and a browser, then press End session. Then:
+# On the seat: sign in to Steam, Spotify and a browser, then press End session. Then:
 ssh seat-01 sudo bash -s < tests/gates/token-leak.sh
 ```
 

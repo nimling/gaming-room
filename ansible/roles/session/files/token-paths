@@ -16,6 +16,10 @@
 # Discord
 .config/discord/Local Storage|
 
+# Spotify (Flatpak, and the native client if it ever comes back)
+.var/app/com.spotify.Client/config/spotify/prefs|autologin\.
+.config/spotify/prefs|autologin\.
+
 # Browsers
 .mozilla/firefox/*/cookies.sqlite|
 .mozilla/firefox/*/logins.json|

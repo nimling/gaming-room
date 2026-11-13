@@ -134,5 +134,7 @@ arcade_voice_port: 64738
 # [{name, address}]. A push run fills it from the inventory (each host's
 # seat_lan_address, else ansible_host); pull runs read it from local-vars.
 arcade_hosts: []
+# Spotify (Flathub) for the launcher's music button. false removes it.
+arcade_spotify: true
 # Screen size and refresh, for example 3440x1440@144; private inventory, per seat.
 seat_display: ""

@@ -7,6 +7,7 @@
 //!   ARCADE_WINDOWED=1   do not go full screen
 
 use arcade_core::manifest::{self, Card, Manifest};
+use arcade_core::music::{self, Control, NowPlaying};
 use arcade_core::plan::{self, Mode, Plan, Request};
 use arcade_core::{lan, nick, ptt, Config, Seat};
 use serde::Serialize;
@@ -169,6 +170,24 @@ fn running(app: State<'_, Arcade>) -> Option<String> {
     None
 }
 
+#[tauri::command]
+fn music_open() -> Result<(), String> {
+    music::open().map_err(text)
+}
+
+/// What Spotify plays; `None` when it is not open.
+// Async: playerctl waits on D-Bus.
+#[tauri::command(async)]
+fn music_status() -> Option<NowPlaying> {
+    music::now_playing()
+}
+
+// Async: playerctl waits on D-Bus.
+#[tauri::command(async)]
+fn music_control(action: String) -> Result<(), String> {
+    music::control(Control::parse(&action).map_err(text)?).map_err(text)
+}
+
 // Async: stopping a running game can take up to 3 s.
 #[tauri::command(async)]
 fn end_session(app: State<'_, Arcade>) -> Result<(), String> {
@@ -206,7 +225,10 @@ fn main() {
             launch,
             quit,
             running,
-            end_session
+            end_session,
+            music_open,
+            music_status,
+            music_control
         ])
         .setup(|app| {
             if std::env::var_os("ARCADE_WINDOWED").is_some() {

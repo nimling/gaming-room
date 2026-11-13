@@ -5,6 +5,7 @@
 - name: Install the launcher's runtime and build packages
   community.general.pacman:
     name:
+      - flatpak
       - gamemode
       - gamescope
       - gcc
@@ -12,6 +13,7 @@
       - mumble
       - openssl
       - pkgconf
+      - playerctl
       - python-cryptography
       - rust
       - spectacle
@@ -75,6 +77,30 @@
     - arcade-app
   when: not seat_in_container
   # In a dry run of a fresh seat the build account and build do not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- Music: Spotify from Flathub ----------------------------------------------
+# Installed for all users, so the player cannot change it; polkit refuses the
+# player's Flatpak actions. The login lives in ~/.var/app and goes at the
+# reset. The launcher's mini player steers it with playerctl.
+- name: Spotify | add the Flathub remote
+  community.general.flatpak_remote:
+    name: flathub
+    flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+    method: system
+    state: present
+  when: arcade_spotify
+
+- name: Spotify | install the app
+  community.general.flatpak:
+    name: com.spotify.Client
+    remote: flathub
+    method: system
+    state: "{{ 'present' if arcade_spotify else 'absent' }}"
+  # Skipped in the test container: it would pull Spotify and its runtime from
+  # Flathub on every CI run.
+  when: not seat_in_container
+  # In a dry run of a fresh seat Flatpak is not installed yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Create the launcher folders
