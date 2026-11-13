@@ -16,7 +16,7 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
-use tauri::{Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 struct Arcade {
     root: PathBuf,
@@ -95,6 +95,7 @@ fn set_nickname(app: State<'_, Arcade>, name: String, key: Option<String>) -> Re
 // Async: stopping a running game can take up to 3 s.
 #[tauri::command(async)]
 fn launch(
+    handle: AppHandle,
     app: State<'_, Arcade>,
     id: String,
     mode: String,
@@ -121,8 +122,33 @@ fn launch(
     .map_err(text)?;
     plan::apply(&p).map_err(text)?;
     let child = plan::spawn(&p).map_err(text)?;
-    *app.game.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, child));
+    *app.game.lock().unwrap_or_else(|e| e.into_inner()) = Some((id.clone(), child));
+    watch_game(handle, id);
     Ok(p)
+}
+
+/// Tells the screen when the game ends, as a `game-ended` event with its id.
+/// The screen then needs no timer of its own while the game runs: the
+/// webview stays asleep, and this thread costs one system call every 2 s.
+fn watch_game(handle: AppHandle, id: String) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(2));
+        let app = handle.state::<Arcade>();
+        let mut game = app.game.lock().unwrap_or_else(|e| e.into_inner());
+        match game.as_mut() {
+            Some((running, child)) if *running == id => {
+                if plan::alive(child) {
+                    continue;
+                }
+                *game = None;
+            }
+            // Quit from the screen or replaced by another game: the screen knows.
+            _ => return,
+        }
+        drop(game);
+        let _ = handle.emit("game-ended", &id);
+        return;
+    });
 }
 
 /// Asks Mumble to quit and waits up to five seconds for it.

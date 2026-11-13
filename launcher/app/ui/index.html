@@ -49,10 +49,10 @@
   --on-art-2: rgba(255, 255, 255, .82);
   --on-art-3: rgba(255, 255, 255, .62);
   --art-accent: #60cdff;
-  --glass: rgba(255, 255, 255, .12);
+  --glass: rgba(255, 255, 255, .14);
   --glass-hover: rgba(255, 255, 255, .2);
   --glass-stroke: rgba(255, 255, 255, .16);
-  --glass-panel: rgba(14, 14, 18, .5);
+  --glass-panel: rgba(14, 14, 18, .64);
 
   /* Type: Fluent ramp. Segoe UI Variable where it exists, Open Sans (same designer) elsewhere */
   --font-text: "Segoe UI Variable Text", "Segoe UI", "Open Sans", system-ui, sans-serif;
@@ -120,9 +120,10 @@ button { font: inherit; color: inherit; }
 .ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .ico.s16 { width: 16px; height: 16px; }
 
-/* Mica: the selected game's art, blurred far behind everything */
+/* Mica: the selected game's art colours, far behind everything. The canvas holds only soft
+   gradients at a tiny size; stretching it gives the blur for free, with no CSS filter to run. */
 .backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.backdrop canvas { position: absolute; inset: -12%; width: 124%; height: 124%; filter: blur(64px) saturate(1.35); opacity: 0; transition: opacity 700ms var(--ease-in); }
+.backdrop canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 700ms var(--ease-in); }
 .backdrop canvas.on { opacity: var(--backdrop-opacity); }
 .backdrop::after { content: ""; position: absolute; inset: 0; background: var(--mica-veil); }
 
@@ -135,9 +136,10 @@ button { font: inherit; color: inherit; }
 
 /* Title bar */
 .titlebar { display: flex; align-items: center; gap: 8px; height: 56px; min-width: 0; }
-.brand { display: flex; align-items: center; gap: 10px; font: 600 14px/20px var(--font-display); white-space: nowrap; margin-right: 8px; }
-.brand-mark { width: 24px; height: 24px; color: var(--accent); flex: none; }
-.brand small { color: var(--fg-3); font-weight: 400; font-size: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; font: 600 14px/20px var(--font-display); white-space: nowrap; margin-right: 8px; }
+/* The Nimtech logo: plain white on the dark seat screen (--fg is white there). */
+.logo { display: block; flex: none; height: 28px; width: auto; aspect-ratio: 934 / 291; fill: currentColor; color: var(--fg); }
+.brand-sep { width: 1px; height: 20px; background: var(--stroke-strong); }
 .chip {
   display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; min-width: 0;
   border-radius: var(--r-ctrl); background: transparent; border: 1px solid transparent; color: var(--fg-2); cursor: pointer;
@@ -193,7 +195,9 @@ button { font: inherit; color: inherit; }
 .btn.accent:disabled { background: var(--ctrl); color: var(--fg-off); }
 .btn.lg { height: 44px; padding: 0 22px; font-size: 15px; }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 13px; }
-.btn.glass { background: var(--glass); border-color: var(--glass-stroke); color: var(--on-art); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+/* No backdrop blur on things that are always on screen: the art under them is static,
+   so a darker tint looks the same and costs nothing per frame. */
+.btn.glass { background: var(--glass); border-color: var(--glass-stroke); color: var(--on-art); }
 .btn.glass:hover { background: var(--glass-hover); }
 .btn.glass:active { background: rgba(255,255,255,.08); color: var(--on-art-2); }
 .btn.glass:disabled { background: rgba(255,255,255,.05); color: rgba(255,255,255,.4); }
@@ -206,7 +210,7 @@ button { font: inherit; color: inherit; }
 }
 
 /* LAN card on the hero */
-.side { background: var(--glass-panel); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); border: 1px solid var(--glass-stroke); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.side { background: var(--glass-panel); border: 1px solid var(--glass-stroke); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .side-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 600 12px/16px var(--font-text); letter-spacing: .05em; text-transform: uppercase; color: var(--on-art-2); }
 .side-head span:last-child { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--on-art-3); }
 .servers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -249,7 +253,7 @@ button { font: inherit; color: inherit; }
 .tile[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent), 0 8px 16px rgba(0,0,0,.24); }
 .tile:focus-visible { transform: scale(1.035); box-shadow: 0 0 0 1px var(--focus-in), 0 0 0 3px var(--focus-out), 0 14px 28px rgba(0,0,0,.36); }
 .badges { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.badge { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; font: 600 11px/1 var(--font-text); color: #ffffff; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.badge { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; font: 600 11px/1 var(--font-text); color: #ffffff; background: rgba(0,0,0,.58); }
 .badge.run { background: rgba(16, 124, 16, .85); }
 .badge i, .dot { width: 7px; height: 7px; border-radius: 50%; background: #6ccb5f; flex: none; }
 .shelf-empty { grid-column: 1 / -1; padding: 28px; border-radius: var(--r-card); border: 1px dashed var(--stroke-strong); color: var(--fg-2); text-align: center; }
@@ -325,10 +329,34 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .ip-row.copied .ip-copy { color: var(--good); }
 .ip-empty { margin: 16px 0 0; color: var(--fg-3); }
 
+/* Game details */
+.sheet { position: relative; width: min(780px, 100%); max-height: 100%; display: flex; flex-direction: column; border-radius: var(--r-card); background: var(--dialog); border: 1px solid var(--stroke-strong); box-shadow: var(--shadow-dialog); overflow: hidden; transform: translateY(16px) scale(.98); transition: transform var(--t-slow) var(--ease-in); }
+.layer.open .sheet { transform: none; }
+.sheet-art { position: relative; flex: none; height: clamp(150px, 26vh, 240px); background: #101014; }
+.sheet-art canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sheet-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.8), rgba(0,0,0,.08) 72%), linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 60%); }
+.sheet-head { position: absolute; z-index: 1; left: 24px; right: 64px; bottom: 18px; }
+.sheet-head h2 { margin: 10px 0 0; font: 600 clamp(28px, 3.4vw, 40px)/1.1 var(--font-display); letter-spacing: -.02em; text-wrap: balance; }
+.sheet-head p { margin: 4px 0 0; color: var(--on-art-2); font-size: 15px; line-height: 20px; }
+.sheet-x { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; height: 36px; padding: 0; }
+.sheet-body { overflow-y: auto; padding: 22px 24px 6px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 260px); gap: 24px; }
+.why-title { margin: 0 0 8px; font: 600 12px/16px var(--font-text); letter-spacing: .05em; text-transform: uppercase; color: var(--fg-3); }
+.why { margin: 0; font: 400 16px/25px var(--font-text); color: var(--fg); text-wrap: pretty; }
+.highlights { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.highlights li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; color: var(--fg-2); }
+.highlights .ico { color: var(--accent); margin-top: 2px; }
+.sheet .facts-box { align-self: start; margin: 0; padding: 4px 14px; border-radius: var(--r-card); background: var(--card); border: 1px solid var(--stroke); }
+.facts-box div { padding: 10px 0; border-top: 1px solid var(--stroke); }
+.facts-box div:first-child { border-top: 0; }
+.facts-box dt { color: var(--fg-3); font-size: 12px; line-height: 16px; }
+.facts-box dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sheet-foot { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 24px 24px; }
+@media (max-width: 640px) { .sheet-body { grid-template-columns: minmax(0, 1fr); } }
+
 .mica-layer { background: var(--mica-veil); -webkit-backdrop-filter: blur(48px) saturate(1.3); backdrop-filter: blur(48px) saturate(1.3); }
 .welcome-card { width: min(540px, 100%); display: flex; flex-direction: column; gap: 10px; transform: translateY(12px); transition: transform var(--t-slow) var(--ease-in); }
 .layer.open .welcome-card { transform: none; }
-.welcome-card .brand-mark { width: 40px; height: 40px; margin-bottom: 8px; }
+.welcome-card .logo { align-self: flex-start; height: 44px; margin-bottom: 12px; }
 .kicker { margin: 0; color: var(--fg-3); font: 600 12px/16px var(--font-text); letter-spacing: .05em; text-transform: uppercase; }
 .display { margin: 0 0 14px; font: 600 clamp(40px, 7vw, 68px)/1.08 var(--font-display); letter-spacing: -.02em; text-wrap: balance; }
 .field { display: flex; flex-direction: column; gap: 8px; }
@@ -394,16 +422,18 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-radius: var(--r-card);
   background: var(--acrylic); -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5);
   border: 1px solid var(--stroke-strong); box-shadow: var(--shadow-flyout);
-  opacity: 0; transform: translate(-50%, 10px); transition: opacity var(--t-normal) var(--ease-in), transform var(--t-normal) var(--ease-in); pointer-events: none;
+  opacity: 0; transform: translate(-50%, 10px); pointer-events: none;
+  /* Hidden toasts leave the render tree, so their blur is never drawn. */
+  visibility: hidden; transition: opacity var(--t-normal) var(--ease-in), transform var(--t-normal) var(--ease-in), visibility 0s linear var(--t-normal);
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); visibility: visible; transition-delay: 0s; }
 .toast .ico { color: var(--good); }
 
 .live .tag, .live [data-action="first-start"], .live #fly-seat .fly-sep, .live #fly-seat .label,
 .live .seg, .live .seg + .fine, .live #people, .live #talker { display: none; }
 
 @media (max-width: 900px) {
-  .keys, .brand small, .tag { display: none; }
+  .keys, .tag { display: none; }
 }
 @media (max-width: 760px) {
   .hero-content { grid-template-columns: minmax(0, 1fr); }
@@ -416,18 +446,24 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   .voice .talker, .me-name, .music-text { display: none; }
   .statusbar .end-label, .statusbar .ips-label { display: none; }
 }
+/* Asleep: a game or another window has the screen. Nothing moves until the launcher is back. */
+.asleep *, .asleep *::before, .asleep *::after { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
 </style>
+
+<!-- The Nimtech logo: mark from the official vector, wordmark from the outlined logo (no font needed). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="nimtech-logo" viewBox="0 0 934 291"><path d="M39.4 38.5L250.8 251.2" fill="none" stroke="currentColor" stroke-width="76.85" stroke-linecap="round"/><path d="M216.1 251.7C216.1 272.9 233.3 290.1 254.5 290.1C275.8 290.1 293 272.9 293 251.7L254.5 251.7L216.1 251.7ZM292.8 38.6L292.8 0.2L216 0.3L216 38.7L254.4 38.7L292.8 38.6ZM254.5 251.7L293 251.7L292.8 38.6L254.4 38.7L216 38.7L216.1 251.7L254.5 251.7Z"/><path d="M334.3 38.7L254.4 38.7" fill="none" stroke="currentColor" stroke-width="76.58" stroke-linecap="square"/><circle cx="40.8" cy="249.7" r="40.5"/><path transform="matrix(1.4 0 0 1.4 411.2 -390.7)" d="M2,395.5l0,-53.3l28.7,0c10.2,0 15.4,5.1 15.4,15.4l0,37.9l-8.2,0l0,-39c0,-4.8 -2.4,-7.2 -7.2,-7.2l-20.5,0l0,46.1l-8.2,0ZM61.9,332.6l0,-9.4l8.6,0l0,9.4l-8.6,0Zm0.2,63l0,-53.3l8.2,0l0,53.3l-8.2,0ZM86.7,395.5l0,-53.3l60.5,0c10.3,0 15.4,5.1 15.4,15.4l0,37.9l-8.2,0l0,-39c0,-4.8 -2.4,-7.2 -7.2,-7.2l-18.4,0l0,46.1l-8.2,0l0,-46.1l-25.6,0l0,46.1l-8.2,0ZM178.1,380.2l0,-57l8.2,0l0,19.1l19.5,0l0,7.2l-19.5,0l0,31.8c0,4.8 2.4,7.2 7.2,7.2l13.3,0l0,4.1l-4.1,3.1l-9.2,0c-10.3,-0 -15.4,-5.1 -15.4,-15.4ZM217.9,380.1l0,-22.6c0,-10.3 5.1,-15.4 15.4,-15.4l13.3,0c10.3,0 15.4,5.1 15.4,15.4l0,14.8l-35.9,0l0,8.8c0,4.8 2.4,7.2 7.2,7.2l26.7,0l0,4.1l-4.1,3.1l-22.6,0c-10.3,-0 -15.4,-5.1 -15.4,-15.4Zm8.2,-14.9l27.7,0l0,-8.7c0,-4.8 -2.4,-7.2 -7.2,-7.2l-13.3,0c-4.8,0 -7.2,2.4 -7.2,7.2l0,8.7ZM276.8,380.1l0,-22.6c0,-10.3 5.1,-15.4 15.4,-15.4l20.1,0l4.1,3.1l0,4.1l-24.2,0c-4.8,0 -7.2,2.4 -7.2,7.2l0,24.6c0,4.8 2.4,7.2 7.2,7.2l24.2,0l0,4.1l-4.1,3.1l-20.1,0c-10.3,-0 -15.4,-5.1 -15.4,-15.4ZM329.2,395.5l0,-72.4l8.2,0l0,19.1l20.5,0c10.3,0 15.4,5.1 15.4,15.4l0,37.9l-8.2,0l0,-39c0,-4.8 -2.4,-7.2 -7.2,-7.2l-20.5,0l0,46.1l-8.2,0Z"/></symbol></svg>
 
 <div class="backdrop" aria-hidden="true"><canvas id="bd-a"></canvas><canvas id="bd-b"></canvas></div>
 
 <div class="app" id="app">
   <header class="titlebar">
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5 22.5 12 12 22.5 1.5 12z" opacity=".35"/><path fill="currentColor" d="M12 6l6 6-6 6-6-6z"/></svg>
-      <span>Arcade <small>Nimtech</small></span>
+      <svg class="logo" role="img" aria-label="Nimtech"><use href="#nimtech-logo"/></svg>
+      <span class="brand-sep" aria-hidden="true"></span>
+      <span>Arcade</span>
     </div>
     <button class="chip" data-fly="seat" aria-haspopup="dialog" title="This seat">
       <svg class="ico s16" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1.5"/><path d="M8 2.5V5M12 2.5V5M8 15v2.5M12 15v2.5M2.5 8H5M2.5 12H5M15 8h2.5M15 12h2.5"/></svg>
@@ -549,7 +585,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 <!-- First start / change name -->
 <div class="layer mica-layer" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wl-title" data-modal="true" hidden>
   <form class="welcome-card" id="wl-form" novalidate autocomplete="off">
-    <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5 22.5 12 12 22.5 1.5 12z" opacity=".35"/><path fill="currentColor" d="M12 6l6 6-6 6-6-6z"/></svg>
+    <svg class="logo" role="img" aria-label="Nimtech"><use href="#nimtech-logo"/></svg>
     <p class="kicker" id="wl-kicker">Seat 04 · Nimtech Arcade</p>
     <h2 class="display" id="wl-title">Who's playing?</h2>
     <div class="field" id="nick-field">
@@ -572,6 +608,23 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     </div>
     <div class="preview" id="nick-preview"></div>
   </form>
+</div>
+
+<!-- Game details -->
+<div class="layer smoke" id="details" role="dialog" aria-modal="true" aria-labelledby="dt-title" data-modal="true" hidden>
+  <article class="sheet">
+    <div class="sheet-art">
+      <canvas id="dt-art" aria-hidden="true"></canvas>
+      <div class="sheet-head on-art">
+        <div class="eyebrow" id="dt-eyebrow"></div>
+        <h2 id="dt-title">Game</h2>
+        <p id="dt-sub"></p>
+      </div>
+      <button class="btn glass sheet-x on-art" data-action="close" aria-label="Close" id="dt-x"></button>
+    </div>
+    <div class="sheet-body" id="dt-body"></div>
+    <div class="sheet-foot" id="dt-actions"></div>
+  </article>
 </div>
 
 <!-- IP addresses -->
@@ -659,6 +712,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     music: '<path d="M7.5 15V4.5l9-2V13"/><circle cx="5.5" cy="15" r="2"/><circle cx="14.5" cy="13" r="2"/>',
     pause: '<rect x="5.5" y="4" width="3" height="12" rx=".6" fill="currentColor" stroke="none"/><rect x="11.5" y="4" width="3" height="12" rx=".6" fill="currentColor" stroke="none"/>',
     prev: '<path d="M5 4.5v11"/><path d="M15.5 5.2v9.6a.6.6 0 0 1-.9.5L7.8 10.5a.6.6 0 0 1 0-1l6.8-4.8a.6.6 0 0 1 .9.5z" fill="currentColor" stroke="none"/>',
+    info: '<circle cx="10" cy="10" r="7.5"/><path d="M10 9v4.5M10 6.5h.01"/>',
     next: '<path d="M15 4.5v11"/><path d="M4.5 5.2v9.6a.6.6 0 0 0 .9.5l6.8-4.8a.6.6 0 0 0 0-1L5.4 4.7a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/>',
   };
   const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 20 20" aria-hidden="true">${ICON[n]}</svg>`;
@@ -677,12 +731,19 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     C: '1920×1080 · 144 fps cap',
   };
   let GAMES = [
-    { id: 'ut99', name: 'Unreal Tournament', sub: 'Deathmatch, CTF, Assault, Domination', group: 'classic', runtime: 'Native', engine: 'OldUnreal 469e', players: '2–16', max: 16, start: 'native', file: 'User.ini', map: 'DM-Morpheus', art: { a: 252, b: 18, motif: 'rings' } },
-    { id: 'ut2004', name: 'Unreal Tournament 2004', sub: 'Onslaught, CTF, Deathmatch', group: 'classic', runtime: 'Proton', engine: 'GE-Proton, pinned', players: '2–32', max: 32, start: 'proton', file: 'UT2004.ini', map: 'ONS-Torlan', art: { a: 214, b: 186, motif: 'streaks' } },
-    { id: 'cnc', name: 'Command & Conquer', sub: 'Tiberian Dawn, on the OpenRA engine', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 88, b: 48, motif: 'grid' } },
-    { id: 'ra', name: 'Red Alert', sub: 'Allies against Soviets, on OpenRA', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 352, b: 8, motif: 'hex' } },
+    { id: 'ut99', name: 'Unreal Tournament', sub: 'Deathmatch, CTF, Assault, Domination', group: 'classic', runtime: 'Native', engine: 'OldUnreal 469e', players: '2–16', max: 16, start: 'native', file: 'User.ini', map: 'DM-Morpheus', art: { a: 252, b: 18, motif: 'rings' },
+      why: 'The LAN party classic. Everyone knows it, a match starts in seconds, and InstaGib makes newcomers and veterans equal from the first frag.',
+      highlights: ['InstaGib: one shot, one frag', 'Drop in and out of a match any time', 'Runs smooth on every seat'] },
+    { id: 'ut2004', name: 'Unreal Tournament 2004', sub: 'Onslaught, CTF, Deathmatch', group: 'classic', runtime: 'Proton', engine: 'GE-Proton, pinned', players: '2–32', max: 32, start: 'proton', file: 'UT2004.ini', map: 'ONS-Torlan', art: { a: 214, b: 186, motif: 'streaks' },
+      why: 'Onslaught puts the whole room on two teams with vehicles. Big, loud and easy to join halfway.', highlights: ['Vehicles and big team maps', 'Up to 32 players'] },
+    { id: 'cnc', name: 'Command & Conquer', sub: 'Tiberian Dawn, on the OpenRA engine', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 88, b: 48, motif: 'grid' },
+      why: 'Slow-burning strategy for two teams. Good between shooter rounds.' },
+    { id: 'ra', name: 'Red Alert', sub: 'Allies against Soviets, on OpenRA', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 352, b: 8, motif: 'hex' },
+      why: 'The strategy game people grew up with, on a modern engine. Two against two over the LAN is a perfect 30-minute match.',
+      highlights: ['Team games up to 8 players', 'Free, no account needed'] },
     { id: 'wargus', name: 'Warcraft II', sub: 'Tides of Darkness, on the Wargus engine', group: 'classic', runtime: 'Native', engine: 'Wargus', players: '1–8', max: 8, start: 'gamescope', file: 'preferences.lua', map: 'Random map', art: { a: 150, b: 44, motif: 'contour' } },
-    { id: 'steam', name: 'Steam', sub: 'Your own library, on this seat', group: 'steam', runtime: 'Steam', engine: 'Proton for Windows games', players: 'Per game', art: { a: 222, b: 200, motif: 'dots' } },
+    { id: 'steam', name: 'Steam', sub: 'Your own library, on this seat', group: 'steam', runtime: 'Steam', engine: 'Proton for Windows games', players: 'Per game', art: { a: 222, b: 200, motif: 'dots' },
+      why: 'Play anything from your own library on a fast seat, together with the room.' },
   ];
   let LAN = {
     ut99: [
@@ -784,21 +845,38 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       }
     },
   };
+  /* Painting art is the launcher's heaviest work, so each picture is painted once.
+     A canvas that already shows the picture is left alone, and small pictures (tiles,
+     backdrop, details banner) are kept and copied when the shelf is rebuilt. */
+  const artCache = new Map();
   function paintArt(cv, g, opt = {}) {
-    const w = opt.w || cv.clientWidth, h = opt.h || cv.clientHeight; if (!w || !h) return;
+    const w = Math.round(opt.w || cv.clientWidth), h = Math.round(opt.h || cv.clientHeight); if (!w || !h || !g) return;
     const dpr = opt.dpr || Math.min(window.devicePixelRatio || 1, 2);
-    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const key = `${g.id}|${w}x${h}|${dpr}|${opt.plain ? 'plain' : 'art'}`;
+    if (cv._art === key) return;
+    cv._art = key;
+    const W = Math.round(w * dpr), H = Math.round(h * dpr);
+    cv.width = W; cv.height = H;
+    const x = cv.getContext('2d'), kept = artCache.get(key);
+    if (kept) { x.drawImage(kept, 0, 0); return; }
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
     const { a, b, motif } = g.art, R = rng(hashStr(g.id)), m = Math.max(w, h);
+    /* The backdrop has no CSS saturate() any more, so its colours start richer. */
+    const sat = v => Math.min(100, Math.round(v * (opt.plain ? 1.3 : 1)));
     const base = x.createLinearGradient(0, h, w, 0);
-    base.addColorStop(0, `hsl(${a},62%,8%)`); base.addColorStop(.5, `hsl(${a},68%,20%)`); base.addColorStop(1, `hsl(${b},82%,44%)`);
+    base.addColorStop(0, `hsl(${a},${sat(62)}%,8%)`); base.addColorStop(.5, `hsl(${a},${sat(68)}%,20%)`); base.addColorStop(1, `hsl(${b},${sat(82)}%,44%)`);
     x.fillStyle = base; x.fillRect(0, 0, w, h);
     const glow = x.createRadialGradient(w * .76, h * .32, 0, w * .76, h * .32, m * .62);
-    glow.addColorStop(0, `hsla(${b},100%,72%,.55)`); glow.addColorStop(.45, `hsla(${b},90%,55%,.14)`); glow.addColorStop(1, `hsla(${b},90%,50%,0)`);
+    glow.addColorStop(0, `hsla(${b},100%,72%,.55)`); glow.addColorStop(.45, `hsla(${b},${sat(90)}%,55%,.14)`); glow.addColorStop(1, `hsla(${b},90%,50%,0)`);
     x.fillStyle = glow; x.fillRect(0, 0, w, h);
     if (!opt.plain) MOTIFS[motif](x, w, h, R, g.art);
     const v = x.createLinearGradient(0, 0, 0, h); v.addColorStop(.55, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.35)');
     x.fillStyle = v; x.fillRect(0, 0, w, h);
+    if (W * H <= 400000) {
+      if (artCache.size >= 48) artCache.clear();
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      c.getContext('2d').drawImage(cv, 0, 0); artCache.set(key, c);
+    }
   }
   function crossPaint(aSel, bSel, g, opt, swap) {
     const A = $(aSel), B = $(bSel);
@@ -812,7 +890,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     const hero = $('#hero');
     if (!game(state.sel)) return;
     crossPaint('#hero-a', '#hero-b', game(state.sel), { w: hero.clientWidth, h: hero.clientHeight }, swap);
-    crossPaint('#bd-a', '#bd-b', game(state.sel), { w: 64, h: 36, dpr: 1, plain: true }, swap);
+    crossPaint('#bd-a', '#bd-b', game(state.sel), { w: 160, h: 90, dpr: 1, plain: true }, swap);
   };
   const paintTiles = () => $$('#shelf .tile').forEach(t => paintArt($('canvas', t), game(t.dataset.id)));
 
@@ -860,7 +938,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
           <li>${ico('down')} Repeat downloads come from the room's cache</li>
         </ul>
         <div class="actions"><button class="btn accent lg" data-action="play" id="act-play">${ico('play')} ${run ? 'Back to Steam' : 'Open Steam'}</button>
-        ${run ? `<button class="btn glass lg" data-action="quit">${ico('quit')} Close Steam</button>` : ''}</div>`;
+        ${run ? `<button class="btn glass lg" data-action="quit">${ico('quit')} Close Steam</button>` : ''}
+        <button class="btn glass lg" data-action="details">${ico('info')} Details</button></div>`;
       side = `<aside class="side"><div class="side-head"><span>Signing in</span></div>
         <div class="side-row">${ico('user')}<div><b>Your own account</b><p>Sign in with your Steam login. Ending the session signs you out and deletes the login from this seat.</p></div></div>
         <div class="side-row">${ico('key')}<div><b>Café licenses</b><p>Borrow a game from Nimtech's café licenses, no account of your own needed.</p><span class="pill wait">Waiting on Valve</span></div></div>
@@ -881,6 +960,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
           : `<button class="btn accent lg" data-action="play" id="act-play">${ico('play')} Play</button>
              ${g.can_host === false ? '' : `<button class="btn glass lg" data-action="host">${ico('host')} Host LAN game</button>`}
              ${g.can_join === false ? '' : `<button class="btn glass lg" data-action="join" ${first ? '' : 'disabled title="Nobody is hosting this game right now"'}>${ico('join')} ${first ? `Join ${esc(first.host)}` : 'Join'}${open.length > 1 ? `<span class="n">+${open.length - 1}</span>` : ''}</button>`}`}
+          <button class="btn glass lg" data-action="details">${ico('info')} Details</button>
         </div>`;
       side = `<aside class="side"><div class="side-head"><span>On the LAN now</span><span>${list.length ? `${list.length} ${list.length === 1 ? 'game' : 'games'}` : ''}</span></div>
         ${list.length ? `<ul class="servers">${list.map(s => `
@@ -920,7 +1000,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#ptt-fine').innerHTML = `Push to talk: hold ${pttKbd(state.ptt)}. It works everywhere, also inside games.`;
     $('#fly-mute').textContent = state.muted ? 'Unmute my mic' : 'Mute my mic';
   }
+  let musicShown = null;
   function renderMusic() {
+    /* Polled every few seconds: touch the page only when the song or state changed. */
+    const shown = JSON.stringify(MUSIC);
+    if (shown === musicShown) return;
+    musicShown = shown;
     const m = MUSIC, playing = !!m && m.status === 'Playing', song = !!m && !!m.title;
     $('#music-ico').innerHTML = ico(playing ? 'play' : 'music', 's16');
     $('#music-text').textContent = song ? `${m.title} · ${m.artist}` : 'Spotify';
@@ -936,6 +1021,60 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   function renderTier() {
     $('#tier-label').textContent = state.tier; $('#spec-tier').textContent = state.tier;
     $$('[data-tier]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tier === state.tier)));
+  }
+
+  /* Game details: what the game is, why it is good in a LAN room, and how it runs here. */
+  function lanLine(g) {
+    if (g.id === 'steam') return 'Per game';
+    return g.can_host === false && g.can_join === false ? 'Use the game\'s own menu'
+      : g.can_host === false ? 'Join from the launcher'
+      : g.can_join === false ? 'Host from the launcher'
+      : 'Host or join from the launcher';
+  }
+  function renderDetails(g) {
+    const run = state.running && state.running.id === g.id, steam = g.id === 'steam';
+    const open = steam ? [] : joinable(g.id), first = open[0];
+    const highlights = Array.isArray(g.highlights) ? g.highlights.filter(Boolean) : [];
+    $('#dt-eyebrow').innerHTML = `<span class="pill ${run ? 'run' : ''}">${run ? 'Running' : esc(g.runtime)}</span><span>${esc(g.engine)}</span>`;
+    $('#dt-title').textContent = g.name;
+    $('#dt-sub').textContent = g.sub || '';
+    $('#dt-x').innerHTML = ico('quit', 's16');
+    const why = g.why || highlights.length ? `<section>
+        <h3 class="why-title">Why it works in a LAN room</h3>
+        ${g.why ? `<p class="why">${esc(g.why)}</p>` : ''}
+        ${highlights.length ? `<ul class="highlights">${highlights.map(h => `<li>${ico('check', 's16')}<span>${esc(h)}</span></li>`).join('')}</ul>` : ''}
+      </section>` : `<section><p class="why">${esc(g.sub || g.name)}</p></section>`;
+    $('#dt-body').innerHTML = `${why}
+      <dl class="facts-box">
+        <div><dt>Players</dt><dd>${esc(g.players)}</dd></div>
+        <div><dt>On this seat · Tier ${esc(state.tier)}</dt><dd>${esc(tuned(g))}</dd></div>
+        <div><dt>Runs with</dt><dd>${esc([g.runtime, g.engine].filter(Boolean).join(' · '))}</dd></div>
+        <div><dt>LAN games</dt><dd>${esc(lanLine(g))}</dd></div>
+      </dl>`;
+    $('#dt-actions').innerHTML = steam
+      ? `<button class="btn accent lg" data-action="play" data-autofocus>${ico('play')} ${run ? 'Back to Steam' : 'Open Steam'}</button>`
+      : run
+        ? `<button class="btn accent lg" data-action="play" data-autofocus>${ico('play')} Resume</button>
+           <button class="btn lg" data-action="quit">${ico('quit')} Quit game</button>`
+        : `<button class="btn accent lg" data-action="play" data-autofocus>${ico('play')} Play</button>
+           ${g.can_host === false ? '' : `<button class="btn lg" data-action="host">${ico('host')} Host LAN game</button>`}
+           ${g.can_join === false ? '' : `<button class="btn lg" data-action="join" ${first ? '' : 'disabled title="Nobody is hosting this game right now"'}>${ico('join')} ${first ? `Join ${esc(first.host)}` : 'Join'}</button>`}`;
+  }
+  function openDetails(id) {
+    const g = game(id); if (!g) return;
+    closeFlyouts();
+    const L = $('#details');
+    renderDetails(g);
+    if (!layers.includes(L)) { L.hidden = false; L._openedAt = performance.now(); openLayer(L); }
+    requestAnimationFrame(() => paintArt($('#dt-art'), g));
+  }
+  /* After a game starts or stops, the open details view shows the new buttons. */
+  function refreshDetails() {
+    const L = $('#details'), g = game(state.sel);
+    if (!layers.includes(L) || !g) return;
+    const hadFocus = L.contains(document.activeElement);
+    renderDetails(g);
+    if (hadFocus && !L.contains(document.activeElement)) { const f = $('#dt-actions [data-autofocus]'); if (f) f.focus({ preventScroll: true }); }
   }
 
   /* ---------- Layers, flyouts, focus ---------- */
@@ -1048,6 +1187,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   }
   let runToken = 0, timerId = 0;
   async function launch(g, mode = 'play', srv = null) {
+    if (layers.includes($('#details'))) closeLayer($('#details'), false);
     if (state.running && state.running.id === g.id) { showRunning(g); return; }
     if (state.running) quit(true);
     const tok = ++runToken; closeFlyouts();
@@ -1111,7 +1251,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     if (state.running.mode === 'join' && state.running.server) { const s = (LAN[g.id] || []).find(x => x.name === state.running.server); if (s) s.n = Math.max(1, s.n - 1); }
     state.running = null;
     if ($('#launch').classList.contains('open')) closeLayer($('#launch'));
-    renderShelf(); renderHero(false);
+    renderShelf(); renderHero(false); refreshDetails();
     if (!silent) toast(`${esc(g.name)} closed`);
   }
   function play(id) { launch(game(id), 'play'); }
@@ -1226,9 +1366,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     openWelcome('first');
   }
 
+  let musicBusy = false;
   async function refreshMusic() {
-    if (!LIVE) return;
+    if (!LIVE || musicBusy) return;
+    musicBusy = true;
     try { MUSIC = await invoke('music_status'); } catch (err) { MUSIC = null; }
+    musicBusy = false;
     renderMusic();
   }
   async function openMusic() {
@@ -1257,13 +1400,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   /* ---------- Events ---------- */
   document.addEventListener('click', e => {
     const cp = e.target.closest('[data-copy]'); if (cp) { copyHost(cp); return; }
+    /* A click beside the details card closes it, but not the second click of a double-click. */
+    if (e.target.id === 'details') { if (performance.now() - (e.target._openedAt || 0) > 400) closeLayer(e.target); return; }
     const el = e.target.closest('[data-action],[data-fly],[data-join],[data-tier],[data-filter],.tile');
     if (!el) {
       if (!e.target.closest('.flyout')) closeFlyouts();
       return;
     }
     if (!el.closest('.flyout') && !el.dataset.fly) closeFlyouts();
-    if (el.classList.contains('tile')) { select(el.dataset.id); el.focus({ preventScroll: true }); return; }
+    if (el.classList.contains('tile')) { select(el.dataset.id); el.focus({ preventScroll: true }); openDetails(el.dataset.id); return; }
     if (el.dataset.fly) { toggleFly(el.dataset.fly, el); return; }
     if (el.dataset.filter) { setFilter(el.dataset.filter); return; }
     if (el.dataset.tier) { setTier(el.dataset.tier); return; }
@@ -1274,6 +1419,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       case 'host': launch(g, 'host'); break;
       case 'join': { const s = joinable(g.id)[0]; if (s) launch(g, 'join', s); break; }
       case 'quit': quit(); break;
+      case 'details': openDetails(state.sel); break;
       case 'back': closeLayer($('#launch'), false); focusSelected(); break;
       case 'end': closeFlyouts(); openLayer($('#end')); break;
       case 'ips': openIps(); break;
@@ -1291,7 +1437,6 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       case 'music-next': musicControl('next'); break;
     }
   });
-  document.addEventListener('dblclick', e => { const t = e.target.closest('.tile'); if (t) play(t.dataset.id); });
   document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('#shelf .tile'); if (t && t.dataset.id !== state.sel) select(t.dataset.id); });
   /* While picking a push-to-talk key, the next key or button press is the answer. */
   document.addEventListener('keydown', captureKey, true);
@@ -1312,9 +1457,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   $('#wl-form').addEventListener('submit', submitNick);
   $('#nick-in').addEventListener('input', () => { $('#nick-field').classList.remove('invalid'); renderPreview(); });
 
-  /* Gamepad: d-pad or left stick moves, A activates, B goes back */
-  let padRaf = 0, lastDir = null, dirSince = 0, lastRepeat = 0; const prevBtn = {};
-  function pollPads(t) {
+  /* Gamepad: d-pad or left stick moves, A activates, B goes back.
+     Read 30 times a second, and only while the launcher has the screen: a game in front
+     gets the gamepad to itself, and the launcher does no work for it. */
+  let padTimer = 0, lastDir = null, dirSince = 0, lastRepeat = 0; const prevBtn = {};
+  function pollPads() {
+    const t = performance.now();
     let any = false;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const p of pads) {
@@ -1331,20 +1479,68 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       if (b && !prevBtn[k + 'b']) back();
       prevBtn[k + 'a'] = a; prevBtn[k + 'b'] = b;
     }
-    padRaf = any ? requestAnimationFrame(pollPads) : 0;
+    if (!any) stopPads();
   }
-  addEventListener('gamepadconnected', () => { if (!padRaf) padRaf = requestAnimationFrame(pollPads); toast('Gamepad connected: d-pad moves, A plays, B goes back'); });
+  function startPads() {
+    const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+    if (!padTimer && pads.length && awake) padTimer = setInterval(pollPads, 33);
+  }
+  function stopPads() { clearInterval(padTimer); padTimer = 0; }
+  addEventListener('gamepadconnected', () => { startPads(); toast('Gamepad connected: d-pad moves, A plays, B goes back'); });
 
-  /* Live room: someone talks now and then */
-  setInterval(() => {
+  /* ---------- Sleep and wake ----------
+     The launcher is awake only while it is on screen and, on a seat, has the focus.
+     When a game, Spotify or another window takes over, every timer stops, the gamepad
+     is left alone and CSS animations pause; the webview then does no work at all.
+     Coming back runs each timer once at once, so the screen is fresh. */
+  let awake = true;
+  const loops = [];
+  function every(ms, fn) {
+    const l = { ms, fn, id: 0 };
+    loops.push(l);
+    if (awake) l.id = setInterval(fn, ms);
+  }
+  /* Focus comes from the focus and blur events, not hasFocus(): if a window manager never
+     sends them, the launcher simply stays awake, as before. */
+  let focused = true;
+  const updateAwake = () => setAwake(document.visibilityState === 'visible' && (!LIVE || focused));
+  function setAwake(on) {
+    if (on === awake) return;
+    awake = on;
+    document.documentElement.classList.toggle('asleep', !on);
+    if (!on) {
+      loops.forEach(l => { clearInterval(l.id); l.id = 0; });
+      stopPads(); renderMic(false);
+      return;
+    }
+    loops.forEach(l => { l.fn(); l.id = setInterval(l.fn, l.ms); });
+    startPads();
+    checkRunning();
+  }
+  addEventListener('focus', () => { focused = true; updateAwake(); });
+  addEventListener('blur', () => { focused = false; updateAwake(); });
+  document.addEventListener('visibilitychange', updateAwake);
+  /* Any touch of mouse or keyboard means someone is here. */
+  ['pointerdown', 'keydown'].forEach(t => addEventListener(t, () => { if (!awake) { focused = true; updateAwake(); } }, true));
+
+  /* The game ended while the launcher slept: the Rust core sends game-ended, and on
+     waking the launcher asks once more in case that event was missed. */
+  async function checkRunning() {
+    if (!LIVE || !state.running) return;
+    try { if (!(await invoke('running'))) quit(true); } catch (err) { /* keep state */ }
+  }
+  function gameEnded(id) { if (state.running && state.running.id === id) quit(true); }
+
+  /* Prototype only: someone in the sample voice room talks now and then */
+  if (!LIVE) every(2600, () => {
     if (!PEOPLE.length) return;
     const r = Math.random();
     state.talker = r < .35 ? null : PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
     renderPeople();
-  }, 2600);
+  });
 
   const tick = () => { $('#clock').textContent = hhmm(new Date()); };
-  setInterval(tick, 15000);
+  every(15000, tick);
 
   let rp = 0;
   const ro = new ResizeObserver(() => { cancelAnimationFrame(rp); rp = requestAnimationFrame(() => { paintHero(false); paintTiles(); }); });
@@ -1369,11 +1565,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#spec-gpu').textContent = b.gpu; $('#spec-display').textContent = b.display;
     $('#wl-kicker').textContent = `${b.seat_name} · Nimtech Arcade`;
     $('#voice-text').textContent = b.voice != null ? `Voice · ${b.voice || 'Lobby'}` : 'Voice not set up';
-    refreshMusic(); setInterval(refreshMusic, 3000);
-    setInterval(async () => {
-      if (!state.running) return;
-      try { if (!(await invoke('running'))) quit(true); } catch (err) { /* keep state */ }
-    }, 2000);
+    refreshMusic(); every(3000, refreshMusic);
+    const ev = window.__TAURI__.event;
+    if (ev && ev.listen) ev.listen('game-ended', e => gameEnded(e.payload)).catch(() => {});
   }
 
   async function start(saved) {
@@ -1390,6 +1584,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#spec-reset').textContent = hhmm(state.lastReset);
     renderTier(); renderMe(); renderMic(); renderMusic(); renderShelf(); renderHero(false);
     ro.observe($('#hero')); ro.observe($('#shelf'));
+    updateAwake();
     if (!state.nick) openWelcome('first');
   }
   const H = window.claude && window.claude.hot;

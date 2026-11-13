@@ -123,6 +123,7 @@ name = "arcade-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "libc",
  "minijinja",
  "serde",
  "serde_json",
