@@ -40,6 +40,7 @@ install -m 755 /dev/null /srv/share/ut99/System64/ut-bin; touch '/srv/share/ut99
 printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
 echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
+mkdir -p /srv/share/tmnf/Packs; touch /srv/share/tmnf/TmForever.exe /srv/share/tmnf/Packs/Stadium.pak; echo "setup=test" >/srv/share/tmnf/.tmnf-version
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -102,7 +103,8 @@ step "Games from the share"
 [[ ! -x /games/classic/mw2/iw4x.exe ]] || die "MW2 files became executable"
 grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTournament.ini || die "UT99 defaults not in the golden home"
 grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
-ok "mw2 and ut99 mirrored; UT99 defaults seeded"
+[[ -e /games/classic/tmnf/Packs/Stadium.pak && ! -x /games/classic/tmnf/TmForever.exe ]] || die "TrackMania not copied from the share, or files executable"
+ok "mw2, ut99 and tmnf mirrored; UT99 defaults seeded"
 
 step "Mumble is pre-filled in the golden home"
 mumble_conf=/home/.golden/player/.config/Mumble/Mumble/mumble_settings.json

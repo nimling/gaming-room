@@ -1,0 +1,22 @@
+# TrackMania Nations Forever: free stunt racing from Nadeo, through Proton.
+# The server unpacks Nadeo's installer (roles/server_gameshare); each seat
+# copies it read-only to /games/classic/tmnf (roles/games). The Proton
+# prefix is in the player's home, so End session starts it fresh.
+# To check on the canary: first-start dialogs (player profile, online
+# login), whether a read-only game folder works, fullscreen, LAN play.
+id: tmnf
+name: TrackMania Nations Forever
+subtitle: Stunt racing, hotseat and LAN
+group: classic
+runtime: proton
+engine: Proton
+path: /games/classic/tmnf
+players: { min: 1, max: 32 }
+launch:
+  workdir: .
+  command: ["/games/classic/tmnf/TmForever.exe"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: native, fps_cap: 60 }
+art: { hue: 140, glow: 210, motif: streaks }

@@ -153,5 +153,8 @@
     mode: "u+rwX,go+rX"
   when: iw4x_base_game.stat.exists
 
+- name: TrackMania Nations Forever
+  ansible.builtin.include_tasks: tmnf.yml
+
 - name: Unreal Tournament
   ansible.builtin.include_tasks: ut99.yml

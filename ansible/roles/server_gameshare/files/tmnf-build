@@ -1,0 +1,46 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/server_gameshare).
+# Unpacks TrackMania Nations Forever from Nadeo's installer (a 7-Zip
+# self-extractor around an Inno Setup installer) into a folder, then swaps
+# it into place. Seats run TmForever.exe through Proton.
+#   tmnf-build <setup.exe> <dest> <owner> <version line>
+set -euo pipefail
+
+if (( $# != 4 )); then
+    echo "usage: tmnf-build SETUP DEST OWNER VERSION" >&2
+    exit 2
+fi
+setup=$1 dest=$2 owner=$3 version=$4
+sevenzip=$(command -v 7z || command -v 7zz || true)
+[[ -n $sevenzip ]] || { echo "tmnf-build: 7z (package 7zip) is not installed" >&2; exit 1; }
+command -v innoextract >/dev/null || { echo "tmnf-build: innoextract is not installed" >&2; exit 1; }
+parent=$(dirname "$dest")
+mkdir -p "$parent"
+work=$(mktemp -d "$parent/.tmnf-build.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+"$sevenzip" x -y -bd -o"$work/sfx" "$setup" >/dev/null
+innoextract -q -s -d "$work/inno" "$work/sfx/TmNationsForever_Setup_Tmp.exe"
+game=$work/inno/app
+for f in TmForever.exe Nadeo.ini Packs/Stadium.pak; do
+    [[ -e "$game/$f" ]] || { echo "tmnf-build: $f missing after unpacking" >&2; exit 1; }
+done
+
+echo "$version" > "$game/.tmnf-version"
+chown -R "$owner:$owner" "$game"
+# rsyncd runs as nobody.
+chmod -R u+rwX,go+rX "$game"
+chmod 0755 "$game"
+
+if [[ -e $dest ]]; then
+    mv "$dest" "$work/old"
+fi
+if ! mv "$game" "$dest"; then
+    # Put the previous build back so the share is never left without the game.
+    [[ -e $work/old ]] && mv "$work/old" "$dest"
+    echo "tmnf-build: could not move the new build into $dest" >&2
+    exit 1
+fi
+trap - EXIT
+rm -rf "$work"
+echo "tmnf-build: $dest ready ($version)"
