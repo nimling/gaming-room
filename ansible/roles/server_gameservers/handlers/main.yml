@@ -1,0 +1,7 @@
+---
+- name: Restart the game server control service
+  ansible.builtin.systemd_service:
+    name: gameservers-api.service
+    state: restarted
+    daemon_reload: true
+  when: gameservers_enabled and not server_in_container

@@ -1,0 +1,31 @@
+# Managed by gaming-room Ansible (roles/server_gameservers).
+# Preset: server/presets/{{ p.id }}.yaml
+{% set home = gameservers_state_root ~ '/' ~ p.id %}
+[Unit]
+Description=Game server: {{ p.name }}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ gameservers_user }}
+Group={{ gameservers_user }}
+Environment=HOME={{ home }}
+WorkingDirectory={{ gameshare_root }}/{{ p.workdir }}
+ExecStart={% for a in p.command %}"{{ a | replace('{home}', home) | replace('\\', '\\\\') | replace('"', '\\"') | replace('%', '%%') }}"{{ ' ' if not loop.last }}{% endfor %}
+
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ home }}
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+{% if p.always_on | default(false) %}
+
+[Install]
+WantedBy=multi-user.target
+{% endif %}

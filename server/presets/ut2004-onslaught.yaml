@@ -1,0 +1,31 @@
+# UT2004 Onslaught: vehicles and power nodes, with in-game map voting.
+id: ut2004-onslaught
+name: UT2004 Onslaught
+game: ut2004
+needs: ut2004/System/ucc-bin
+port: 7820
+query: { type: ut2004, port: 7821 }
+firewall_udp: ["7820:7821", "7830", "10777:10786"]
+workdir: ut2004/System
+command:
+  - ./ucc-bin
+  - server
+  - "ONS-Torlan?game=Onslaught.ONSOnslaughtGame"
+  - port=7820
+  - "ini={home}/UT2004.ini"
+  - "userini={home}/User.ini"
+  - -nohomedir
+seed:
+  - { from: ut2004/System/Default.ini, to: UT2004.ini }
+  - { from: ut2004/System/DefUser.ini, to: User.ini }
+ini:
+  - file: UT2004.ini
+    set:
+      Engine.GameReplicationInfo:
+        ServerName: Nimtech Onslaught
+      Engine.GameInfo:
+        VotingHandlerType: xVoting.xVotingHandler
+      xVoting.xVotingHandler:
+        bMapVote: "True"
+      IpDrv.MasterServerUplink:
+        DoUplink: "False"

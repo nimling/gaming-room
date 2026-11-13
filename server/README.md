@@ -36,6 +36,21 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 - **Seats must use the server as DNS.** Set it as the DNS server in the gaming VLAN's DHCP settings in UniFi.
 - Cache on `/srv/lancache/cache`, 1000 GB by default (`lancache_cache_size`).
 
+## On-demand game servers
+
+- Off by default. Switch on with `gameservers_enabled: true` in `ansible/inventory.yml`.
+- One file per server type in [`presets/`](presets/README.md), for example UT2004 InstaGib with map voting. A preset shows up once its game is in `/srv/games`.
+- Each preset runs as its own service, `gs-<id>.service`, as the account `gameserver`, with its settings in `/var/lib/gameservers/<id>`. It reads the game from the share; it can only write its own settings folder.
+- The control service (`gameservers-api.service`, port 8790, gaming VLAN only) lists the presets with their players and map, and starts or stops them. A polkit rule lets its account start and stop `gs-*.service`, nothing else. The launcher will use it for a Servers view.
+- On-demand servers stop after 15 minutes without players (`gameservers_idle_minutes`); at most 4 run at once (`gameservers_max_running`). A server that does not answer the player query is never stopped for being empty.
+- The UT99 InstaGib server (`ut99-server.service`) stays always on, as before.
+
+```bash
+curl http://<server>:8790/api/servers                              # list
+curl -X POST http://<server>:8790/api/servers/ut2004-instagib/start # start
+curl -X POST http://<server>:8790/api/servers/ut2004-instagib/stop  # stop
+```
+
 ## Steam PC Café
 
 - Off by default. Switch on with `pccafe_enabled: true` and `pccafe_bridge_nic: <NIC>` (for example `enp2s0`) in `ansible/inventory.yml`.

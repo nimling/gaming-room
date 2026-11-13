@@ -1,0 +1,6 @@
+---
+# On-demand game servers: one service per preset in server/presets, and a
+# small control service the launcher talks to. Off unless gameservers_enabled.
+- name: Game servers | the rest of this role
+  ansible.builtin.include_tasks: servers.yml
+  when: gameservers_enabled

@@ -1,0 +1,35 @@
+# UT2004 InstaGib deathmatch with in-game map voting.
+id: ut2004-instagib
+name: UT2004 InstaGib
+game: ut2004
+needs: ut2004/System/ucc-bin
+port: 7800
+# UT2004's own query protocol on the game port + 1.
+query: { type: ut2004, port: 7801 }
+# Game, query, GameSpy (+10) and the LAN beacon range.
+firewall_udp: ["7800:7801", "7810", "10777:10786"]
+workdir: ut2004/System
+command:
+  - ./ucc-bin
+  - server
+  - "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib"
+  - port=7800
+  - "ini={home}/UT2004.ini"
+  - "userini={home}/User.ini"
+  - -nohomedir
+seed:
+  - { from: ut2004/System/Default.ini, to: UT2004.ini }
+  - { from: ut2004/System/DefUser.ini, to: User.ini }
+ini:
+  - file: UT2004.ini
+    set:
+      Engine.GameReplicationInfo:
+        ServerName: Nimtech InstaGib
+      # Players vote for the next map in game (F5 / "mutate mapvote").
+      Engine.GameInfo:
+        VotingHandlerType: xVoting.xVotingHandler
+      xVoting.xVotingHandler:
+        bMapVote: "True"
+      # No internet master server on the gaming VLAN.
+      IpDrv.MasterServerUplink:
+        DoUplink: "False"
