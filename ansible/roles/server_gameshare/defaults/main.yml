@@ -40,6 +40,45 @@ tmnf_cache: /var/cache/tmnf
 tmnf_setup_url: https://nadeo-download.cdn.ubi.com/trackmaniaforever/tmnationsforever_setup.exe
 tmnf_setup_sha256: 2f659138ed4409da404970841e18f03d29921beaf6a424824c8312ddb20f6355
 
+# --- Bought games on open-source engines ---------------------------------------
+# A person copies the bought game data into {{ gameshare_root }}/<name> (see
+# each guide). Then server.yml adds the pinned engine on top
+# (tasks/engine_game.yml), and seats copy the finished folder.
+gameshare_engine_cache: /var/cache/gameshare-engines
+gameshare_engine_games:
+  # Quake III Arena: Quake3e engine; data pak0.pk3 from a bought copy, the
+  # 1.32 point-release paks (pak1-8, free from id) from ioquake3.
+  - name: quake3
+    data: baseq3/pak0.pk3
+    guide: docs/bought-games.md
+    programs: [quake3e.x64, quake3e-vulkan.x64, quake3e.ded.x64]
+    parts:
+      # To update: pick a dated release (not "latest"), then
+      #   gh api repos/ec-/Quake3e/releases/tags/<date> --jq '.assets[] | {name, digest}'
+      - name: quake3e-2026-10-14
+        url: https://github.com/ec-/Quake3e/releases/download/2026-10-14/quake3e-linux-x86_64.zip
+        ext: .zip
+        sha256: 2bb1e9e2cf6044d38995676d6c2729123a6ab48590b6ef66f9ea9c3361d643f6
+      - name: quake3-pointrelease-1.32
+        url: https://files.ioquake3.org/quake3-latest-pk3s.zip
+        ext: .zip
+        sha256: 95a811825a43260b2c52af97ef6f2c26fcc16d0032b3a132d6c4b20457a10ced
+        subdir: quake3-latest-pk3s
+  # Star Wars Jedi Knight: Jedi Academy: OpenJK engine; data assets0-3.pk3
+  # from a bought copy.
+  - name: jka
+    data: base/assets0.pk3
+    guide: docs/bought-games.md
+    programs: [openjk.x86_64, openjk_sp.x86_64, openjkded.x86_64]
+    parts:
+      # OpenJK only publishes a moving "latest" build. The checksum pins the
+      # build the server first downloaded; when OpenJK replaces it, the
+      # download fails until the checksum here is updated on purpose.
+      - name: openjk-2026-09-29
+        url: https://github.com/JACoders/OpenJK/releases/download/latest/OpenJK-linux-x86_64.tar.gz
+        ext: .tar.gz
+        sha256: 8116857544cc8ca90713edae43db0b13108cb044af7ea7312c739a677464c297
+
 # --- Unreal Tournament (GOTY) on OldUnreal 469e -------------------------------
 # Free from Epic and OldUnreal; no CD key. The server builds the game once
 # from the GOTY ISO, Bonus Pack 4 and the 469e Linux patch (files/ut99-build,

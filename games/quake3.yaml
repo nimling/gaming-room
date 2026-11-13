@@ -1,0 +1,54 @@
+# Quake III Arena on the Quake3e engine, native Linux.
+# The game data (baseq3/pak0.pk3) comes from a bought copy; the server adds
+# Quake3e and the free 1.32 point-release paks (docs/bought-games.md). Each
+# seat copies the finished folder read-only to /games/classic/quake3.
+# Every setting goes on the command line; the CD key is not needed on a LAN.
+# To check on the canary: no dialogs, the nickname, fullscreen.
+id: quake3
+name: Quake III Arena
+subtitle: The arena shooter, deathmatch and CTF
+group: classic
+runtime: native
+engine: Quake3e
+path: /games/classic/quake3
+players: { min: 2, max: 16 }
+launch:
+  command: ["./quake3e.x64"]
+  args:
+    - "+set"
+    - "fs_basepath"
+    - "{{ path }}"
+    - "+set"
+    - "name"
+    - "{{ nickname }}"
+    - "+set"
+    - "r_fullscreen"
+    - "1"
+    - "+set"
+    - "r_mode"
+    - "-1"
+    - "+set"
+    - "r_customwidth"
+    - "{{ width }}"
+    - "+set"
+    - "r_customheight"
+    - "{{ height }}"
+    - "+set"
+    - "com_maxfps"
+    - "{{ fps_cap }}"
+    # Skip the id and intro videos.
+    - "+set"
+    - "com_introplayed"
+    - "1"
+# Address, or address:port; servers listen on 27960 by default.
+join:
+  args: ["+connect", "{{ server }}"]
+# The Longest Yard, free for all.
+host:
+  map: q3dm17
+  args: ["+set", "g_gametype", "0", "+set", "sv_maxclients", "16", "+map", "{{ map }}"]
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 125 }
+art: { hue: 8, glow: 30, motif: rings }
