@@ -127,6 +127,11 @@ seat_shared_games:
     dest: "{{ seat_classic_root }}/tmnf"
     required: [TmForever.exe, .tmnf-version]
     exclude: []
+  # Bought Windows game, run through proton-view (docs/worms.md).
+  - name: worms
+    dest: "{{ seat_classic_root }}/worms"
+    required: [WA.exe]
+    exclude: []
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false

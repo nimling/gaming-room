@@ -40,6 +40,7 @@ install -m 755 /dev/null /srv/share/ut99/System64/ut-bin; touch '/srv/share/ut99
 printf '[URL]\nLocalMap=CityIntro.unr\n' >/srv/share/ut99/System64/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut99/System64/DefUser.ini
 echo "iso=test bp4=test patch=469e" >/srv/share/ut99/.ut99-version
+mkdir -p /srv/share/worms/User/Teams; touch /srv/share/worms/WA.exe /srv/share/worms/User/Teams/WG.WGT
 mkdir -p /srv/share/tmnf/Packs; touch /srv/share/tmnf/TmForever.exe /srv/share/tmnf/Packs/Stadium.pak; echo "setup=test" >/srv/share/tmnf/.tmnf-version
 mkdir -p /srv/share/quake3/baseq3 /srv/share/jka/base
 touch /srv/share/quake3/baseq3/pak0.pk3; install -m 755 /dev/null /srv/share/quake3/quake3e.x64
@@ -129,6 +130,18 @@ step "Games from the share"
 [[ ! -x /games/classic/mw2/iw4x.exe ]] || die "MW2 files became executable"
 grep -qx 'LocalMap=CityIntro.unr' /home/.golden/player/.utpg/System/UnrealTournament.ini || die "UT99 defaults not in the golden home"
 grep -qx 'Name=Player' /home/.golden/player/.utpg/System/User.ini || die "UT99 user defaults not in the golden home"
+[[ -e /games/classic/worms/User/Teams/WG.WGT && -x /usr/local/bin/proton-view ]] || die "Worms not copied from the share, or proton-view missing"
+# proton-view builds a writable view in the home; stub umu-run so it stops there.
+mkdir -p /tmp/bin; install -d -o player /tmp/pv
+install -m 755 /dev/stdin /tmp/bin/umu-run <<'STUB'
+#!/bin/sh
+echo "umu-run $*"
+STUB
+view=$(sudo -u player env PATH="/tmp/bin:$PATH" PROTONPATH=GE-Proton HOME=/tmp/pv proton-view worms WA.exe 2>&1; cat /tmp/pv/.local/share/arcade/worms.log)
+[[ -f /tmp/pv/.local/share/arcade/worms-game/WA.exe && ! -L /tmp/pv/.local/share/arcade/worms-game/WA.exe ]] || die "proton-view did not copy the program"
+[[ -L /tmp/pv/.local/share/arcade/worms-game/User/Teams/WG.WGT && -w /tmp/pv/.local/share/arcade/worms-game/User/Teams ]] || die "proton-view view not linked or not writable"
+grep -q 'umu-run ./WA.exe' <<<"$view" || die "proton-view did not start the game with umu-run"
+ok "mw2, ut99 and worms mirrored; UT99 defaults seeded; proton-view builds a writable view"
 [[ -e /games/classic/tmnf/Packs/Stadium.pak && ! -x /games/classic/tmnf/TmForever.exe ]] || die "TrackMania not copied from the share, or files executable"
 ok "mw2, ut99 and tmnf mirrored; UT99 defaults seeded"
 [[ -x /games/classic/quake3/quake3e.x64 && -e /games/classic/quake3/baseq3/pak0.pk3 ]] || die "Quake 3 not copied from the share, or not executable"

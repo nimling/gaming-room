@@ -14,8 +14,9 @@
     owner: "{{ gameshare_owner }}"
     group: "{{ gameshare_owner }}"
     mode: "0755"
+  # Worms: bought folder copied in by hand (docs/worms.md).
   loop: >-
-    {{ [gameshare_root, iw4x_dir]
+    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms']
        + (gameshare_engine_games | map(attribute='name') | map('regex_replace', '^', gameshare_root ~ '/') | list) }}
 
 - name: Serve the game share read-only over rsync
