@@ -176,6 +176,8 @@ ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini
 grep -qx 'MaxPlayers=16' "$ini" || die "preset did not start from the game's defaults"
 grep -qx 'VotingHandlerType=xVoting.xVotingHandler' "$ini" || die "map voting not set"
 grep -qx 'DoUplink=False' "$ini" || die "internet uplink not off"
+grep -qx 'Port=7800' "$ini" || die "UT2004 preset still on the default game port (UT99 holds 7777)"
+grep -qx 'QueryPort=7801' "$ini" || die "UT2004 preset still on the default query port (UT99 holds 7778)"
 python3 - <<'PY' || die "preset list for the control service"
 import json
 c = json.load(open("/etc/gameservers/presets.json"))
