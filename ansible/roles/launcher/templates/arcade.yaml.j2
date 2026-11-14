@@ -1,5 +1,7 @@
 # Managed by gaming-room Ansible (roles/launcher). Read by arcade and arcade-app.
 games_dir: {{ arcade_games_dir }}
+# Keep the screen on and the idle reset waiting while a game runs.
+idle_inhibit: true
 {% if arcade_proton_path %}
 proton: {{ arcade_proton_path }}
 {% endif %}

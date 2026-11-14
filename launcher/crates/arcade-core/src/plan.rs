@@ -171,12 +171,22 @@ pub fn build(req: &Request) -> Result<Plan> {
         }
     }
 
-    // Command: [gamemoderun] [gamescope … --] [umu-run] game args
+    // Command: [systemd-inhibit …] [gamemoderun] [gamescope … --] [umu-run] game args
     let mut env_vars = BTreeMap::new();
     for (k, v) in &m.launch.env {
         env_vars.insert(k.clone(), render(v)?);
     }
     let mut cmd: Vec<String> = Vec::new();
+    // Steam's own start command returns at once; the game runs inside Steam.
+    if req.config.idle_inhibit && m.runtime != Runtime::Steam {
+        cmd.extend([
+            "systemd-inhibit".into(),
+            "--what=idle".into(),
+            "--who=Arcade".into(),
+            format!("--why={} is running", m.name),
+            "--mode=block".into(),
+        ]);
+    }
     if m.gamemode && m.runtime != Runtime::Steam {
         cmd.push("gamemoderun".into());
     }
@@ -540,6 +550,27 @@ profiles:
             shell_line(&p),
             "gamemoderun gamescope -w 640 -h 480 -W 2560 -H 1440 -r 60 -f -S integer -- wargus"
         );
+    }
+
+    #[test]
+    fn seats_hold_an_idle_lock_while_a_game_runs() {
+        let home = tempfile::tempdir().unwrap();
+        let m = manifest(UT);
+        let s = seat(home.path());
+        let c: Config = serde_yaml::from_str("idle_inhibit: true").unwrap();
+        let p = build(&req(&m, &s, &c, Mode::Play)).unwrap();
+        assert_eq!(p.program, "systemd-inhibit");
+        assert_eq!(
+            p.args[..5],
+            [
+                "--what=idle",
+                "--who=Arcade",
+                "--why=Unreal Tournament is running",
+                "--mode=block",
+                "gamemoderun"
+            ]
+        );
+        assert_eq!(p.args.last().map(String::as_str), Some("./ut-bin"));
     }
 
     #[test]

@@ -17,6 +17,11 @@ pub struct Config {
     /// Every seat and the server on the gaming VLAN, for the IP addresses
     /// screen. Ansible fills it from the private inventory.
     pub hosts: Vec<Host>,
+    /// Hold a logind idle lock (systemd-inhibit) while a game runs, so the
+    /// screen stays on and the idle reset waits even when the only input is
+    /// a gamepad, which never reaches the compositor. On for the seats; off
+    /// by default so tests need no login manager.
+    pub idle_inhibit: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -45,6 +50,7 @@ impl Default for Config {
             proton: None,
             voice: None,
             hosts: Vec::new(),
+            idle_inhibit: false,
         }
     }
 }
