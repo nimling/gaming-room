@@ -169,6 +169,7 @@ grep -qx 'User=gameserver' "$u" || die "preset does not run as gameserver"
 grep -qx 'ExecStart="/srv/games/ut2004/System/ucc-bin" "server" "DM-Rankin?game=XGame.xDeathMatch?mutator=XGame.MutInstaGib" "port=7800" "ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini" "userini=/var/lib/gameservers/ut2004-instagib/User.ini" "-nohomedir"' "$u" \
     || { grep ExecStart "$u"; die "preset command"; }
 grep -qx 'ReadWritePaths=/var/lib/gameservers/ut2004-instagib' "$u" || die "preset can write outside its folder"
+grep -qx 'SuccessExitStatus=42 SIGTERM' "$u" || die "a normal UT2004 stop (exit 42) would count as failed"
 grep -q '^\[Install\]' "$u" && die "on-demand preset starts at boot"
 [[ -e /etc/systemd/system/gs-ut2004-onslaught.service && ! -e /etc/systemd/system/gs-ut99-monsterhunt.service ]] || die "wrong set of preset services"
 ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini
