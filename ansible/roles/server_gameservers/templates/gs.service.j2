@@ -18,6 +18,9 @@ ExecStart={% for a in args %}"{{ a | replace('{home}', home) | replace('\\', '\\
 
 Restart=on-failure
 RestartSec=10
+# A clean stop: UT2004 exits with 42 after SIGTERM ("appRequestExit(0)"),
+# which systemd would otherwise mark as failed, and then restart.
+SuccessExitStatus=42 SIGTERM
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
