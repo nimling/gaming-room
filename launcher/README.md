@@ -60,7 +60,7 @@ A game must get the whole machine, so the launcher sleeps whenever it is not in 
 | `/etc/seat/tier` | `seat-tier` (Phase 1) | Settings per tier |
 | `/etc/seat/hardware.json` | `seat-tier` | Graphics card shown in the seat panel |
 | `/etc/seat/display` | Not yet; Phase 3 Ansible role | Screen size, for example `2560x1440@144`. Default 1920x1080 at 60 Hz |
-| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server`, `hosts` (name and address of every seat and the server, from the private inventory) |
+| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server`, `hosts` (name and address of every seat and the server, from the private inventory), `idle_inhibit` (hold a logind idle lock while a game runs, so gamepad-only play keeps the screen on) |
 | `~/.config/arcade/nickname` | The launcher | Wiped by the seat reset |
 | `~/.config/arcade/ptt` | The launcher | Push-to-talk key the player picked; none means side button or V. Wiped by the seat reset |
 

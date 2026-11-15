@@ -98,6 +98,7 @@ ok "launcher settings, autostart and no auto-suspend"
 step "Idle screens go dark and stay dark"
 pd=/home/.golden/player/.config/powerdevilrc
 grep -qx 'TurnOffDisplayWhenIdle=true' "$pd" || die "screen does not turn off when idle"
+grep -qx 'idle_inhibit: true' /etc/arcade/arcade.yaml || die "launcher does not keep the screen on during games"
 grep -qx 'TurnOffDisplayIdleTimeoutSec=300' "$pd" || die "screen does not turn off after 5 minutes"
 grep -qx 'DimDisplayIdleTimeoutSec=240' "$pd" || die "screen does not dim before it turns off"
 # seat-idle-action with a stub systemctl: an unused session is left alone,
