@@ -223,6 +223,12 @@ pub fn parse_presets(json: &str) -> Result<Vec<Preset>> {
 
 /// A plain HTTP/1.0 GET; enough for the control service on the LAN.
 pub fn http_get(url: &str, timeout: Duration) -> Result<String> {
+    http("GET", url, None, timeout)
+}
+
+/// One plain HTTP/1.0 request with an optional JSON body. Returns the body
+/// of a 200 answer; anything else is an error.
+pub fn http(method: &str, url: &str, json: Option<&str>, timeout: Duration) -> Result<String> {
     let rest = url
         .strip_prefix("http://")
         .with_context(|| format!("{url}: only http:// is supported"))?;
@@ -243,7 +249,15 @@ pub fn http_get(url: &str, timeout: Duration) -> Result<String> {
     s.set_write_timeout(Some(timeout))?;
     // One write: write! on an unbuffered stream sends each piece as its own
     // packet, and a server that reads once sees half a request.
-    let req = format!("GET /{path} HTTP/1.0\r\nHost: {authority}\r\nConnection: close\r\n\r\n");
+    let mut req =
+        format!("{method} /{path} HTTP/1.0\r\nHost: {authority}\r\nConnection: close\r\n");
+    match json {
+        Some(body) => req.push_str(&format!(
+            "Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        )),
+        None => req.push_str("\r\n"),
+    }
     s.write_all(req.as_bytes())?;
     let mut raw = Vec::new();
     s.take(1 << 20).read_to_end(&mut raw)?;
@@ -474,8 +488,12 @@ pub fn scan(config: &Config) -> BTreeMap<String, Vec<Game>> {
         let found = query_lan();
         (api.join().unwrap_or_default(), found)
     });
-    let own = own_peer(config).and_then(|p| crate::lan::own_address(&p));
-    merge(&list, &found, own, &config.hosts)
+    merge(&list, &found, own_ip(config), &config.hosts)
+}
+
+/// This seat's address on the gaming VLAN.
+pub fn own_ip(config: &Config) -> Option<IpAddr> {
+    own_peer(config).and_then(|p| crate::lan::own_address(&p))
 }
 
 /// A host on the gaming VLAN, to find this seat's own address by route.

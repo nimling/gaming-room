@@ -225,6 +225,82 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual((b["state"], b["players"]), ("stopped", None))
 
 
+def beat(**over):
+    body = {"seat": "seat-01", "nickname": "xXx_Gamer_xXx", "game": "ut2004", "mode": "join", "address": "192.0.2.10:7800"}
+    body.update(over)
+    return body
+
+
+class PresenceStore(unittest.TestCase):
+    def setUp(self):
+        self.now = 1000.0
+        self.p = api.Presence(clock=lambda: self.now, ttl=30, limit=3)
+
+    def test_heartbeat_is_listed_with_the_senders_ip(self):
+        code, people = self.p.report("192.0.2.21", beat())
+        self.assertEqual(code, 200)
+        self.assertEqual(people, [{
+            "ip": "192.0.2.21", "seat": "seat-01", "nickname": "xXx_Gamer_xXx",
+            "game": "ut2004", "mode": "join", "address": "192.0.2.10:7800", "seconds": 0,
+        }])
+
+    def test_seconds_count_while_the_game_stays_the_same(self):
+        self.p.report("192.0.2.21", beat())
+        self.now += 25
+        self.p.report("192.0.2.21", beat())
+        self.now += 20
+        self.assertEqual(self.p.list()[0]["seconds"], 45)
+        self.p.report("192.0.2.21", beat(game="quake3", mode="play", address=None))
+        self.assertEqual(self.p.list()[0]["seconds"], 0)
+
+    def test_entry_expires_without_heartbeat(self):
+        self.p.report("192.0.2.21", beat())
+        self.now += 30
+        self.assertEqual(len(self.p.list()), 1)
+        self.now += 1
+        self.assertEqual(self.p.list(), [])
+
+    def test_a_seat_only_replaces_its_own_entry(self):
+        self.p.report("192.0.2.21", beat())
+        self.p.report("192.0.2.22", beat(seat="seat-01", nickname="Kaptein"))
+        self.assertEqual([e["nickname"] for e in self.p.list()], ["Kaptein", "xXx_Gamer_xXx"])
+
+    def test_leave_removes_the_entry(self):
+        self.p.report("192.0.2.21", beat())
+        self.p.leave("192.0.2.21")
+        self.assertEqual(self.p.list(), [])
+
+    def test_in_the_launcher_has_no_game(self):
+        code, people = self.p.report("192.0.2.21", beat(game=None, mode="join", address="192.0.2.10:7800"))
+        self.assertEqual(code, 200)
+        self.assertEqual((people[0]["game"], people[0]["mode"], people[0]["address"]), (None, None, None))
+
+    def test_limit(self):
+        for i in range(3):
+            self.assertEqual(self.p.report(f"192.0.2.{i}", beat())[0], 200)
+        self.assertEqual(self.p.report("192.0.2.9", beat())[0], 429)
+        self.assertEqual(self.p.report("192.0.2.0", beat())[0], 200)  # known seats still beat
+        self.now += 31
+        self.assertEqual(self.p.report("192.0.2.9", beat())[0], 200)
+
+    def test_bad_heartbeats_are_refused(self):
+        for body in [
+            [],
+            beat(nickname="x"),
+            beat(nickname="has space"),
+            beat(nickname="x" * 17),
+            beat(seat=""),
+            beat(game="../x"),
+            beat(mode="spectate"),
+            beat(address="192.0.2.10"),
+            beat(address="192.0.2.10:99999"),
+            beat(address="a b:1"),
+            beat(mode="host", address="192.0.2.10:7800"),
+        ]:
+            self.assertEqual(self.p.report("192.0.2.21", body)[0], 400, body)
+        self.assertEqual(self.p.list(), [])
+
+
 class Http(unittest.TestCase):
     def setUp(self):
         self.m, self.fake = manager()
@@ -236,8 +312,9 @@ class Http(unittest.TestCase):
         self.httpd.shutdown()
         self.httpd.server_close()
 
-    def call(self, method, path):
-        req = urllib.request.Request(self.base + path, method=method)
+    def call(self, method, path, body=None):
+        data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode())
+        req = urllib.request.Request(self.base + path, data=data, method=method)
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 return r.status, json.loads(r.read())
@@ -254,6 +331,21 @@ class Http(unittest.TestCase):
         for path in ["/api/servers/nope/start", "/api/servers/..%2Fx/start", "/api/servers/a;reboot/start"]:
             self.assertEqual(self.call("POST", path)[0], 404, path)
         self.assertEqual([c for c in self.fake.calls if c[0] == "start"], [])
+
+    def test_presence_round_trip(self):
+        self.assertEqual(self.call("GET", "/api/presence"), (200, []))
+        code, people = self.call("POST", "/api/presence", beat())
+        self.assertEqual(code, 200)
+        self.assertEqual(people[0]["ip"], "127.0.0.1")
+        self.assertEqual(self.call("GET", "/api/presence")[1], people)
+        self.assertEqual(self.call("DELETE", "/api/presence")[0], 200)
+        self.assertEqual(self.call("GET", "/api/presence"), (200, []))
+
+    def test_presence_refuses_big_or_broken_bodies(self):
+        self.assertEqual(self.call("POST", "/api/presence", b"{" + b" " * 2000 + b"}")[0], 413)
+        self.assertEqual(self.call("POST", "/api/presence", b"not json")[0], 400)
+        self.assertEqual(self.call("POST", "/api/presence", beat(nickname="?"))[0], 400)
+        self.assertEqual(self.call("GET", "/api/presence"), (200, []))
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@
 use arcade_core::manifest::{self, Card, Manifest};
 use arcade_core::music::{self, Control, NowPlaying};
 use arcade_core::plan::{self, Mode, Plan, Request};
+use arcade_core::presence::{self, Beat, Person};
 use arcade_core::{browse, lan, nick, ptt, Config, Seat};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -23,7 +24,15 @@ struct Arcade {
     root: PathBuf,
     config: Config,
     games_dir: PathBuf,
-    game: Mutex<Option<(String, Child)>>,
+    game: Mutex<Option<Running>>,
+}
+
+/// The game this launcher started.
+struct Running {
+    id: String,
+    child: Child,
+    /// What this seat tells the People list while the game runs.
+    beat: Beat,
 }
 
 #[derive(Serialize)]
@@ -106,6 +115,23 @@ fn launch(
     let seat = Seat::detect(&app.root);
     let m = Manifest::load_id(&app.games_dir, &id).map_err(text)?;
     let nickname = nick::load(&seat.home).ok_or("Choose a nickname first")?;
+    let beat = Beat {
+        seat: seat.name.clone(),
+        nickname: nickname.clone(),
+        game: Some(id.clone()),
+        mode: Some(
+            match mode.as_str() {
+                "join" | "host" => mode.as_str(),
+                _ => "play",
+            }
+            .to_string(),
+        ),
+        // Only an ip:port can be joined from another seat.
+        address: server.clone().filter(|_| mode == "join").filter(|s| {
+            s.rsplit_once(':')
+                .is_some_and(|(_, p)| p.parse::<u16>().is_ok())
+        }),
+    };
     let mode = match mode.as_str() {
         "join" => Mode::Join(server.ok_or("No server to join")?),
         "host" => Mode::Host,
@@ -123,32 +149,64 @@ fn launch(
     .map_err(text)?;
     plan::apply(&p).map_err(text)?;
     let child = plan::spawn(&p).map_err(text)?;
-    *app.game.lock().unwrap_or_else(|e| e.into_inner()) = Some((id.clone(), child));
+    report(&app.config, beat.clone());
+    *app.game.lock().unwrap_or_else(|e| e.into_inner()) = Some(Running {
+        id: id.clone(),
+        child,
+        beat,
+    });
     watch_game(handle, id);
     Ok(p)
 }
 
+/// Sends a heartbeat to the People list off the calling thread.
+fn report(config: &Config, beat: Beat) {
+    if let Some(base) = config.gameservers.clone() {
+        thread::spawn(move || {
+            if let Err(e) = presence::report(&base, &beat) {
+                eprintln!("arcade: people list: {e:#}");
+            }
+        });
+    }
+}
+
+/// How often the game watcher reports while a game runs, in its 2 s ticks.
+const BEAT_TICKS: u32 = 5;
+
 /// Tells the screen when the game ends, as a `game-ended` event with its id.
 /// The screen then needs no timer of its own while the game runs: the
-/// webview stays asleep, and this thread costs one system call every 2 s.
+/// webview stays asleep, and this thread costs one system call every 2 s,
+/// plus one small heartbeat to the People list every 10 s.
 fn watch_game(handle: AppHandle, id: String) {
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(2));
-        let app = handle.state::<Arcade>();
-        let mut game = app.game.lock().unwrap_or_else(|e| e.into_inner());
-        match game.as_mut() {
-            Some((running, child)) if *running == id => {
-                if plan::alive(child) {
-                    continue;
+    thread::spawn(move || {
+        let mut tick = 0;
+        loop {
+            thread::sleep(Duration::from_secs(2));
+            tick += 1;
+            let app = handle.state::<Arcade>();
+            let mut game = app.game.lock().unwrap_or_else(|e| e.into_inner());
+            let beat = match game.as_mut() {
+                Some(r) if r.id == id => {
+                    if plan::alive(&mut r.child) {
+                        let beat = (tick % BEAT_TICKS == 0).then(|| r.beat.clone());
+                        drop(game);
+                        if let Some(b) = beat {
+                            report(&app.config, b);
+                        }
+                        continue;
+                    }
+                    game.take().map(|r| r.beat)
                 }
-                *game = None;
+                // Quit from the screen or replaced by another game: the screen knows.
+                _ => return,
+            };
+            drop(game);
+            if let Some(b) = beat {
+                report(&app.config, b.idle());
             }
-            // Quit from the screen or replaced by another game: the screen knows.
-            _ => return,
+            let _ = handle.emit("game-ended", &id);
+            return;
         }
-        drop(game);
-        let _ = handle.emit("game-ended", &id);
-        return;
     });
 }
 
@@ -172,38 +230,86 @@ fn stop_mumble() {
     }
 }
 
-fn stop_game(app: &Arcade) {
-    if let Some((_, mut child)) = app.game.lock().unwrap_or_else(|e| e.into_inner()).take() {
-        plan::stop(&mut child);
-    }
+/// Stops the running game; returns what it reported to the People list.
+fn stop_game(app: &Arcade) -> Option<Beat> {
+    let running = app.game.lock().unwrap_or_else(|e| e.into_inner()).take();
+    running.map(|mut r| {
+        plan::stop(&mut r.child);
+        r.beat
+    })
 }
 
 // Async: stopping a running game can take up to 3 s.
 #[tauri::command(async)]
 fn quit(app: State<'_, Arcade>) {
-    stop_game(&app);
+    if let Some(beat) = stop_game(&app) {
+        report(&app.config, beat.idle());
+    }
 }
 
 /// The id of the game that is still running, if any.
 #[tauri::command]
 fn running(app: State<'_, Arcade>) -> Option<String> {
     let mut game = app.game.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((id, child)) = game.as_mut() {
-        if plan::alive(child) {
-            return Some(id.clone());
+    if let Some(r) = game.as_mut() {
+        if plan::alive(&mut r.child) {
+            return Some(r.id.clone());
         }
     }
     *game = None;
     None
 }
 
-/// Games running on the LAN, per game id, for "On the LAN". The screen asks
-/// every few seconds while it is awake, so nothing polls while a game or
-/// another window has the screen.
+#[derive(Serialize)]
+struct Lan {
+    /// Games running on the LAN, per game id.
+    games: BTreeMap<String, Vec<browse::Game>>,
+    /// Everyone in a launcher on the gaming VLAN, with the server to join.
+    people: Vec<Person>,
+}
+
+/// What this seat reports now: the running game, or the player in the
+/// launcher. `None` before a nickname is chosen.
+fn current_beat(app: &Arcade) -> Option<Beat> {
+    let game = app.game.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(r) = game.as_ref() {
+        return Some(r.beat.clone());
+    }
+    drop(game);
+    let seat = Seat::detect(&app.root);
+    let nickname = nick::load(&seat.home)?;
+    Some(Beat {
+        seat: seat.name,
+        nickname,
+        game: None,
+        mode: None,
+        address: None,
+    })
+}
+
+/// "On the LAN" and the People list. The screen asks every few seconds
+/// while it is awake, so nothing polls while a game or another window has
+/// the screen; the same request is this seat's heartbeat.
 // Async: one scan listens for half a second.
 #[tauri::command(async)]
-fn lan_games(app: State<'_, Arcade>) -> BTreeMap<String, Vec<browse::Game>> {
-    browse::scan(&app.config)
+fn lan_games(app: State<'_, Arcade>) -> Lan {
+    let config = &app.config;
+    let beat = current_beat(&app);
+    let (games, entries) = thread::scope(|s| {
+        let people = s.spawn(|| {
+            let base = config.gameservers.as_deref()?;
+            let list = match &beat {
+                Some(b) => presence::report(base, b),
+                None => presence::list(base),
+            };
+            list.map_err(|e| eprintln!("arcade: people list: {e:#}"))
+                .ok()
+        });
+        let games = browse::scan(config);
+        (games, people.join().ok().flatten().unwrap_or_default())
+    });
+    let people = presence::resolve(&entries, &games, browse::own_ip(config));
+    Lan { games, people }
 }
 
 #[tauri::command]
@@ -228,6 +334,10 @@ fn music_control(action: String) -> Result<(), String> {
 #[tauri::command(async)]
 fn end_session(app: State<'_, Arcade>) -> Result<(), String> {
     stop_game(&app);
+    // Off the People list at once; the reset does not wait for it.
+    if let Some(base) = app.config.gameservers.clone() {
+        thread::spawn(move || presence::leave(&base));
+    }
     let status = Command::new("systemctl")
         .args(["start", "--no-block", "seat-reset.service"])
         .status()

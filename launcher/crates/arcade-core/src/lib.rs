@@ -10,6 +10,7 @@ pub mod manifest;
 pub mod music;
 pub mod nick;
 pub mod plan;
+pub mod presence;
 pub mod ptt;
 pub mod seat;
 

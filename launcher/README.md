@@ -30,6 +30,7 @@ arcade launch ut99 --screenshot-after 20      # test mode: screenshot, then clos
 arcade nick Kaptein                           # set the nickname
 arcade ips                                    # IP addresses of every seat and the server
 arcade lan                                    # games running on the LAN, as "On the LAN" shows them
+arcade people                                 # who is in a launcher and what they play, as People shows it
 arcade ptt KeyB                               # push to talk on B (quit Mumble first)
 arcade music next                             # Spotify: open, play-pause, next, previous; none shows the song
 arcade end-session                            # reset the seat
@@ -51,6 +52,15 @@ The "On the LAN" tab and each game's "On the LAN now" list show the games runnin
 - The LAN, the way each game's own browser does it, by broadcast: UT99 (beacon `REPORTQUERY` on UDP 8777-8786, then GameSpy `\status\`), UT2004 (server-info query on 7778 and 10777-10786), Quake 3 and Jedi Academy (`getstatus` on 27960-27963 and 29070-29073). This finds games hosted on seats and the always-on UT99 server.
 
 A server both sources know is listed once. This seat's own game is marked as hosting. One scan listens for half a second; it does not run while a game or another window is in front.
+
+## People
+
+The People button in the bottom bar opens "Who's playing": everyone in a launcher on the gaming VLAN, with their seat, game, server and for how long. Join puts this seat on the same server. Each game's "On the LAN now" list also shows who is on each server, and who else plays the game.
+
+- Every launcher reports to the control service (`POST <gameservers>/api/presence`): seat, nickname, game id, mode (play, host or join) and, for a join, the server address. The answer is the whole room.
+- While the launcher is in front, the report rides on the 5-second "On the LAN" refresh. While a game runs, the thread that watches the game reports every 10 seconds. When the game ends, it reports "in the launcher" at once. End session takes the seat off the list.
+- The service keeps the list in memory, files each entry under the seat's address and drops it 30 seconds after the last report.
+- Join is offered when the launcher started the game: a join (the server address is known) or a host (found in "On the LAN" by the seat's address). A game started from its own server browser shows as "in game", without Join.
 
 ## Staying light
 
