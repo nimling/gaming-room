@@ -222,6 +222,8 @@ button { font: inherit; color: inherit; }
 .srv-count { font: 600 13px/16px var(--font-text); font-variant-numeric: tabular-nums; color: var(--on-art-2); }
 .meter { height: 3px; border-radius: 2px; background: rgba(255,255,255,.14); margin-top: 8px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--art-accent); border-radius: inherit; transition: width var(--t-slow) var(--ease-in); }
+.srv-who { font-size: 12px; line-height: 16px; color: var(--art-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.side-also { margin: 0; color: var(--on-art-3); font-size: 12px; line-height: 16px; }
 .side-empty { margin: 0; color: var(--on-art-2); font-size: 13px; line-height: 20px; }
 .side-row { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding: 10px; border-radius: 6px; background: rgba(255,255,255,.06); }
 .side-row b { display: block; font-weight: 600; }
@@ -305,6 +307,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .person .avatar { transition: box-shadow var(--t-fast) var(--ease-in); }
 .person.talking .avatar { box-shadow: 0 0 0 2px var(--mica), 0 0 0 4px var(--good); }
 .person .you { margin-left: auto; color: var(--fg-3); font-size: 12px; }
+.flyout.wide { width: 400px; }
+.who { max-height: min(60vh, 520px); overflow-y: auto; }
+.who .person { padding: 8px 4px; border-bottom: 1px solid var(--stroke); }
+.who .person:last-child { border-bottom: 0; }
+.who-text { min-width: 0; flex: 1; }
+.who-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who-name small { color: var(--fg-3); font-weight: 400; font-size: 12px; }
+.who-meta { color: var(--fg-2); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who-empty { margin: 10px 0 0; color: var(--fg-3); font-size: 13px; line-height: 20px; }
 .stack { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .stack .btn { justify-content: flex-start; }
 .me-head { display: flex; gap: 12px; align-items: center; }
@@ -522,6 +533,9 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     <button class="voice" data-fly="voice" aria-haspopup="dialog">
       <i class="dot"></i><span id="voice-text">Lobby · <b id="voice-n">7</b> people</span><span class="talker" id="talker"></span>
     </button>
+    <button class="voice" data-fly="who" aria-haspopup="dialog" title="Who's playing">
+      <span id="who-ico"></span><span id="who-text">People</span>
+    </button>
     <button class="voice" data-fly="music" aria-haspopup="dialog" title="Music">
       <span id="music-ico"></span><span class="music-text" id="music-text">Spotify</span>
     </button>
@@ -569,6 +583,12 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     <button class="btn" data-action="mute" id="fly-mute">Mute my mic</button>
   </div>
   <p class="fine" id="ptt-fine">Push to talk: hold the mouse side button or <kbd>V</kbd>. It works everywhere, also inside games.</p>
+</div>
+
+<div class="flyout up wide" id="fly-who" role="dialog" aria-label="Who's playing" data-modal="false" hidden>
+  <div class="fly-title">Who's playing</div>
+  <div class="fly-sub">Everyone in a launcher on the LAN. Join puts you on the same server.</div>
+  <div id="who-list"></div>
 </div>
 
 <div class="flyout up" id="fly-music" role="dialog" aria-label="Music" data-modal="false" hidden>
@@ -782,6 +802,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   let HOSTS = [{ name: 'gaming-server', address: '192.0.2.10', this_seat: false },
     ...Array.from({ length: 10 }, (_, i) => ({ name: `Seat ${String(i + 1).padStart(2, '0')}`, address: `192.0.2.${21 + i}`, this_seat: i === 3 }))];
   let PEOPLE = ['Kaptein', 'Lyn', 'Mora', 'Pixel', 'Ola', 'Tuva'];
+  /* Who's playing: everyone in a launcher on the LAN (the Rust core's presence::Person).
+     server is set when this seat can join them there. */
+  let WHO = [
+    { nickname: 'Kaptein', seat: 'Seat 02', game: 'ut99', mode: 'host', seconds: 760, server: { name: "Kaptein's DM", address: '192.0.2.22:7777' }, you: false },
+    { nickname: 'Lyn', seat: 'Seat 05', game: 'ut99', mode: 'join', seconds: 1860, server: { name: 'CTF night', address: '192.0.2.10:7777' }, you: false },
+    { nickname: 'Mora', seat: 'Seat 06', game: 'ra', mode: 'host', seconds: 240, server: { name: '2v2, no rush 10', address: '192.0.2.25:1234' }, you: false },
+    { nickname: 'Pixel', seat: 'Seat 08', game: 'ut99', mode: 'play', seconds: 420, server: null, you: false },
+    { nickname: 'Tuva', seat: 'Seat 09', game: null, mode: null, seconds: 30, server: null, you: false },
+  ];
   /* What Spotify plays: { status, title, artist }, or null when it is not open. */
   let MUSIC = null;
   const SAMPLE_SONGS = [['Kids', 'MGMT'], ['Midnight City', 'M83'], ['Sandstorm', 'Darude']];
@@ -974,6 +1003,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       </aside>`;
     } else {
       const list = servers(g.id), open = joinable(g.id), first = open[0];
+      const here = whoIn(g.id), on = s => here.filter(p => p.server && p.server.address === s.address).map(whoName);
+      const also = here.filter(p => !p.server || !list.some(s => s.address === p.server.address));
       main = `
         <div class="eyebrow"><span class="pill ${run ? 'run' : ''}">${run ? (state.running.mode === 'host' ? 'Running · hosting' : 'Running') : esc(g.runtime)}</span><span>${esc(g.engine)}</span></div>
         <h1 class="hero-title">${esc(g.name)}</h1>
@@ -995,11 +1026,13 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
           <li class="server ${s.mine ? 'mine' : ''}"><div style="min-width:0">
             <div class="srv-name">${esc(s.name)}</div>
             <div class="srv-meta">${[s.map, s.mine ? 'this seat' : s.ping == null ? s.host : `${s.ping} ms`].filter(Boolean).map(esc).join(' · ')}</div>
+            ${on(s).length ? `<div class="srv-who">${esc(on(s).join(', '))}</div>` : ''}
             <div class="meter"><i style="width:${s.max ? Math.min(100, Math.round(s.n / s.max * 100)) : 0}%"></i></div></div>
             <div class="srv-side"><span class="srv-count">${s.n}/${s.max || '?'}</span>
             ${s.mine ? '<span class="srv-meta">Hosting</span>' : `<button class="btn glass sm" data-join="${esc(s.address || s.name)}" ${full(s) || run ? 'disabled' : ''}>Join</button>`}</div>
           </li>`).join('')}</ul>`
-          : `<p class="side-empty">Nobody is playing this right now. Host a game and it shows up here on every seat.</p>`}
+          : also.length ? '' : `<p class="side-empty">Nobody is playing this right now. Host a game and it shows up here on every seat.</p>`}
+        ${also.length ? `<p class="side-also">Also in ${esc(g.name)}: ${also.map(p => `${esc(whoName(p))} (${esc(p.seat)})`).join(', ')}</p>` : ''}
       </aside>`;
     }
     box.innerHTML = `<div style="min-width:0">${main}</div>${side}`;
@@ -1019,6 +1052,55 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#people').innerHTML = all.map(p => `<li class="person ${p === state.talker ? 'talking' : ''}">${avatar(p)}<span>${esc(p)}</span>${p === state.nick ? `<span class="you">${state.muted ? 'You · muted' : 'You'}</span>` : ''}</li>`).join('');
     $('#talker').textContent = state.talker ? `· ${state.talker} is talking` : '';
   }
+  /* Who's playing */
+  const whoIn = id => WHO.filter(p => p.game === id);
+  const whoName = p => p.you ? `${p.nickname} (you)` : p.nickname;
+  const whoKey = p => `${p.seat}|${p.nickname}`;
+  function since(sec) {
+    const m = Math.floor((sec || 0) / 60);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+  }
+  /* The server to join this person on, or null: not joinable from the launcher,
+     already there, or the game is not on this seat. */
+  function whoJoin(p) {
+    const g = p.server && game(p.game);
+    if (!g || p.you || g.can_join === false) return null;
+    const r = state.running;
+    if (r && r.id === g.id && r.address === p.server.address) return null;
+    return { g, s: servers(g.id).find(x => x.address === p.server.address) || { host: p.seat, name: p.server.name, address: p.server.address, map: '', n: 0, max: 0 } };
+  }
+  function whoDoing(p) {
+    if (!p.game) return 'In the launcher';
+    const name = (game(p.game) || {}).name || p.game;
+    if (p.server) return `${name} · ${p.server.name}`;
+    return `${name} · ${p.mode === 'host' ? 'hosting' : 'in game'}`;
+  }
+  const whoOrder = p => (p.you ? 3 : !p.game ? 2 : p.server ? 0 : 1);
+  function renderWho() {
+    const n = WHO.length;
+    $('#who-ico').innerHTML = ico('people', 's16');
+    $('#who-text').innerHTML = n ? `People · <b>${n}</b>` : 'People';
+    if (!layers.includes($('#fly-who'))) return;
+    const a = document.activeElement, kept = a && a.dataset && a.dataset.who;
+    const list = WHO.slice().sort((x, y) => whoOrder(x) - whoOrder(y) || x.nickname.localeCompare(y.nickname));
+    $('#who-list').innerHTML = list.length ? `<ul class="people who">${list.map(p => {
+      const j = whoJoin(p);
+      return `<li class="person">${avatar(p.nickname)}<div class="who-text">
+        <div class="who-name">${esc(p.nickname)}${p.you ? ' <small>· you</small>' : ''}</div>
+        <div class="who-meta">${esc(whoDoing(p))}</div>
+        <div class="who-meta">${esc([p.seat, p.game ? since(p.seconds) : ''].filter(Boolean).join(' · '))}</div></div>
+        ${j ? `<button class="btn sm" data-who="${esc(whoKey(p))}">Join</button>` : ''}</li>`;
+    }).join('')}</ul>` : '<p class="who-empty">Nobody else is in a launcher right now.</p>';
+    if (kept) { const b = $(`#who-list [data-who="${CSS.escape(kept)}"]`); if (b) b.focus({ preventScroll: true }); }
+  }
+  function joinWho(key) {
+    const p = WHO.find(x => whoKey(x) === key), j = p && whoJoin(p);
+    if (!j) return;
+    closeFlyouts();
+    select(j.g.id, false);
+    launch(j.g, 'join', j.s);
+  }
+
   function renderMic(live) {
     const m = $('#mic');
     m.classList.toggle('muted', state.muted); m.classList.toggle('live', !!live && !state.muted);
@@ -1466,14 +1548,15 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     const cp = e.target.closest('[data-copy]'); if (cp) { copyHost(cp); return; }
     /* A click beside the details card closes it, but not the second click of a double-click. */
     if (e.target.id === 'details') { if (performance.now() - (e.target._openedAt || 0) > 400) closeLayer(e.target); return; }
-    const el = e.target.closest('[data-action],[data-fly],[data-join],[data-tier],[data-filter],.tile');
+    const el = e.target.closest('[data-action],[data-fly],[data-join],[data-who],[data-tier],[data-filter],.tile');
     if (!el) {
       if (!e.target.closest('.flyout')) closeFlyouts();
       return;
     }
     if (!el.closest('.flyout') && !el.dataset.fly) closeFlyouts();
     if (el.classList.contains('tile')) { select(el.dataset.id); el.focus({ preventScroll: true }); openDetails(el.dataset.id); return; }
-    if (el.dataset.fly) { toggleFly(el.dataset.fly, el); return; }
+    if (el.dataset.fly) { toggleFly(el.dataset.fly, el); if (el.dataset.fly === 'who') renderWho(); return; }
+    if (el.dataset.who) { joinWho(el.dataset.who); return; }
     if (el.dataset.filter) { setFilter(el.dataset.filter); return; }
     if (el.dataset.tier) { setTier(el.dataset.tier); return; }
     if (el.dataset.join !== undefined) { const g = game(state.sel); const s = servers(g.id).find(x => (x.address || x.name) === el.dataset.join); if (s) launch(g, 'join', s); return; }
@@ -1630,16 +1713,23 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     lanBusy = true;
     let next;
     try { next = await invoke('lan_games'); } catch (err) { next = null; } finally { lanBusy = false; }
-    if (!next || typeof next !== 'object') return;
+    if (!next || typeof next !== 'object' || !next.games) return;
+    const who = Array.isArray(next.people) ? next.people : [];
+    next = next.games;
     const r = state.running;
     if (r && r.mode === 'host' && !(next[r.id] || []).some(s => s.mine)) {
       const own = (LAN[r.id] || []).filter(s => s.mine);
       if (own.length) next[r.id] = [...(next[r.id] || []), ...own];
     }
     const shelfKey = l => GAMES.map(g => (l[g.id] || []).length).join();
-    const heroKey = l => JSON.stringify(l[state.sel] || []);
-    const shelfChanged = shelfKey(next) !== shelfKey(LAN), heroChanged = heroKey(next) !== heroKey(LAN);
-    LAN = next;
+    /* People change the hero only through who is on which server of this game. */
+    const heroKey = (l, w) => JSON.stringify([l[state.sel] || [], w.filter(p => p.game === state.sel).map(p => [p.nickname, p.seat, p.you, p.server && p.server.address])]);
+    /* Minutes, not seconds: the list is drawn again at most once a minute per person. */
+    const listKey = w => JSON.stringify(w.map(p => [whoKey(p), p.game, p.mode, p.server, p.you, Math.floor(p.seconds / 60)]));
+    const shelfChanged = shelfKey(next) !== shelfKey(LAN), heroChanged = heroKey(next, who) !== heroKey(LAN, WHO);
+    const whoChanged = listKey(who) !== listKey(WHO) || shelfChanged;
+    LAN = next; WHO = who;
+    if (whoChanged) renderWho();
     if (!shelfChanged && !heroChanged) return;
     const a = document.activeElement;
     const tile = a && a.closest && a.closest('#shelf .tile'), btn = a && a.closest && a.closest('#hero-content [data-action],#hero-content [data-join]');
@@ -1655,7 +1745,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 
   async function boot() {
     const b = await invoke('bootstrap');
-    GAMES = b.games; LAN = {}; PEOPLE = []; HOSTS = b.hosts || [];
+    GAMES = b.games; LAN = {}; PEOPLE = []; WHO = []; HOSTS = b.hosts || [];
     state.tier = b.tier; state.nick = b.nickname || ''; state.ptt = b.ptt || null;
     state.sel = GAMES.length ? GAMES[0].id : null;
     document.documentElement.classList.add('live');
@@ -1681,7 +1771,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     }
     makeNoise(); tick();
     $('#spec-reset').textContent = hhmm(state.lastReset);
-    renderTier(); renderMe(); renderMic(); renderMusic(); renderShelf(); renderHero(false);
+    renderTier(); renderMe(); renderMic(); renderMusic(); renderWho(); renderShelf(); renderHero(false);
     ro.observe($('#hero')); ro.observe($('#shelf'));
     updateAwake();
     if (!state.nick) openWelcome('first');

@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 use arcade_core::manifest::{self, Manifest, Tier};
 use arcade_core::music::{self, Control};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{browse, lan, nick, ptt, Config, Display, Seat};
+use arcade_core::{browse, lan, nick, presence, ptt, Config, Display, Seat};
 use clap::{Args, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -61,6 +61,12 @@ enum Cmd {
     },
     /// List the games running on the LAN, as the "On the LAN" tab shows them
     Lan {
+        #[arg(long)]
+        json: bool,
+    },
+    /// List the people in a launcher on the LAN and what they play, as the
+    /// People list shows them. Reads only: this seat does not report.
+    People {
         #[arg(long)]
         json: bool,
     },
@@ -215,6 +221,36 @@ fn run() -> Result<ExitCode> {
                 for e in list {
                     let me = if e.this_seat { "  (this seat)" } else { "" };
                     println!("{:<16} {}{me}", e.address, e.name);
+                }
+            }
+        }
+        Cmd::People { json } => {
+            let Some(base) = config.gameservers.as_deref() else {
+                bail!("no gameservers address in the seat settings");
+            };
+            let entries = presence::list(base)?;
+            let people =
+                presence::resolve(&entries, &browse::scan(&config), browse::own_ip(&config));
+            if json {
+                println!("{}", serde_json::to_string_pretty(&people)?);
+            } else if people.is_empty() {
+                println!("nobody is in a launcher");
+            } else {
+                for p in people {
+                    let doing = match (&p.game, &p.server) {
+                        (None, _) => "in the launcher".to_string(),
+                        (Some(g), Some(s)) => {
+                            format!("{g} on {} ({})  can join", s.name, s.address)
+                        }
+                        (Some(g), None) => format!("{g} ({})", p.mode.as_deref().unwrap_or("play")),
+                    };
+                    let me = if p.you { "  (this seat)" } else { "" };
+                    println!(
+                        "{:<16} {:<10} {:>4} min  {doing}{me}",
+                        p.nickname,
+                        p.seat,
+                        p.seconds / 60
+                    );
                 }
             }
         }

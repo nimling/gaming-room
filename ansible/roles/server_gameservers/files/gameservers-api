@@ -10,8 +10,14 @@ that stayed empty. Only the gaming VLAN can reach it (firewall).
   GET  /api/servers               presets with state, players and map
   POST /api/servers/<id>/start    start a preset
   POST /api/servers/<id>/stop     stop a preset
+  GET  /api/presence              who is at which seat and what they play
+  POST /api/presence              this seat's player and game (a heartbeat)
+  DELETE /api/presence            this seat's player left (End session)
 
 Nothing in a request is passed to a command: the id must match a preset.
+Presence lives in memory only. A seat's entry is filed under the address
+it came from, so a seat can only change its own entry, and it is dropped
+when no heartbeat came for PRESENCE_TTL seconds.
 """
 
 import json
@@ -254,10 +260,100 @@ class Manager:
         return stopped
 
 
+# --- Presence -------------------------------------------------------------------
+
+PRESENCE_TTL = 30  # seconds without a heartbeat before an entry is dropped
+PRESENCE_MAX = 32  # entries; the room has ten seats
+PRESENCE_BODY = 1024  # bytes
+NICK_RE = re.compile(r"^[A-Za-z0-9_-]{2,16}$")  # the launcher's nickname rule
+SEAT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,40}$")  # "Seat 04"
+ADDRESS_RE = re.compile(r"^[A-Za-z0-9.-]{1,64}:[0-9]{1,5}$")
+MODES = ("play", "host", "join")
+
+
+def check_presence(body):
+    """The fields of a heartbeat, cleaned, or a reason it is refused."""
+    if not isinstance(body, dict):
+        return None, "expected a JSON object"
+    seat, nick = body.get("seat"), body.get("nickname")
+    game, mode, address = body.get("game"), body.get("mode"), body.get("address")
+    if not isinstance(seat, str) or not SEAT_RE.match(seat):
+        return None, "bad seat"
+    if not isinstance(nick, str) or not NICK_RE.match(nick):
+        return None, "bad nickname"
+    if game is not None and (not isinstance(game, str) or not ID_RE.match(game)):
+        return None, "bad game"
+    if game is None:
+        mode = address = None
+    elif mode not in MODES:
+        return None, "bad mode"
+    if address is not None:
+        if not isinstance(address, str) or not ADDRESS_RE.match(address) or mode != "join":
+            return None, "bad address"
+        if not 0 < int(address.rsplit(":", 1)[1]) < 65536:
+            return None, "bad address"
+    return {"seat": seat, "nickname": nick, "game": game, "mode": mode, "address": address}, None
+
+
+class Presence:
+    """Who sits at which seat and what they play, filed by the seat's IP."""
+
+    def __init__(self, clock=time.monotonic, ttl=PRESENCE_TTL, limit=PRESENCE_MAX):
+        self.clock = clock
+        self.ttl = ttl
+        self.limit = limit
+        self.entries = {}  # ip -> {fields..., "since": t, "seen": t}
+        self.lock = threading.Lock()
+
+    def _prune(self, now):
+        for ip in [ip for ip, e in self.entries.items() if now - e["seen"] > self.ttl]:
+            del self.entries[ip]
+
+    def report(self, ip, body):
+        fields, error = check_presence(body)
+        if error:
+            return 400, {"ok": False, "error": error}
+        with self.lock:
+            now = self.clock()
+            self._prune(now)
+            old = self.entries.get(ip)
+            if old is None and len(self.entries) >= self.limit:
+                return 429, {"ok": False, "error": "too many seats"}
+            same = old is not None and all(
+                old[k] == fields[k] for k in ("nickname", "game", "mode", "address")
+            )
+            since = old["since"] if same else now
+            self.entries[ip] = {**fields, "since": since, "seen": now}
+        return 200, self.list()
+
+    def leave(self, ip):
+        with self.lock:
+            self.entries.pop(ip, None)
+        return 200, {"ok": True}
+
+    def list(self):
+        """Everyone with a recent heartbeat; `seconds` is how long they have
+        been doing what they do now, so seat clocks do not matter."""
+        with self.lock:
+            now = self.clock()
+            self._prune(now)
+            out = [
+                {
+                    "ip": ip,
+                    **{k: e[k] for k in ("seat", "nickname", "game", "mode", "address")},
+                    "seconds": int(now - e["since"]),
+                }
+                for ip, e in self.entries.items()
+            ]
+        return sorted(out, key=lambda e: (e["nickname"].lower(), e["ip"]))
+
+
 # --- HTTP ---------------------------------------------------------------------
 
 
-def make_handler(manager):
+def make_handler(manager, presence=None):
+    presence = presence or Presence()
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "gameservers"
 
@@ -272,9 +368,31 @@ def make_handler(manager):
         def do_GET(self):
             if self.path.rstrip("/") == "/api/servers":
                 return self._send(200, manager.list())
+            if self.path.rstrip("/") == "/api/presence":
+                return self._send(200, presence.list())
+            return self._send(404, {"ok": False, "error": "not found"})
+
+        def _presence_post(self):
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if not 0 < length <= PRESENCE_BODY:
+                return self._send(413 if length > PRESENCE_BODY else 400, {"ok": False, "error": "bad body"})
+            try:
+                body = json.loads(self.rfile.read(length))
+            except (ValueError, UnicodeDecodeError):
+                return self._send(400, {"ok": False, "error": "bad JSON"})
+            return self._send(*presence.report(self.client_address[0], body))
+
+        def do_DELETE(self):
+            if self.path.rstrip("/") == "/api/presence":
+                return self._send(*presence.leave(self.client_address[0]))
             return self._send(404, {"ok": False, "error": "not found"})
 
         def do_POST(self):
+            if self.path.rstrip("/") == "/api/presence":
+                return self._presence_post()
             m = re.fullmatch(r"/api/servers/([^/]+)/(start|stop)", self.path)
             if not m:
                 return self._send(404, {"ok": False, "error": "not found"})
@@ -283,6 +401,12 @@ def make_handler(manager):
                 return self._send(404, {"ok": False, "error": "no such server"})
             code, body = manager.start(pid) if verb == "start" else manager.stop(pid)
             return self._send(code, body)
+
+        def log_request(self, code="-", size="-"):
+            # Heartbeats come every few seconds from every seat: log only failures.
+            if self.path.rstrip("/") == "/api/presence" and str(code) == "200":
+                return
+            super().log_request(code, size)
 
         def log_message(self, fmt, *args):
             sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))

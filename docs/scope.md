@@ -106,6 +106,7 @@ A thin launcher of our own on top of proven runners: the launcher owns the exper
 - **Tuned:** settings rendered from templates at launch, using the seat's tier and display.
 - **Old low-resolution games:** inside `gamescope` with integer scaling.
 - **Windows-only titles:** `umu-run` with a pinned GE-Proton, prefix preinstalled in the golden home.
+- **People:** "Who's playing" lists everyone in a launcher on the LAN by nickname, with seat, game and server. Join puts you on the same server. Each launcher reports to the gaming server's control service; nothing is kept after 30 s without a report.
 - **Music:** the official Spotify app from Flathub, opened from the launcher. A mini player in the status bar shows the song and has play, pause, next and previous. People sign in with their own account; a shared Nimtech account is not allowed by Spotify's terms. Playing music inside the launcher window is not possible: Spotify needs Widevine DRM, and the window's WebKitGTK has none.
 
 ## Game catalogue
