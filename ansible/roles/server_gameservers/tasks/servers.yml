@@ -275,3 +275,14 @@
   loop_control:
     label: "{{ item.0.id }}: {{ item.1 }}"
   when: not server_in_container
+
+- name: Game servers | firewall for each preset, TCP
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ server_vlan_cidr }}"
+    port: "{{ item.1 }}"
+    proto: tcp
+  loop: "{{ gameservers_ready | subelements('firewall_tcp', skip_missing=true) }}"
+  loop_control:
+    label: "{{ item.0.id }}: {{ item.1 }}"
+  when: not server_in_container

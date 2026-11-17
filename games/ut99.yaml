@@ -27,7 +27,7 @@ ingame:
       Tabs at the top: InstaGib, Classic (DM, CTF, Domination, Assault) and
       Co-op (Monster Hunt). Pick a mode, then a map, then Vote.
   - title: Without the key
-    text: "Press ~ (console) and type: mutate votemenu"
+    text: "Open the console and type: mutate votemenu"
 path: /games/classic/ut99
 players: { min: 2, max: 16 }
 launch:

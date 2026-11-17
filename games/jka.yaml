@@ -11,11 +11,13 @@ group: classic
 runtime: native
 engine: OpenJK
 # Shown in the launcher's "Playing now" panel while the game runs.
-# To check on the canary: Shift+~ opens the console in OpenJK.
+# Seat-01: the key left of 1 opens the console (Norwegian layout).
 ingame:
   - title: Vote for a map
-    keys: ["Shift", "~"]
-    text: /callvote map mp/ffa3 (any map). Others vote with F1 or F2.
+    keys: ["|"]
+    text: >-
+      The key left of 1 opens the console. Type /callvote map mp/ffa3 (any
+      map). Others vote with F1 or F2.
   - title: Change the mode
     text: /callvote g_gametype 0 (FFA), 3 (duel), 6 (team FFA), 7 (siege), 8 (CTF).
 path: /games/classic/jka
