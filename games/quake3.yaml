@@ -2,7 +2,9 @@
 # The game data (baseq3/pak0.pk3) comes from a bought copy; the server adds
 # Quake3e and the free 1.32 point-release paks (docs/bought-games.md). Each
 # seat copies the finished folder read-only to /games/classic/quake3.
-# Every setting goes on the command line; the CD key is not needed on a LAN.
+# Every setting goes on the command line. The game's menu asks for a CD key
+# unless baseq3/q3key from the bought copy is in the share (no online check
+# on a LAN).
 # To check on the canary: no dialogs, the nickname, fullscreen.
 id: quake3
 name: Quake III Arena

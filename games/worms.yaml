@@ -4,6 +4,12 @@
 # The game writes teams and settings into its own folder, so game-view
 # starts it from a writable view in the player's home (reset at End
 # session).
+# Under Wine the game asks once whether to turn on Wine tweaks (Yes means a
+# small window); the launcher writes the answer No into the registry
+# (games/worms/options.reg.j2), and skips the intro. Known: every start
+# shows a warning that files in its folder are not writable. It is a false
+# alarm of W:A's own check under Wine (seen with a fully writable copy too);
+# OK goes on, and teams and settings do save.
 # LAN games: Network → LAN in the game (UDP broadcast on 17010-17012, open
 # on the gaming VLAN).
 # To check on the canary: first-start dialogs, fullscreen, a LAN game.
@@ -18,6 +24,9 @@ players: { min: 2, max: 6 }
 gamemode: false
 launch:
   command: ["game-view", "worms", "WA.exe"]
+config:
+  - template: worms/options.reg.j2
+    to: "~/.local/share/arcade/worms.reg"
 profiles:
   A: { resolution: native, fps_cap: refresh }
   B: { resolution: native, fps_cap: refresh }
