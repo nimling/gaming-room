@@ -1,0 +1,45 @@
+# The always-on Quake 3 server: free for all on The Longest Yard. Voting is
+# built into the game: "/callvote map q3dm6" or "/callvote g_gametype 4"
+# in the console; others press F1 (yes) or F2 (no).
+id: quake3-ffa
+name: Quake III Arena
+game: quake3
+needs: quake3/baseq3/pak0.pk3
+port: 27960
+always_on: true
+# getstatus on the game port.
+query: { type: quake3, port: 27960 }
+firewall_udp: ["27960"]
+# The engine finds the game data next to its program (the workdir).
+workdir: quake3
+command:
+  - ./quake3e.ded.x64
+  - +set
+  - dedicated
+  - "1"
+  - +set
+  - net_port
+  - "27960"
+  - +set
+  - fs_homepath
+  - "{home}"
+  - +set
+  - sv_hostname
+  - Nimtech Quake 3
+  - +set
+  - sv_maxclients
+  - "16"
+  - +set
+  - g_allowVote
+  - "1"
+  - +set
+  - g_gametype
+  - "0"
+  - +set
+  - fraglimit
+  - "30"
+  - +set
+  - timelimit
+  - "15"
+  - +map
+  - q3dm17

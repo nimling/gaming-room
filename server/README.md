@@ -13,7 +13,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e |
 | Wake-on-LAN | `server_wol` | — | Ready: `wake-seats`, `wake-seats seat-03` |
 | Firewall, Docker, sshd | `server_base` | 22 | Ready |
-| UT99 dedicated server | `server_gameshare` | 7777-7781 and 8777 UDP | Ready: InstaGib on DM-Deck16][, `ut99_server_enabled` in the private inventory |
+| Always-on game servers: UT99, UT2004, Quake 3, Jedi Academy | `server_gameservers` | 7777-7779 and 8777, 7800-7801, 27960, 29070 UDP | Ready: in-game voting for map and mode; see below |
 | OpenRA game server | — | 1234 TCP | Next |
 | LAN game list for the launcher | — | — | Later |
 | Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM), NIC on the host bridge `br0` |
@@ -36,14 +36,24 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 - **Seats must use the server as DNS.** Set it as the DNS server in the gaming VLAN's DHCP settings in UniFi.
 - Cache on `/srv/lancache/cache`, 1000 GB by default (`lancache_cache_size`).
 
-## On-demand game servers
+## Game servers
 
 - Off by default. Switch on with `gameservers_enabled: true` in `ansible/inventory.yml`.
+- **Always on, one per game**, so players can join at once. Each lets players vote in game for the next map and mode:
+
+  | Server | Port | Voting |
+  | --- | --- | --- |
+  | UT99 (`ut99-classic`) | 7777 | VoteSys: the menu opens at the end of each match; mid-match with F7 on the seats (`mutate votemenu`). Tabs InstaGib, Classic (DM, TDM, CTF, Domination, Assault) and Co-op (Monster Hunt). |
+  | UT2004 (`ut2004-instagib`) | 7800 | Built in: press X (`ShowVoteMenu`); it also opens at the end of each match. InstaGib DM and CTF, DM, TDM, CTF, Bombing Run, Double Domination, Onslaught. |
+  | Quake III Arena (`quake3-ffa`) | 27960 | Built in: `/callvote map q3dm6`, `/callvote g_gametype 4`; F1 yes, F2 no. |
+  | Jedi Academy (`jka-ffa`) | 29070 | Built in, the same as Quake 3. |
+
+- **On demand**: UT99 Monster Hunt and UT2004 Onslaught as their own servers.
 - One file per server type in [`presets/`](presets/README.md), for example UT2004 InstaGib with map voting. A preset shows up once its game is in `/srv/games`.
 - Each preset runs as its own service, `gs-<id>.service`, as the account `gameserver`, with its settings in `/var/lib/gameservers/<id>`. It reads the game from the share; it can only write its own settings folder.
 - The control service (`gameservers-api.service`, port 8790, gaming VLAN only) lists the presets with their players and map, and starts or stops them. A polkit rule lets its account start and stop `gs-*.service`, nothing else. The launcher will use it for a Servers view.
 - On-demand servers stop after 15 minutes without players (`gameservers_idle_minutes`); at most 4 run at once (`gameservers_max_running`). A server that does not answer the player query is never stopped for being empty.
-- The UT99 InstaGib server (`ut99-server.service`) stays always on, as before.
+- The old `ut99-server.service` is gone; `ut99-classic` replaced it on the same ports.
 
 ```bash
 curl http://<server>:8790/api/servers                              # list

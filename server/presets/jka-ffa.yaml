@@ -1,0 +1,45 @@
+# The always-on Jedi Academy server: free for all on mp/ffa3. Voting is
+# built into the game: "/callvote map mp/ffa5" or "/callvote g_gametype 8"
+# in the console (Shift+~); others press F1 (yes) or F2 (no).
+id: jka-ffa
+name: Jedi Academy
+game: jka
+needs: jka/base/assets0.pk3
+port: 29070
+always_on: true
+# getstatus on the game port, as Quake 3.
+query: { type: quake3, port: 29070 }
+firewall_udp: ["29070"]
+# The engine finds the game data next to its program (the workdir).
+workdir: jka
+command:
+  - ./openjkded.x86_64
+  - +set
+  - dedicated
+  - "1"
+  - +set
+  - net_port
+  - "29070"
+  - +set
+  - fs_homepath
+  - "{home}"
+  - +set
+  - sv_hostname
+  - Nimtech Jedi Academy
+  - +set
+  - sv_maxclients
+  - "16"
+  - +set
+  - g_allowVote
+  - "1"
+  - +set
+  - g_gametype
+  - "0"
+  - +set
+  - fraglimit
+  - "20"
+  - +set
+  - timelimit
+  - "15"
+  - +map
+  - mp/ffa3
