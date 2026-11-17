@@ -17,6 +17,17 @@ highlights:
   - Host an InstaGib match from the launcher
   - Drop in and out of a match any time
   - Up to 16 players
+# Shown in the launcher's "Playing now" panel while the game runs.
+ingame:
+  - title: Vote for the next map or mode
+    keys: ["F7"]
+    text: Opens the vote menu. It opens by itself at the end of each match.
+  - title: Pick a mode
+    text: >-
+      Tabs at the top: InstaGib, Classic (DM, CTF, Domination, Assault) and
+      Co-op (Monster Hunt). Pick a mode, then a map, then Vote.
+  - title: Without the key
+    text: "Press ~ (console) and type: mutate votemenu"
 path: /games/classic/ut99
 players: { min: 2, max: 16 }
 launch:
@@ -34,6 +45,10 @@ config:
     set:
       DefaultPlayer:
         Name: "{{ nickname }}"
+      # F7 opens VoteSys' vote menu on the server (the "Playing now" tip).
+      # F7 is free in UT99's default binds.
+      Engine.Input:
+        F7: "mutate votemenu"
   - ini: "~/.utpg/System/UnrealTournament.ini"
     set:
       # No first-start setup screen.

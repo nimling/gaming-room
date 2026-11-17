@@ -101,6 +101,21 @@ pub struct Manifest {
     /// A few short points for the game details view.
     #[serde(default)]
     pub highlights: Vec<String>,
+    /// Tips for the "Playing now" panel the launcher shows while the game
+    /// runs: how to vote for a map or mode, and so on.
+    #[serde(default)]
+    pub ingame: Vec<Tip>,
+}
+
+/// One tip for the "Playing now" panel.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tip {
+    pub title: String,
+    /// Keys to press together, shown as keycaps.
+    #[serde(default)]
+    pub keys: Vec<String>,
+    pub text: String,
 }
 
 /// Longest `why` text, in characters.
@@ -108,6 +123,10 @@ pub const WHY_MAX: usize = 400;
 /// Most highlights, and the longest one in characters.
 pub const HIGHLIGHTS_MAX: usize = 5;
 pub const HIGHLIGHT_MAX: usize = 80;
+/// Most in-game tips, and the longest title and text in characters.
+pub const TIPS_MAX: usize = 6;
+pub const TIP_TITLE_MAX: usize = 60;
+pub const TIP_TEXT_MAX: usize = 200;
 
 fn yes() -> bool {
     true
@@ -220,6 +239,8 @@ pub struct Card {
     /// Empty when the manifest has no `why`.
     pub why: String,
     pub highlights: Vec<String>,
+    /// Tips for the "Playing now" panel; empty when the manifest has none.
+    pub ingame: Vec<Tip>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -359,12 +380,17 @@ impl Manifest {
             installed: self.installed(),
             can_join: self.join.is_some(),
             can_host: self.host.is_some(),
-            why: self
-                .why
-                .as_deref()
-                .map(|w| w.split_whitespace().collect::<Vec<_>>().join(" "))
-                .unwrap_or_default(),
+            why: self.why.as_deref().map(one_line).unwrap_or_default(),
             highlights: self.highlights.iter().map(|h| h.trim().into()).collect(),
+            ingame: self
+                .ingame
+                .iter()
+                .map(|t| Tip {
+                    title: one_line(&t.title),
+                    keys: t.keys.iter().map(|k| k.trim().into()).collect(),
+                    text: one_line(&t.text),
+                })
+                .collect(),
         }
     }
 
@@ -447,6 +473,34 @@ impl Manifest {
                 ));
             }
         }
+        if self.ingame.len() > TIPS_MAX {
+            out.push(format!(
+                "ingame has {} tips; keep it to {TIPS_MAX}",
+                self.ingame.len()
+            ));
+        }
+        for (i, t) in self.ingame.iter().enumerate() {
+            let at = format!("ingame tip {}", i + 1);
+            let title = t.title.trim().chars().count();
+            let text = t.text.trim().chars().count();
+            if title == 0 {
+                out.push(format!("{at}: title is empty"));
+            } else if title > TIP_TITLE_MAX {
+                out.push(format!(
+                    "{at}: title has {title} characters; keep it to {TIP_TITLE_MAX}"
+                ));
+            }
+            if text == 0 {
+                out.push(format!("{at}: text is empty"));
+            } else if text > TIP_TEXT_MAX {
+                out.push(format!(
+                    "{at}: text has {text} characters; keep it to {TIP_TEXT_MAX}"
+                ));
+            }
+            if t.keys.iter().any(|k| k.trim().is_empty()) {
+                out.push(format!("{at}: keys has an empty key"));
+            }
+        }
 
         let env = crate::plan::environment();
         let mut templates: Vec<(String, String)> = Vec::new();
@@ -492,6 +546,11 @@ impl Manifest {
         }
         out
     }
+}
+
+/// Text on one line, with runs of spaces and line breaks made one space.
+fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn on_path(program: &str) -> bool {
@@ -665,6 +724,63 @@ profiles:
         let p = m.problems(Path::new("games/ut99.yaml"), Path::new("games"));
         assert!(p.iter().any(|s| s.contains("keep it to 400")), "{p:?}");
         assert!(p.iter().any(|s| s.contains("keep it to 5")), "{p:?}");
+    }
+
+    #[test]
+    fn ingame_tips_reach_the_card() {
+        let text = format!(
+            "{UT}ingame:\n  - title: Vote for the next map\n    keys: [\"F7\"]\n    text: >-\n      Opens the vote menu.\n      It also opens by itself.\n  - title: Change the game mode\n    text: Pick a tab, then a map.\n"
+        );
+        let m: Manifest = serde_yaml::from_str(&text).unwrap();
+        assert!(m
+            .problems(Path::new("games/ut99.yaml"), Path::new("games"))
+            .is_empty());
+        let c = m.card(Tier::B, &display());
+        assert_eq!(c.ingame.len(), 2);
+        assert_eq!(c.ingame[0].keys, ["F7"]);
+        assert_eq!(
+            c.ingame[0].text,
+            "Opens the vote menu. It also opens by itself."
+        );
+        assert!(c.ingame[1].keys.is_empty());
+        let plain: Manifest = serde_yaml::from_str(UT).unwrap();
+        assert!(plain.card(Tier::B, &display()).ingame.is_empty());
+    }
+
+    #[test]
+    fn ingame_tips_are_checked() {
+        let text = format!("{UT}ingame:\n  - title: \" \"\n    keys: [\"\"]\n    text: \"\"\n");
+        let m: Manifest = serde_yaml::from_str(&text).unwrap();
+        let p = m.problems(Path::new("games/ut99.yaml"), Path::new("games"));
+        assert!(
+            p.iter().any(|s| s.contains("tip 1: title is empty")),
+            "{p:?}"
+        );
+        assert!(
+            p.iter().any(|s| s.contains("tip 1: text is empty")),
+            "{p:?}"
+        );
+        assert!(p.iter().any(|s| s.contains("empty key")), "{p:?}");
+
+        let mut m: Manifest = serde_yaml::from_str(UT).unwrap();
+        let tip = Tip {
+            title: "t".repeat(TIP_TITLE_MAX + 1),
+            keys: vec![],
+            text: "x".repeat(TIP_TEXT_MAX + 1),
+        };
+        m.ingame = vec![tip; TIPS_MAX + 1];
+        let p = m.problems(Path::new("games/ut99.yaml"), Path::new("games"));
+        assert!(p.iter().any(|s| s.contains("keep it to 60")), "{p:?}");
+        assert!(p.iter().any(|s| s.contains("keep it to 200")), "{p:?}");
+        assert!(p.iter().any(|s| s.contains("keep it to 6")), "{p:?}");
+    }
+
+    #[test]
+    fn ingame_tips_refuse_unknown_keys() {
+        let text = format!("{UT}ingame:\n  - title: Vote\n    txt: Press F7.\n");
+        assert!(serde_yaml::from_str::<Manifest>(&text).is_err());
+        let text = format!("{UT}ingame:\n  - title: Vote\n    text: Press F7.\n    key: F7\n");
+        assert!(serde_yaml::from_str::<Manifest>(&text).is_err());
     }
 
     #[test]

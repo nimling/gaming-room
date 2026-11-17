@@ -9,6 +9,15 @@ subtitle: Onslaught, Assault, Bombing Run, CTF, Deathmatch
 group: classic
 runtime: native
 engine: OldUnreal 3374
+# Shown in the launcher's "Playing now" panel while the game runs.
+ingame:
+  - title: Vote for the next map or mode
+    keys: ["X"]
+    text: >-
+      Opens the vote menu: pick a game type, then a map. It also opens by
+      itself at the end of a match.
+  - title: Without the key
+    text: "Press ~ (console) and type: ShowVoteMenu"
 path: /games/classic/ut2004
 players: { min: 2, max: 32 }
 launch:
