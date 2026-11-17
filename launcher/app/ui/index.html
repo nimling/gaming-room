@@ -409,6 +409,20 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 .timer { font: 600 28px/36px var(--font-display); font-variant-numeric: tabular-nums; color: var(--on-art); }
 .running-line { margin: 22px 0 0; font: 400 18px/24px var(--font-text); color: var(--on-art-2); }
 .running .fine { color: var(--on-art-3); }
+/* Playing now: the running game's tips, beside the launch text. No buttons in it, so focus stays on the actions. */
+.launch { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.playing { position: relative; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; margin: clamp(8px, 4vw, 56px); }
+.playing-name { margin: 0; font: 600 20px/28px var(--font-display); color: var(--on-art); }
+.tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tip { padding: 10px; border-radius: 6px; background: rgba(255,255,255,.06); }
+.tip-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.tip-head b { font-weight: 600; }
+.tip p { margin: 4px 0 0; font-size: 13px; line-height: 18px; color: var(--on-art-2); }
+.tip-keys, .playing-back { display: inline-flex; align-items: center; gap: 4px; color: var(--on-art-3); font-size: 12px; }
+.playing kbd { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.24); color: var(--on-art); }
+.playing-server { margin: 0; font-size: 13px; line-height: 18px; color: var(--on-art-2); overflow-wrap: anywhere; }
+.playing-server b { color: var(--on-art); font-weight: 600; }
+.playing-back { margin: 0; font-size: 13px; color: var(--on-art-2); }
 
 .reset-card { width: min(460px, 100%); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .reset-card .ring circle { stroke: var(--accent); }
@@ -438,6 +452,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
 }
 @media (max-width: 760px) {
   .hero-content { grid-template-columns: minmax(0, 1fr); }
+  .launch { grid-template-columns: minmax(0, 1fr); align-content: end; overflow-y: auto; }
+  .playing { width: auto; max-height: none; overflow: visible; margin: 0 clamp(8px, 4vw, 56px) clamp(8px, 4vw, 56px); }
   .hero { min-height: 0; }
   .seat-label, .clock { display: none; }
 }
@@ -675,6 +691,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       <p class="fine">On a seat the game covers this screen. Press the Super key or the gamepad Guide button to come back.</p>
     </div>
   </div>
+  <aside class="side playing on-art" id="ln-help" aria-labelledby="ln-help-name" hidden></aside>
 </div>
 
 <!-- Reset -->
@@ -734,9 +751,18 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   let GAMES = [
     { id: 'ut99', name: 'Unreal Tournament', sub: 'Deathmatch, CTF, Assault, Domination', group: 'classic', runtime: 'Native', engine: 'OldUnreal 469e', players: '2–16', max: 16, start: 'native', file: 'User.ini', map: 'DM-Morpheus', art: { a: 252, b: 18, motif: 'rings' },
       why: 'The LAN party classic. Everyone knows it, a match starts in seconds, and InstaGib makes newcomers and veterans equal from the first frag.',
-      highlights: ['InstaGib: one shot, one frag', 'Drop in and out of a match any time', 'Runs smooth on every seat'] },
+      highlights: ['InstaGib: one shot, one frag', 'Drop in and out of a match any time', 'Runs smooth on every seat'],
+      ingame: [
+        { title: 'Vote for the next map or mode', keys: ['F7'], text: 'Opens the vote menu. It opens by itself at the end of each match.' },
+        { title: 'Pick a mode', keys: [], text: 'Tabs at the top: InstaGib, Classic (DM, CTF, Domination, Assault) and Co-op (Monster Hunt). Pick a mode, then a map, then Vote.' },
+        { title: 'Without the key', keys: [], text: 'Press ~ (console) and type: mutate votemenu' },
+      ] },
     { id: 'ut2004', name: 'Unreal Tournament 2004', sub: 'Onslaught, CTF, Deathmatch', group: 'classic', runtime: 'Proton', engine: 'GE-Proton, pinned', players: '2–32', max: 32, start: 'proton', file: 'UT2004.ini', map: 'ONS-Torlan', art: { a: 214, b: 186, motif: 'streaks' },
-      why: 'Onslaught puts the whole room on two teams with vehicles. Big, loud and easy to join halfway.', highlights: ['Vehicles and big team maps', 'Up to 32 players'] },
+      why: 'Onslaught puts the whole room on two teams with vehicles. Big, loud and easy to join halfway.', highlights: ['Vehicles and big team maps', 'Up to 32 players'],
+      ingame: [
+        { title: 'Vote for the next map or mode', keys: ['X'], text: 'Opens the vote menu: pick a game type, then a map. It also opens by itself at the end of a match.' },
+        { title: 'Without the key', keys: [], text: 'Press ~ (console) and type: ShowVoteMenu' },
+      ] },
     { id: 'cnc', name: 'Command & Conquer', sub: 'Tiberian Dawn, on the OpenRA engine', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 88, b: 48, motif: 'grid' },
       why: 'Slow-burning strategy for two teams. Good between shooter rounds.' },
     { id: 'ra', name: 'Red Alert', sub: 'Allies against Soviets, on OpenRA', group: 'classic', runtime: 'Native', engine: 'OpenRA', players: '1–8', max: 8, start: 'native', file: 'settings.yaml', map: 'Random map', art: { a: 352, b: 8, motif: 'hex' },
@@ -748,10 +774,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   ];
   let LAN = {
     ut99: [
-      { host: 'Kaptein', name: "Kaptein's DM", map: 'DM-Deck16][', n: 6, max: 16, ping: 1 },
-      { host: 'Lyn', name: 'CTF night', map: 'CTF-Face', n: 9, max: 12, ping: 2 },
+      { host: 'Kaptein', name: "Kaptein's DM", address: '192.0.2.22:7777', map: 'DM-Deck16][', n: 6, max: 16, ping: 1 },
+      { host: 'Lyn', name: 'CTF night', address: '192.0.2.10:7777', map: 'CTF-Face', n: 9, max: 12, ping: 2 },
     ],
-    ra: [{ host: 'Mora', name: '2v2, no rush 10', map: 'Random map', n: 3, max: 4, ping: 1 }],
+    ra: [{ host: 'Mora', name: '2v2, no rush 10', address: '192.0.2.25:1234', map: 'Random map', n: 3, max: 4, ping: 1 }],
   };
   let HOSTS = [{ name: 'gaming-server', address: '192.0.2.10', this_seat: false },
     ...Array.from({ length: 10 }, (_, i) => ({ name: `Seat ${String(i + 1).padStart(2, '0')}`, address: `192.0.2.${21 + i}`, this_seat: i === 3 }))];
@@ -1214,7 +1240,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       steps = buildSteps(g, mode, srv);
     }
     $('#ln-steps').innerHTML = steps.map(s => `<li class="step" data-s="pending"><span class="step-ico">${RING}${CHK}</span><span><b>${esc(s.t)}</b><small>${esc(s.d)}</small></span></li>`).join('');
-    $('#ln-running').hidden = true; $('#ln-timer').textContent = '0.0 s';
+    $('#ln-running').hidden = true; $('#ln-help').hidden = true; $('#ln-timer').textContent = '0.0 s';
     L.hidden = false; paintArt($('#ln-art'), g, { w: innerWidth, h: innerHeight });
     openLayer(L);
     const t0 = performance.now();
@@ -1228,7 +1254,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     }
     clearInterval(timerId);
     $('#ln-timer').textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s';
-    state.running = { id: g.id, mode, server: srv && srv.name };
+    state.running = { id: g.id, mode, server: srv && srv.name, address: (srv && srv.address) || null };
     if (mode === 'host') (LAN[g.id] = LAN[g.id] || []).push({ host: state.nick, name: `${state.nick}'s game`, map: g.map, n: 1, max: g.max, ping: 0, mine: true });
     if (mode === 'join' && srv) srv.n = Math.min(srv.max, srv.n + 1);
     renderShelf(); renderHero(false);
@@ -1250,7 +1276,35 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
       : r.mode === 'host' ? `${g.name} is running. You're hosting ${state.nick}'s game; the room can join now.`
       : `${g.name} is running. You're ${state.nick} in the menu.`;
     $('#ln-running').hidden = false;
+    renderPlaying(g);
     setTimeout(() => $('#ln-back').focus({ preventScroll: true }), 60);
+  }
+  /* Playing now: how to vote and other tips for the running game (the manifest's
+     ingame list), the server it joined, and the way back into the game. */
+  function renderPlaying(g) {
+    const r = state.running, P = $('#ln-help');
+    if (!r || !g) { P.hidden = true; return; }
+    const tips = Array.isArray(g.ingame) ? g.ingame.filter(t => t && t.title && t.text) : [];
+    const keys = k => (Array.isArray(k) ? k.filter(Boolean) : []).map(x => `<kbd>${esc(x)}</kbd>`).join('<span aria-hidden="true">+</span>');
+    const where = r.mode === 'join' && (r.address || r.server)
+      ? [r.server, r.address].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).map(esc).join(' · ')
+      : r.mode === 'host' ? 'Your own, hosted on this seat' : '';
+    P.innerHTML = `<div class="side-head"><span>Playing now</span></div>
+      <h3 class="playing-name" id="ln-help-name">${esc(g.name)}</h3>
+      ${tips.length ? `<ul class="tips">${tips.map(t => `<li class="tip"><div class="tip-head"><b>${esc(t.title)}</b>${keys(t.keys) ? `<span class="tip-keys">${keys(t.keys)}</span>` : ''}</div><p>${esc(t.text)}</p></li>`).join('')}</ul>` : ''}
+      ${where ? `<p class="playing-server">Server: <b>${where}</b></p>` : ''}
+      <p class="playing-back">Back to the game: <kbd>Alt</kbd><span aria-hidden="true">+</span><kbd>Tab</kbd></p>`;
+    P.hidden = false;
+  }
+  /* Coming back to the launcher while a game runs shows Playing now, unless a
+     dialog is open. Esc, B or Back to launcher closes it as before. */
+  function showPlaying() {
+    const r = state.running, g = r && game(r.id);
+    if (!g) return;
+    if (layers.includes($('#launch'))) { if (!$('#ln-running').hidden) renderPlaying(g); return; }
+    if (layers.some(l => l.dataset.modal === 'true')) return;
+    closeFlyouts();
+    showRunning(g);
   }
   function quit(silent) {
     if (!state.running) return;
@@ -1259,6 +1313,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     if (state.running.mode === 'host' && LAN[g.id]) { LAN[g.id] = LAN[g.id].filter(s => !s.mine); if (!LAN[g.id].length) delete LAN[g.id]; }
     if (state.running.mode === 'join' && state.running.server) { const s = (LAN[g.id] || []).find(x => x.name === state.running.server); if (s) s.n = Math.max(1, s.n - 1); }
     state.running = null;
+    $('#ln-help').hidden = true;
     if ($('#launch').classList.contains('open')) closeLayer($('#launch'));
     renderShelf(); renderHero(false); refreshDetails();
     if (!silent) toast(`${esc(g.name)} closed`);
@@ -1524,7 +1579,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     }
     loops.forEach(l => { l.fn(); l.id = setInterval(l.fn, l.ms); });
     startPads();
-    checkRunning();
+    checkRunning().then(() => { if (state.running) showPlaying(); });
   }
   addEventListener('focus', () => { focused = true; updateAwake(); });
   addEventListener('blur', () => { focused = false; updateAwake(); });

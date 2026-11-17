@@ -37,6 +37,22 @@ cargo run -q -p arcade-cli -- --games ../games plan ut99 --profile C --nick Test
 | `art` | | Placeholder art: `{ hue, glow, motif }`. Motifs: rings, grid, hex, contour, streaks, dots. |
 | `why` | | Why the game is good in a LAN room: 1 to 3 short sentences, at most 400 characters. Shown in the game details view. |
 | `highlights` | | Up to 5 short points for the details view, each at most 80 characters. |
+| `ingame` | | Up to 6 tips for the "Playing now" panel the launcher shows while the game runs, for example how to vote for a map. Each tip has `title` (at most 60 characters), `text` (at most 200) and optional `keys`, pressed together and shown as keycaps. See below. |
+
+## In-game tips
+
+When a player switches back to the launcher while a game runs, the launcher shows a "Playing now" panel with these tips.
+
+```yaml
+ingame:
+  - title: Vote for the next map or mode
+    keys: ["F7"]
+    text: Opens the vote menu. It opens by itself at the end of each match.
+  - title: Without the key
+    text: "Press ~ (console) and type: mutate votemenu"
+```
+
+Keep each tip to one or two short sentences. Quote a text that has `: ` in it.
 
 ## Templates
 
