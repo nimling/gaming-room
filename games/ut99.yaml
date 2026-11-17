@@ -46,9 +46,12 @@ config:
       DefaultPlayer:
         Name: "{{ nickname }}"
       # F7 opens VoteSys' vote menu on the server (the "Playing now" tip).
-      # F7 is free in UT99's default binds.
+      # F7 is free in UT99's default binds. VoteSys needs UT99's menu
+      # system, which a direct join from the launcher never starts, so F7
+      # starts it first: ShowObjectives creates it and shows nothing
+      # outside Assault (there it shows the objectives).
       Engine.Input:
-        F7: "mutate votemenu"
+        F7: "ShowObjectives | mutate votemenu"
   - ini: "~/.utpg/System/UnrealTournament.ini"
     set:
       # No first-start setup screen.
