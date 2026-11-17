@@ -41,6 +41,10 @@ config:
       # never shows a first-run screen.
       FirstRun:
         FirstRun: "3374"
+      # A hosted game shows under this name in the server browsers and the
+      # launcher's On the LAN list.
+      Engine.GameReplicationInfo:
+        ServerName: "{{ nickname }}'s game"
       SDLDrv.SDLClient:
         StartupFullscreen: "True"
         FullscreenViewportX: "{{ width }}"

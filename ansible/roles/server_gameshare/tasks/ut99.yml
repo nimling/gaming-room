@@ -159,6 +159,22 @@
   # In a dry run the settings file does not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+# Without it, the server shows as UT99's default "Another UT Server".
+- name: UT99 server | name it
+  community.general.ini_file:
+    path: "{{ ut99_server_home }}/.utpg/System/UnrealTournament.ini"
+    section: Engine.GameReplicationInfo
+    option: ServerName
+    value: "{{ ut99_server_name }}"
+    no_extra_spaces: true
+    owner: "{{ ut99_server_user }}"
+    group: "{{ ut99_server_user }}"
+    mode: "0644"
+  notify: Restart the UT99 server
+  when: ut99_server_enabled and not server_in_container
+  # In a dry run the settings file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
 - name: UT99 server | install the service
   ansible.builtin.template:
     src: ut99-server.service.j2
