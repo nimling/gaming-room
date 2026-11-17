@@ -21,7 +21,10 @@ highlights:
 ingame:
   - title: Vote for the next map or mode
     keys: ["F7"]
-    text: Opens the vote menu. It opens by itself at the end of each match.
+    text: >-
+      Opens the vote menu. The first time in a match, press it twice: the
+      first press loads the maps. It also opens by itself at the end of
+      each match.
   - title: Pick a mode
     text: >-
       Tabs at the top: InstaGib, Classic (DM, CTF, Domination, Assault) and
