@@ -54,6 +54,10 @@ config:
       # No first-start setup screen.
       FirstRun:
         FirstRun: "469"
+      # A hosted game shows under this name in the server browsers and the
+      # launcher's On the LAN list, instead of "Another UT Server".
+      Engine.GameReplicationInfo:
+        ServerName: "{{ nickname }}'s game"
       # Skip the intro flyby; start in the quiet menu map.
       URL:
         LocalMap: UT-Logo-Map.unr
