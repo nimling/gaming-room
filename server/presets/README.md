@@ -15,6 +15,7 @@ The server runs each preset as its own service (`gs-<id>.service`, account `game
 | `port` | yes | Game port. Pick one no other preset uses. |
 | `query` | yes | How the control service counts players: `{ type: ut99, port }` (GameSpy), `{ type: ut2004, port }` or `{ type: quake3, port }`. |
 | `firewall_udp` | yes | UDP ports or ranges to open to the gaming VLAN. |
+| `firewall_tcp` | | TCP ports or ranges to open to the gaming VLAN (for example VoteSys' data port). |
 | `workdir` | yes | Folder under `/srv/games` to start in. |
 | `command` | yes | Program and arguments. `{home}` is the preset's settings folder. |
 | `seed` | | Files copied once from `/srv/games` into the settings folder: `{ from, to }`. |

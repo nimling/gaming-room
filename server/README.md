@@ -13,7 +13,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e |
 | Wake-on-LAN | `server_wol` | — | Ready: `wake-seats`, `wake-seats seat-03` |
 | Firewall, Docker, sshd | `server_base` | 22 | Ready |
-| Always-on game servers: UT99, UT2004, Quake 3, Jedi Academy | `server_gameservers` | 7777-7779 and 8777, 7800-7801, 27960, 29070 UDP | Ready: in-game voting for map and mode; see below |
+| Always-on game servers: UT99, UT2004, Quake 3, Jedi Academy | `server_gameservers` | 7777-7779 and 8777, 7800-7801, 27960, 29070 UDP; 7787 TCP (UT99 vote menu) | Ready: in-game voting for map and mode; see below |
 | OpenRA game server | — | 1234 TCP | Next |
 | LAN game list for the launcher | — | — | Later |
 | Steam PC Café Server | — | UDP 27036, TCP 27037 | Only if Valve says go. Windows in `dockur/windows` (KVM), NIC on the host bridge `br0` |
@@ -44,7 +44,7 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
   | Server | Port | Voting |
   | --- | --- | --- |
   | UT99 (`ut99-classic`) | 7777 | VoteSys: the menu opens at the end of each match; mid-match with F7 on the seats (`mutate votemenu`). Tabs InstaGib, Classic (DM, TDM, CTF, Domination, Assault) and Co-op (Monster Hunt). |
-  | UT2004 (`ut2004-instagib`) | 7800 | Built in: press X (`ShowVoteMenu`); it also opens at the end of each match. InstaGib DM and CTF, DM, TDM, CTF, Bombing Run, Double Domination, Onslaught. |
+  | UT2004 (`ut2004-instagib`) | 7800 | Built in: press X, then Map Voting (`ShowVoteMenu`); it also opens at the end of each match. InstaGib DM and CTF, DM, TDM, CTF, Bombing Run, Double Domination, Onslaught. |
   | Quake III Arena (`quake3-ffa`) | 27960 | Built in: `/callvote map q3dm6`, `/callvote g_gametype 4`; F1 yes, F2 no. |
   | Jedi Academy (`jka-ffa`) | 29070 | Built in, the same as Quake 3. |
 

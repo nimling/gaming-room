@@ -15,10 +15,10 @@ engine: Quake3e
 # Shown in the launcher's "Playing now" panel while the game runs.
 ingame:
   - title: Vote for a map
-    keys: ["~"]
+    keys: ["|"]
     text: >-
-      Open the console and type /callvote map q3dm17 (any map name). Others
-      vote with F1 (yes) or F2 (no).
+      The key left of 1 opens the console. Type /callvote map q3dm17 (any
+      map name). Others vote with F1 (yes) or F2 (no).
   - title: Change the mode
     text: >-
       /callvote g_gametype 0 (free for all), 1 (duel), 3 (team DM), 4 (CTF).

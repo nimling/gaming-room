@@ -14,6 +14,8 @@ query: { type: ut99, port: 7778 }
 # Game and query ports, and 8777 for the LAN beacon the in-game browser
 # listens for.
 firewall_udp: ["7777:7779", "8777"]
+# VoteSys sends the vote menu's maps and presets over TCP.
+firewall_tcp: ["7787"]
 workdir: ut99/System64
 command:
   - ./ucc-bin
@@ -46,11 +48,13 @@ ini:
         # Back to InstaGib after 10 minutes without players.
         IdleTimeout: "600"
         bOpenVoteMenuAutomatically: "True"
-        MidGameVoteThreshold: "0.5"
         bEnableKickVoting: "False"
         bManageServerPackages: "True"
-        # Menu data over the game connection: no extra TCP port.
-        bEnableCustomDataTransport: "False"
+        # The vote menu's data comes over VoteSys' own TCP port. Its
+        # fallback through the game connection never finished on 469e
+        # ("Vote Menu data is still being transferred").
+        bEnableCustomDataTransport: "True"
+        DataPort: "7787"
   # One preset per mode. No map list: every map of the mode is on the ballot.
   - file: .utpg/System/VoteSysPresets.ini
     set:
