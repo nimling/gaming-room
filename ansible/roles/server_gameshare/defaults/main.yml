@@ -122,6 +122,13 @@ ut99_mods:
     file: MonsterHunt613.zip
     url: https://github.com/shrimpza/monsterhunt/releases/download/releases%2Fv613/MonsterHunt613.zip
     sha256: 5c23fa6ac2efc714784c8020c72d1acefb24027952835a7565d537c38fa86622
+  # VoteSys: in-game voting for map and game mode (server/presets/ut99-classic.yaml).
+  # AGPL-3.0, needs 469 on the server. Digest from GitHub's release listing:
+  #   gh api repos/Deaod/VoteSys/releases/tags/<tag> --jq '.assets[] | {name, digest}'
+  - name: votesys21
+    file: VoteSys_v21.zip
+    url: https://github.com/Deaod/VoteSys/releases/download/v21/VoteSys_v21.zip
+    sha256: c47e9e487a6ae3546768f21d4124d918d88a7db6b4fda84f71257e8d3f396c17
 
 # --- Unreal Tournament 2004 on OldUnreal 3374 --------------------------------
 # Free again: Epic approved OldUnreal's release; no CD key. The server builds
@@ -143,11 +150,3 @@ ut2004_patch_sha256: d79eb45fda3ace2b7a68e6a0b9730b7d6602004b111e0b16f3f7cc28f31
 ut2004_iso_url: https://files.oldunreal.net/UT2004.ISO
 ut2004_iso_fallback_url: https://files2.oldunreal.net/UT2004.ISO
 ut2004_iso_sha256: 43e9182ae20bcbc0f6f4588fee6c1b336c261f1465403118a1973b09b1a22541
-
-# Dedicated LAN server, from the same files. Off until switched on in the
-# private inventory. It answers LAN browser queries on the gaming VLAN only.
-ut99_server_enabled: false
-ut99_server_user: ut99server
-ut99_server_home: /var/lib/ut99-server
-ut99_server_port: 7777
-ut99_server_url: "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM"

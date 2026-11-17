@@ -1,9 +1,12 @@
-# UT2004 InstaGib deathmatch with in-game map voting.
+# The always-on UT2004 server. It starts as InstaGib deathmatch on
+# DM-Rankin; players vote on the next map and game type in game (X, or
+# "ShowVoteMenu" in the console; it also opens at the end of each match).
 id: ut2004-instagib
-name: UT2004 InstaGib
+name: UT2004
 game: ut2004
 needs: ut2004/System/ucc-bin
 port: 7800
+always_on: true
 # UT2004's own query protocol on the game port + 1.
 query: { type: ut2004, port: 7801 }
 # Game, query, GameSpy (+10) and the LAN beacon range.
@@ -29,12 +32,25 @@ ini:
         Port: "7800"
         QueryPort: "7801"
       Engine.GameReplicationInfo:
-        ServerName: Nimtech InstaGib
-      # Players vote for the next map in game (F5 / "mutate mapvote").
+        ServerName: Nimtech UT2004
+      # Players vote for the next map and game type in game.
       Engine.GameInfo:
         VotingHandlerType: xVoting.xVotingHandler
       xVoting.xVotingHandler:
         bMapVote: "True"
+        # A vote mid-match changes the map once half the players agree.
+        bMidGameVote: "True"
+        bKickVote: "False"
+        # One entry per game type on the ballot; maps are found by prefix.
+        GameConfig:
+          - '(GameClass="XGame.xDeathMatch",Prefix="DM",Acronym="IDM",GameName="InstaGib DeathMatch",Mutators="XGame.MutInstaGib",Options="")'
+          - '(GameClass="XGame.xCTFGame",Prefix="CTF",Acronym="ICTF",GameName="InstaGib CTF",Mutators="XGame.MutInstaGib",Options="")'
+          - '(GameClass="XGame.xDeathMatch",Prefix="DM",Acronym="DM",GameName="DeathMatch",Mutators="",Options="")'
+          - '(GameClass="XGame.xTeamGame",Prefix="DM",Acronym="TDM",GameName="Team DeathMatch",Mutators="",Options="")'
+          - '(GameClass="XGame.xCTFGame",Prefix="CTF",Acronym="CTF",GameName="Capture the Flag",Mutators="",Options="")'
+          - '(GameClass="XGame.xBombingRun",Prefix="BR",Acronym="BR",GameName="Bombing Run",Mutators="",Options="")'
+          - '(GameClass="XGame.xDoubleDom",Prefix="DOM",Acronym="DOM",GameName="Double Domination",Mutators="",Options="")'
+          - '(GameClass="Onslaught.ONSOnslaughtGame",Prefix="ONS",Acronym="ONS",GameName="Onslaught",Mutators="",Options="")'
       # No internet master server on the gaming VLAN.
       IpDrv.MasterServerUplink:
         DoUplink: "False"

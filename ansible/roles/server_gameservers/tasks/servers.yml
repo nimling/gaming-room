@@ -89,6 +89,29 @@
   # In a dry run of a fresh server the account does not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+# Settings files can sit in sub folders (UT99 keeps them in .utpg/System).
+- name: Game servers | create the sub folders of the settings files
+  ansible.builtin.file:
+    path: "{{ gameservers_state_root }}/{{ item }}"
+    state: directory
+    owner: "{{ gameservers_user }}"
+    group: "{{ gameservers_user }}"
+    mode: "0750"
+  loop: >-
+    {%- set out = [] -%}
+    {%- for p in gameservers_ready -%}
+    {%- for f in (p.seed | default([]) | map(attribute='to') | list) + (p.ini | default([]) | map(attribute='file') | list) -%}
+    {%- set d = f | dirname -%}
+    {%- if d -%}
+    {%- set parts = d.split('/') -%}
+    {%- for i in range(1, parts | length + 1) -%}
+    {%- set _ = out.append(p.id ~ '/' ~ parts[:i] | join('/')) -%}
+    {%- endfor -%}
+    {%- endif -%}
+    {%- endfor -%}{%- endfor -%}
+    {{- out | unique | sort -}}
+  ignore_errors: "{{ ansible_check_mode }}"
+
 # Once: after that, the server's own changes (bans, stats) stay.
 - name: Game servers | start each preset from the game's default settings
   ansible.builtin.copy:

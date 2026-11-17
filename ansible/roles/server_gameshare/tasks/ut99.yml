@@ -103,97 +103,22 @@
   changed_when: true
   # The build swaps the folder; the running server would keep the old,
   # deleted one and fail at the next map change.
-  notify: Restart the UT99 server
+  notify: Restart the UT99 game servers
   when: ut99_build and (ut99_built.content | default('') | b64decode | trim) != ut99_version_line
 
-# --- Dedicated LAN server ------------------------------------------------------
-# Runs from the share as its own account. Its settings and logs live in that
-# account's home (~/.utpg, passed with ini= and userini=), so the share stays
-# read-only for it.
-- name: UT99 server | create its account
-  ansible.builtin.user:
-    name: "{{ ut99_server_user }}"
-    system: true
-    home: "{{ ut99_server_home }}"
-    create_home: true
-    shell: /usr/sbin/nologin
-    password_lock: true
-  when: ut99_server_enabled
-
-- name: UT99 server | create its settings folder
-  ansible.builtin.file:
-    path: "{{ ut99_server_home }}/.utpg/System"
-    state: directory
-    owner: "{{ ut99_server_user }}"
-    group: "{{ ut99_server_user }}"
-    mode: "0755"
-  when: ut99_server_enabled
-  # In a dry run of a fresh server the account does not exist yet.
-  ignore_errors: "{{ ansible_check_mode }}"
-
-- name: UT99 server | start from the game's default settings
-  ansible.builtin.copy:
-    src: "{{ ut99_dir }}/System64/{{ item.src }}"
-    dest: "{{ ut99_server_home }}/.utpg/System/{{ item.dest }}"
-    remote_src: true
-    force: false
-    owner: "{{ ut99_server_user }}"
-    group: "{{ ut99_server_user }}"
-    mode: "0644"
-  loop:
-    - { src: Default.ini, dest: UnrealTournament.ini }
-    - { src: DefUser.ini, dest: User.ini }
-  when: ut99_server_enabled and not server_in_container
-  # In a dry run the game is not built yet.
-  ignore_errors: "{{ ansible_check_mode }}"
-
-# The VLAN has no internet master servers to report to; seats find the server
-# through the LAN beacon.
-- name: UT99 server | do not report to internet master servers
-  ansible.builtin.lineinfile:
-    path: "{{ ut99_server_home }}/.utpg/System/UnrealTournament.ini"
-    regexp: '^ServerActors=IpServer\.UdpServerUplink'
-    state: absent
-  notify: Restart the UT99 server
-  when: ut99_server_enabled and not server_in_container
-  # In a dry run the settings file does not exist yet.
-  ignore_errors: "{{ ansible_check_mode }}"
-
-- name: UT99 server | install the service
-  ansible.builtin.template:
-    src: ut99-server.service.j2
-    dest: /etc/systemd/system/ut99-server.service
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart the UT99 server
-  when: ut99_server_enabled
-
-- name: UT99 server | run it
-  ansible.builtin.systemd_service:
-    name: ut99-server.service
-    enabled: true
-    state: started
-    daemon_reload: true
-  when: ut99_server_enabled and not server_in_container
-  # In a dry run the unit file does not exist yet.
-  ignore_errors: "{{ ansible_check_mode }}"
-
-- name: UT99 server | stop it when switched off
+# --- The old dedicated server ---------------------------------------------------
+# The always-on UT99 server is now a game server preset (server/presets/
+# ut99-classic.yaml, roles/server_gameservers) on the same ports. Remove the
+# old service so the ports are free; its account and home stay.
+- name: UT99 server | stop the old service
   ansible.builtin.systemd_service:
     name: ut99-server.service
     enabled: false
     state: stopped
-  when: not ut99_server_enabled and not server_in_container
+  when: not server_in_container
   failed_when: false
 
-# Game port 7777, query 7778, and up to 7781 for a second instance; 8777 is
-# the LAN beacon the in-game server browser listens for.
-- name: UT99 server | firewall, from the gaming VLAN only
-  community.general.ufw:
-    rule: allow
-    from_ip: "{{ server_vlan_cidr }}"
-    port: "{{ item }}"
-    proto: udp
-  loop: ["{{ ut99_server_port }}:{{ ut99_server_port + 4 }}", "8777"]
-  when: ut99_server_enabled and not server_in_container
+- name: UT99 server | remove the old service
+  ansible.builtin.file:
+    path: /etc/systemd/system/ut99-server.service
+    state: absent

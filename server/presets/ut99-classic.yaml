@@ -1,0 +1,65 @@
+# The always-on UT99 server, with in-game voting for map and game mode
+# (VoteSys, built into the game folder by roles/server_gameshare). It starts
+# as InstaGib on DM-Deck16][; players vote on the next mode and map at the
+# end of each match, or mid-match (F7 on the seats, or "mutate votemenu").
+# Replaces the old ut99-server.service on the same ports.
+id: ut99-classic
+name: UT99
+game: ut99
+needs: ut99/System/VoteSys_v21.u
+port: 7777
+always_on: true
+# GameSpy query on the game port + 1.
+query: { type: ut99, port: 7778 }
+# Game and query ports, and 8777 for the LAN beacon the in-game browser
+# listens for.
+firewall_udp: ["7777:7779", "8777"]
+workdir: ut99/System64
+command:
+  - ./ucc-bin
+  - server
+  - "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=VoteSys_v21.MutVoteSys,Botpack.InstaGibDM"
+  - port=7777
+  - "ini={home}/.utpg/System/UnrealTournament.ini"
+  - "userini={home}/.utpg/System/User.ini"
+# UT99 469 keeps all its settings files, VoteSys' included, in ~/.utpg/System.
+seed:
+  - { from: ut99/System64/Default.ini, to: .utpg/System/UnrealTournament.ini }
+  - { from: ut99/System64/DefUser.ini, to: .utpg/System/User.ini }
+ini:
+  - file: .utpg/System/UnrealTournament.ini
+    set:
+      Engine.GameEngine:
+        # Clients load the vote menu when they join. VoteSys adds the
+        # packages of the voted mode itself (bManageServerPackages).
+        ServerPackages: [VoteSys_v21]
+      Engine.GameReplicationInfo:
+        ServerName: Nimtech UT99
+      # No internet master server on the gaming VLAN.
+      IpServer.UdpServerUplink:
+        DoUplink: "False"
+  - file: .utpg/System/VoteSys.ini
+    set:
+      ServerSettings:
+        DefaultPreset: InstaGib/DeathMatch
+        DefaultMap: DM-Deck16][
+        # Back to InstaGib after 10 minutes without players.
+        IdleTimeout: "600"
+        bOpenVoteMenuAutomatically: "True"
+        MidGameVoteThreshold: "0.5"
+        bEnableKickVoting: "False"
+        bManageServerPackages: "True"
+        # Menu data over the game connection: no extra TCP port.
+        bEnableCustomDataTransport: "False"
+  # One preset per mode. No map list: every map of the mode is on the ballot.
+  - file: .utpg/System/VoteSysPresets.ini
+    set:
+      VS_PresetConfig0: { PresetName: DeathMatch, Abbreviation: IDM, Category: InstaGib, SortPriority: "10", Game: Botpack.DeathMatchPlus, Mutators: Botpack.InstaGibDM }
+      VS_PresetConfig1: { PresetName: Team DeathMatch, Abbreviation: ITDM, Category: InstaGib, SortPriority: "20", Game: Botpack.TeamGamePlus, Mutators: Botpack.InstaGibDM }
+      VS_PresetConfig2: { PresetName: CTF, Abbreviation: ICTF, Category: InstaGib, SortPriority: "30", Game: Botpack.CTFGame, Mutators: Botpack.InstaGibDM }
+      VS_PresetConfig3: { PresetName: DeathMatch, Abbreviation: DM, Category: Classic, SortPriority: "40", Game: Botpack.DeathMatchPlus }
+      VS_PresetConfig4: { PresetName: Team DeathMatch, Abbreviation: TDM, Category: Classic, SortPriority: "50", Game: Botpack.TeamGamePlus }
+      VS_PresetConfig5: { PresetName: CTF, Abbreviation: CTF, Category: Classic, SortPriority: "60", Game: Botpack.CTFGame }
+      VS_PresetConfig6: { PresetName: Domination, Abbreviation: DOM, Category: Classic, SortPriority: "70", Game: Botpack.Domination }
+      VS_PresetConfig7: { PresetName: Assault, Abbreviation: AS, Category: Classic, SortPriority: "80", Game: Botpack.Assault }
+      VS_PresetConfig8: { PresetName: Monster Hunt, Abbreviation: MH, Category: Co-op, SortPriority: "90", Game: MonsterHunt.MonsterHunt }

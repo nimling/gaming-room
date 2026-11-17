@@ -46,7 +46,9 @@ if [[ -e "$work/Maps/DM-Cybrosis][.unr" && ! -e "$work/Maps/DOM-Cybrosis][.unr" 
 fi
 # Mods: the same files on the server and every seat, so online play matches.
 for mod in ${mods[@]+"${mods[@]}"}; do
-    unzip -q -o "$mod" -x 'Help/*' -d "$work"
+    # Not into the game: docs, and VoteSys' sample settings (the server
+    # writes its own; the samples name mods the room does not have).
+    unzip -q -o "$mod" -x 'Help/*' 'Docs/*' 'LICENSE' '*.md' 'System/VoteSys*.ini' -d "$work"
 done
 for f in System64/ut-bin System64/ucc-bin "Maps/DM-Deck16][.unr"; do
     [[ -e "$work/$f" ]] || { echo "ut99-build: $f missing after the build" >&2; exit 1; }

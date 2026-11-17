@@ -48,7 +48,6 @@ all:
           server_lan_ip: 192.0.2.10
           server_vlan_cidr: 192.0.2.0/24
           server_upstream_dns: 192.0.2.1
-          ut99_server_enabled: true
           gameservers_enabled: true
           pccafe_enabled: true
           pccafe_bridge_nic: eth0
@@ -136,15 +135,10 @@ ok "engine waits for the data, then is added; idempotent"
 step "Unreal Tournament"
 [[ -x /usr/local/sbin/ut99-build ]] || die "UT99 build script missing"
 [[ ! -e /srv/games/ut99 ]] || die "UT99 built in the container (downloads should be off)"
-id ut99server >/dev/null || die "no ut99server account"
-unit=/etc/systemd/system/ut99-server.service
-grep -q '^User=ut99server$' "$unit" || die "UT99 server does not run as ut99server"
-grep -qF 'ucc-bin server "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM" port=7777' "$unit" || die "UT99 server command"
-grep -q '^ReadWritePaths=/var/lib/ut99-server$' "$unit" || die "UT99 server can write outside its home"
-grep -qF 'ini=/var/lib/ut99-server/.utpg/System/UnrealTournament.ini userini=/var/lib/ut99-server/.utpg/System/User.ini' "$unit" || die "UT99 server settings not in its home"
+[[ ! -e /etc/systemd/system/ut99-server.service ]] || die "old UT99 server unit still installed (now a preset)"
 { command -v 7z || command -v 7zz; } >/dev/null || die "7zip missing"
 command -v bzip2 >/dev/null || die "bzip2 missing"
-ok "build script, tools and dedicated server unit"
+ok "build script and tools; old server unit gone"
 
 step "Unreal Tournament 2004"
 [[ -x /usr/local/sbin/ut2004-build ]] || die "UT2004 build script missing"
@@ -156,12 +150,24 @@ step "On-demand game servers"
 python3 -m unittest discover -s tests/gameservers >/tmp/gs-unit.log 2>&1 || { cat /tmp/gs-unit.log; die "control service unit tests"; }
 ok "control service unit tests"
 [[ ! -e /etc/systemd/system/gs-ut2004-instagib.service ]] || die "preset service installed without its game"
-grep -q '"presets": \[\]' /etc/gameservers/presets.json || die "presets listed without their game"
+# The Quake 3 stand-in from the engine step makes its preset ready; nothing else.
+grep -q '"id": "quake3-ffa"' /etc/gameservers/presets.json || die "Quake 3 preset not listed with its game present"
+grep -q '"id": "ut2004-instagib"' /etc/gameservers/presets.json && die "presets listed without their game"
+q=/etc/systemd/system/gs-quake3-ffa.service
+grep -qx 'ExecStart="/srv/games/quake3/quake3e.ded.x64" "+set" "dedicated" "1" "+set" "net_port" "27960" "+set" "fs_homepath" "/var/lib/gameservers/quake3-ffa" "+set" "sv_hostname" "Nimtech Quake 3" "+set" "sv_maxclients" "16" "+set" "g_allowVote" "1" "+set" "g_gametype" "0" "+set" "fraglimit" "30" "+set" "timelimit" "15" "+map" "q3dm17"' "$q" \
+    || { grep ExecStart "$q"; die "Quake 3 preset command"; }
+grep -q '^\[Install\]' "$q" || die "always-on Quake 3 preset does not start at boot"
 # A stand-in UT2004 makes its presets ready.
 install -d -o nimadmin /srv/games/ut2004/System
 install -m 755 -o nimadmin /dev/null /srv/games/ut2004/System/ucc-bin
 printf '[Engine.GameInfo]\nMaxPlayers=16\n[IpDrv.MasterServerUplink]\nDoUplink=True\n' >/srv/games/ut2004/System/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/games/ut2004/System/DefUser.ini
+# And a stand-in UT99 with VoteSys, for the always-on UT99 preset.
+install -d -o nimadmin /srv/games/ut99/System /srv/games/ut99/System64
+echo stand-in >/srv/games/ut99/System/VoteSys_v21.u
+install -m 755 -o nimadmin /dev/null /srv/games/ut99/System64/ucc-bin
+printf '[Engine.GameEngine]\nServerPackages=Botpack\n[IpServer.UdpServerUplink]\nDoUplink=True\n' >/srv/games/ut99/System64/Default.ini
+printf '[DefaultPlayer]\nName=Player\n' >/srv/games/ut99/System64/DefUser.ini
 # Same stand-in engine parts as above, so this run needs no third-party download.
 run -e @/tmp/engine-vars.yml >/tmp/gs.log 2>&1 || { grep -E "fatal|FAILED|msg" /tmp/gs.log | tail -n 20; die "run with UT2004 present failed"; }
 u=/etc/systemd/system/gs-ut2004-instagib.service
@@ -170,7 +176,8 @@ grep -qx 'ExecStart="/srv/games/ut2004/System/ucc-bin" "server" "DM-Rankin?game=
     || { grep ExecStart "$u"; die "preset command"; }
 grep -qx 'ReadWritePaths=/var/lib/gameservers/ut2004-instagib' "$u" || die "preset can write outside its folder"
 grep -qx 'SuccessExitStatus=42 SIGTERM' "$u" || die "a normal UT2004 stop (exit 42) would count as failed"
-grep -q '^\[Install\]' "$u" && die "on-demand preset starts at boot"
+grep -q '^\[Install\]' "$u" || die "always-on UT2004 preset does not start at boot"
+grep -q '^\[Install\]' /etc/systemd/system/gs-ut2004-onslaught.service && die "on-demand preset starts at boot"
 [[ -e /etc/systemd/system/gs-ut2004-onslaught.service && ! -e /etc/systemd/system/gs-ut99-monsterhunt.service ]] || die "wrong set of preset services"
 ini=/var/lib/gameservers/ut2004-instagib/UT2004.ini
 [[ $(stat -c %U "$ini") == gameserver ]] || die "preset settings not owned by gameserver"
@@ -179,12 +186,28 @@ grep -qx 'VotingHandlerType=xVoting.xVotingHandler' "$ini" || die "map voting no
 grep -qx 'DoUplink=False' "$ini" || die "internet uplink not off"
 grep -qx 'Port=7800' "$ini" || die "UT2004 preset still on the default game port (UT99 holds 7777)"
 grep -qx 'QueryPort=7801' "$ini" || die "UT2004 preset still on the default query port (UT99 holds 7778)"
+[[ $(grep -c '^GameConfig=(GameClass=' "$ini") == 8 ]] || die "UT2004 game type voting not set"
+grep -qx 'bMidGameVote=True' "$ini" || die "UT2004 mid-game voting not on"
+# UT99: settings in .utpg/System, folders owned by the game server account.
+v=/var/lib/gameservers/ut99-classic/.utpg/System
+[[ $(stat -c %U "$v") == gameserver && $(stat -c %U "$v/..") == gameserver ]] || die "UT99 settings folders not owned by gameserver"
+grep -qx 'ServerPackages=Botpack' "$v/UnrealTournament.ini" || die "the game's own ServerPackages were lost"
+grep -qx 'ServerPackages=VoteSys_v21' "$v/UnrealTournament.ini" || die "VoteSys not added to ServerPackages"
+grep -qx 'DoUplink=False' "$v/UnrealTournament.ini" || die "UT99 internet uplink not off"
+grep -qx 'DefaultPreset=InstaGib/DeathMatch' "$v/VoteSys.ini" || die "VoteSys default preset"
+grep -qx 'bEnableCustomDataTransport=False' "$v/VoteSys.ini" || die "VoteSys would need an extra TCP port"
+grep -qx 'Game=MonsterHunt.MonsterHunt' "$v/VoteSysPresets.ini" || die "VoteSys presets"
+[[ $(grep -c '^PresetName=' "$v/VoteSysPresets.ini") == 9 ]] || die "VoteSys preset count"
+grep -qF '"server" "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=VoteSys_v21.MutVoteSys,Botpack.InstaGibDM" "port=7777" "ini=/var/lib/gameservers/ut99-classic/.utpg/System/UnrealTournament.ini"' /etc/systemd/system/gs-ut99-classic.service || die "UT99 preset command"
 python3 - <<'PY' || die "preset list for the control service"
 import json
 c = json.load(open("/etc/gameservers/presets.json"))
 assert c["address"] == "192.0.2.10" and c["port"] == 8790, c
-assert [p["id"] for p in c["presets"]] == ["ut2004-instagib", "ut2004-onslaught"], c["presets"]
-assert c["presets"][0]["query"] == {"type": "ut2004", "port": 7801}, c["presets"][0]
+ids = [p["id"] for p in c["presets"]]
+assert ids == ["quake3-ffa", "ut2004-instagib", "ut2004-onslaught", "ut99-classic"], ids
+by = {p["id"]: p for p in c["presets"]}
+assert by["ut2004-instagib"]["query"] == {"type": "ut2004", "port": 7801}, by["ut2004-instagib"]
+assert by["ut2004-instagib"]["always_on"] and by["ut99-classic"]["always_on"] and not by["ut2004-onslaught"].get("always_on"), by
 PY
 grep -q 'subject.user == "gameserver-api"' /etc/polkit-1/rules.d/50-gameservers.rules || die "polkit rule"
 grep -q '/\^gs-\[a-z0-9-\]+\\.service\$/' /etc/polkit-1/rules.d/50-gameservers.rules || die "polkit rule not limited to gs-*.service"
