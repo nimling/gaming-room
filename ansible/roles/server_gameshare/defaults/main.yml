@@ -151,5 +151,3 @@ ut99_server_user: ut99server
 ut99_server_home: /var/lib/ut99-server
 ut99_server_port: 7777
 ut99_server_url: "DM-Deck16][?game=Botpack.DeathMatchPlus?mutator=Botpack.InstaGibDM"
-# The name in the in-game server browser and the launcher's On the LAN list.
-ut99_server_name: Nimtech InstaGib
