@@ -1,0 +1,16 @@
+// Managed by the Arcade launcher (games/serioussam.yaml). Written at every start.
+// Serious Sam runs this file as a script before it opens its window, then
+// writes all its settings back here when it closes. Only the video mode is
+// set here; everything else starts from the game's defaults.
+{%- if width * 9 == height * 16 %}{% set aspect = (16, 9) %}
+{%- elif width * 10 == height * 16 %}{% set aspect = (16, 10) %}
+{%- elif width * 3 == height * 4 %}{% set aspect = (4, 3) %}
+{%- elif width * 4 == height * 5 %}{% set aspect = (5, 4) %}
+{%- elif width * 9 == height * 21 or width * 9 > height * 20 %}{% set aspect = (21, 9) %}
+{%- else %}{% set aspect = (16, 9) %}{% endif %}
+persistent extern INDEX sam_bFullScreen=(INDEX)1;
+persistent extern INDEX sam_bBorderLess=(INDEX)0;
+persistent extern INDEX sam_iScreenSizeI=(INDEX){{ width }};
+persistent extern INDEX sam_iScreenSizeJ=(INDEX){{ height }};
+persistent extern INDEX sam_iAspectSizeI=(INDEX){{ aspect[0] }};
+persistent extern INDEX sam_iAspectSizeJ=(INDEX){{ aspect[1] }};

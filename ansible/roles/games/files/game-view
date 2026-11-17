@@ -11,6 +11,11 @@
 # path, work from the view. The home reset throws it all away. The same
 # steps as iw4x-seat, for any game.
 #
+# A Windows game's settings can live in the registry. If the launcher wrote
+# ~/.local/share/arcade/<name>.reg (a manifest's config), it goes into the
+# game's Wine prefix before the start, once per prefix and again when the
+# file changes.
+#
 #   game-view <name> <program> [game arguments]    program relative to the folder
 #   game-view <name> <program> --check
 set -euo pipefail
@@ -91,6 +96,20 @@ case ":${PRESSURE_VESSEL_FILESYSTEMS_RO:-}:" in
     *) export PRESSURE_VESSEL_FILESYSTEMS_RO=${PRESSURE_VESSEL_FILESYSTEMS_RO:+$PRESSURE_VESSEL_FILESYSTEMS_RO:}/games ;;
 esac
 mkdir -p "$WINEPREFIX"
+
+# Registry settings: imported from inside the view (Proton's container sees
+# the home, not every host path), then remembered in the prefix.
+reg=$data/$name.reg
+if [[ -f $reg ]] && ! cmp -s "$reg" "$WINEPREFIX/game-view.reg"; then
+    cp -- "$reg" "$dir/.game-view.reg"
+    echo "game-view: $(date -Is) $name: registry settings from $reg" >>"$log"
+    if umu-run regedit /S .game-view.reg >>"$log" 2>&1; then
+        cp -- "$reg" "$WINEPREFIX/game-view.reg"
+    else
+        echo "game-view: could not import $reg; starting without it" >>"$log"
+    fi
+    rm -f -- "$dir/.game-view.reg"
+fi
 
 echo "game-view: $(date -Is) $name with $PROTONPATH: $program $*" >>"$log"
 exec umu-run "./$program" "$@" >>"$log" 2>&1

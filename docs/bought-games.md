@@ -8,11 +8,11 @@ Steam (one seat) ──copy the data files──▶ server /srv/games/<name> ─
 
 | Game | Folder | Engine | Data files to copy |
 | --- | --- | --- | --- |
-| Quake III Arena | `quake3` | [Quake3e](https://github.com/ec-/Quake3e) | `baseq3/pak0.pk3` |
+| Quake III Arena | `quake3` | [Quake3e](https://github.com/ec-/Quake3e) | `baseq3/pak0.pk3` and `baseq3/q3key` |
 | Star Wars Jedi Knight: Jedi Academy | `jka` | [OpenJK](https://github.com/JACoders/OpenJK) | `GameData/base/assets0.pk3` to `assets3.pk3` → `base/` |
 | Serious Sam Classic: The Second Encounter (+ The First Encounter) | `serioussam` | [SeriousSamClassic](https://github.com/tx00100xt/SeriousSamClassic) 1.10.7 | TSE: all `*.gro` and `Help/` → `SamTSE/`; TFE: all `*.gro`, `Help/` and `Levels/` → `SamTFE/` |
 
-The server also downloads the free Quake 3 point release (`pak1.pk3` to `pak8.pk3`). Nothing from a CD key is needed for LAN play.
+The server also downloads the free Quake 3 point release (`pak1.pk3` to `pak8.pk3`). Copy the key file `baseq3/q3key` too: without it the game's menu stops at a CD key prompt. A LAN game does not check the key online. Steam copies may not have the file; then enter the key once on the canary seat and copy the `q3key` it writes from `~/.q3a/baseq3/`.
 
 ## Licences
 
@@ -25,7 +25,7 @@ Buy the game on Steam (GOG also works). Decide the licence model per game before
 
    ```bash
    # Quake III Arena
-   rsync -a orchestrator@<seat>:"/games/steam/steamapps/common/Quake 3 Arena/baseq3/pak0.pk3" /srv/games/quake3/baseq3/
+   rsync -a orchestrator@<seat>:"/games/steam/steamapps/common/Quake 3 Arena/baseq3/"{pak0.pk3,q3key} /srv/games/quake3/baseq3/
    # Jedi Academy
    rsync -a orchestrator@<seat>:"/games/steam/steamapps/common/Jedi Academy/GameData/base/assets[0-3].pk3" /srv/games/jka/base/
    # Serious Sam Classic: The Second Encounter (the First Encounter likewise into SamTFE/, plus Levels/)

@@ -2,9 +2,11 @@
 # the open-sourced Serious Engine (native). The game data comes from a
 # bought copy; the server adds the engine (docs/bought-games.md). Each seat
 # copies the folder read-only to /games/classic/serioussam.
-# The game keeps player profiles, saves and temp files next to its program,
-# so game-view starts it from a writable view in the player's home (reset
-# at End session).
+# The game keeps temp files next to its program, so game-view starts it from
+# a writable view in the player's home (reset at End session). Settings,
+# profiles and saves go to ~/.local/share/Serious-Engine/serioussamse/.
+# Without settings it opens a 1024x768 window; the launcher writes the
+# video mode (fullscreen at the tier's resolution) before every start.
 # LAN: Network → Join or Start a server in the game; co-op up to 16.
 # To check on the canary: first-start dialogs, player name, fullscreen,
 # a co-op LAN game.
@@ -18,6 +20,9 @@ path: /games/classic/serioussam/SamTSE
 players: { min: 1, max: 16 }
 launch:
   command: ["game-view", "serioussam", "SamTSE/Bin/SeriousSam"]
+config:
+  - template: serioussam/PersistentSymbols.ini.j2
+    to: "~/.local/share/Serious-Engine/serioussamse/Scripts/PersistentSymbols.ini"
 profiles:
   A: { resolution: native, fps_cap: refresh }
   B: { resolution: native, fps_cap: 144 }

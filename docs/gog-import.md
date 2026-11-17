@@ -24,7 +24,7 @@ Then copy only the data files. Find them by name; GOG's folder layout varies bet
 
 | Game | Find | Copy into |
 | --- | --- | --- |
-| Quake III Arena | the `baseq3/` folder with `pak0.pk3` | `/srv/games/quake3/baseq3/pak0.pk3` (Team Arena, if present: `missionpack/pak0.pk3` → `/srv/games/quake3/missionpack/`) |
+| Quake III Arena | the `baseq3/` folder with `pak0.pk3` | `pak0.pk3` and the key file `q3key` → `/srv/games/quake3/baseq3/` (without `q3key` the menu stops at a CD key prompt; Team Arena, if present: `missionpack/pak0.pk3` → `/srv/games/quake3/missionpack/`) |
 | Jedi Academy | the `base/` folder with `assets0.pk3` | `assets0.pk3` to `assets3.pk3` → `/srv/games/jka/base/` |
 | Worms Armageddon | the folder with `WA.exe` | the whole folder → `/srv/games/worms/` |
 | Serious Sam: The Second Encounter | the folder with `SE1_00.gro` | all `*.gro` and `Help/` → `/srv/games/serioussam/SamTSE/` |

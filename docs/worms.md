@@ -26,6 +26,11 @@ Decide the licence model before it goes to all seats: one copy per seat, or the 
 
 Seats copy the game at their next pull once `/srv/games/worms/WA.exe` exists. The launcher starts it with `game-view`, which builds a writable view of the read-only folder in the player's home, because the game saves teams and settings next to itself. End session throws that view away.
 
+## First start
+
+- The launcher writes `~/.local/share/arcade/worms.reg`, and `game-view` imports it into the game's Wine prefix before the start. It answers the game's "first time under Wine" question with No, so the game stays fullscreen, and skips the intro.
+- Known: every start shows a warning that files in the game's folder are not writable. It is a false alarm of the game's own check under Wine; it shows even with a fully writable copy. Click OK. Teams and settings do save.
+
 ## LAN play
 
 In the game: Network → LAN. Hosts announce themselves by UDP broadcast on ports 17010 to 17012; the seats' firewall allows the gaming VLAN.

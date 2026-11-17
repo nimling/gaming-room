@@ -145,6 +145,13 @@ view=$(sudo -u player env PATH="/tmp/bin:$PATH" PROTONPATH=GE-Proton HOME=/tmp/p
 [[ -f /tmp/pv/.local/share/arcade/worms-game/WA.exe && ! -L /tmp/pv/.local/share/arcade/worms-game/WA.exe ]] || die "game-view did not copy the program"
 [[ -L /tmp/pv/.local/share/arcade/worms-game/User/Teams/WG.WGT && -w /tmp/pv/.local/share/arcade/worms-game/User/Teams ]] || die "game-view view not linked or not writable"
 grep -q 'umu-run ./WA.exe' <<<"$view" || die "game-view did not start the Windows game with umu-run"
+# Registry settings from the launcher go into the prefix once, before the game.
+printf 'REGEDIT4\n' | sudo -u player tee /tmp/pv/.local/share/arcade/worms.reg >/dev/null
+view=$(sudo -u player env PATH="/tmp/bin:$PATH" PROTONPATH=GE-Proton HOME=/tmp/pv game-view worms WA.exe 2>&1; cat /tmp/pv/.local/share/arcade/worms.log)
+grep -q 'umu-run regedit /S .game-view.reg' <<<"$view" || die "game-view did not import the registry settings"
+[[ -f /tmp/pv/.local/share/arcade/prefixes/worms/game-view.reg && ! -e /tmp/pv/.local/share/arcade/worms-game/.game-view.reg ]] || die "game-view did not remember the import"
+sudo -u player env PATH="/tmp/bin:$PATH" PROTONPATH=GE-Proton HOME=/tmp/pv game-view worms WA.exe >/dev/null 2>&1
+[[ $(grep -c 'umu-run regedit' /tmp/pv/.local/share/arcade/worms.log) == 1 ]] || die "game-view imported the same registry settings twice"
 # A Linux game: the program deep in the folder is a real copy and runs directly.
 sudo -u player env HOME=/tmp/pv game-view serioussam SamTSE/Bin/SeriousSam +test 2>&1 || die "game-view could not start a Linux game"
 [[ -f /tmp/pv/.local/share/arcade/serioussam-game/SamTSE/Bin/SeriousSam && ! -L /tmp/pv/.local/share/arcade/serioussam-game/SamTSE/Bin/SeriousSam ]] || die "game-view linked the Linux program instead of copying it"
