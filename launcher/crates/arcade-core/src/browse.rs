@@ -241,10 +241,10 @@ pub fn http_get(url: &str, timeout: Duration) -> Result<String> {
         .with_context(|| format!("connecting to {authority}"))?;
     s.set_read_timeout(Some(timeout))?;
     s.set_write_timeout(Some(timeout))?;
-    write!(
-        s,
-        "GET /{path} HTTP/1.0\r\nHost: {authority}\r\nConnection: close\r\n\r\n"
-    )?;
+    // One write: write! on an unbuffered stream sends each piece as its own
+    // packet, and a server that reads once sees half a request.
+    let req = format!("GET /{path} HTTP/1.0\r\nHost: {authority}\r\nConnection: close\r\n\r\n");
+    s.write_all(req.as_bytes())?;
     let mut raw = Vec::new();
     s.take(1 << 20).read_to_end(&mut raw)?;
     let text = String::from_utf8_lossy(&raw);
@@ -779,9 +779,15 @@ mod tests {
         let addr = l.local_addr().unwrap();
         let t = std::thread::spawn(move || {
             let (mut s, _) = l.accept().unwrap();
-            let mut req = [0u8; 256];
-            let n = s.read(&mut req).unwrap();
-            assert!(req[..n].starts_with(b"GET /api/servers HTTP/1.0\r\n"));
+            // Read the whole request head, however the client split it.
+            let mut req = Vec::new();
+            let mut buf = [0u8; 256];
+            while !req.ends_with(b"\r\n\r\n") {
+                let n = s.read(&mut buf).unwrap();
+                assert!(n > 0, "client closed before the end of the request");
+                req.extend_from_slice(&buf[..n]);
+            }
+            assert!(req.starts_with(b"GET /api/servers HTTP/1.0\r\n"));
             s.write_all(b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n[]")
                 .unwrap();
         });
