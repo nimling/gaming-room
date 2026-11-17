@@ -27,6 +27,7 @@ arcade --games ../games plan ut99 --nick Tester --profile C --join 192.0.2.20:77
 arcade --games ../games plan openra-ra --nick Tester
 arcade --games ../games plan serioussam --nick Tester --json | grep -q "sam_iScreenSizeI=(INDEX)2560;"
 arcade ips
+arcade lan
 
 step "Build the app"
 cargo build --locked -p arcade-app

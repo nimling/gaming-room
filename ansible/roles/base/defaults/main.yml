@@ -165,6 +165,11 @@ arcade_voice_server: ""
 # Empty joins the root channel (named Lobby on our server).
 arcade_voice_channel: ""
 arcade_voice_port: 64738
+# The gaming server's control service for the on-demand game servers
+# (roles/server_gameservers, port 8790). The launcher's "On the LAN" lists
+# show its running servers. Empty leaves it out; the lists then show only
+# the games that answer LAN queries.
+arcade_gameservers_api: "{{ ('http://' ~ arcade_voice_server ~ ':8790') if arcade_voice_server else '' }}"
 # Seats and server shown on the launcher's IP addresses screen, as
 # [{name, address}]. A push run fills it from the inventory (each host's
 # seat_lan_address, else ansible_host); pull runs read it from local-vars.

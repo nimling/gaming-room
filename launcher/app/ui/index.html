@@ -763,7 +763,8 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
   const state = { nick: 'Nima', ptt: null, pttDraft: null, capturing: false, tier: 'B', filter: 'all', sel: 'ut99', running: null, muted: false, talker: null, lastReset: new Date(Date.now() - 47 * 60000) };
   const game = id => GAMES.find(g => g.id === id);
   const servers = id => (LAN[id] || []).slice().sort((a, b) => (b.mine ? -1 : 0) - (a.mine ? -1 : 0) || b.n - a.n);
-  const joinable = id => servers(id).filter(s => !s.mine && s.n < s.max);
+  const full = s => s.max > 0 && s.n >= s.max;
+  const joinable = id => servers(id).filter(s => !s.mine && !full(s));
   const tuned = g => g.tuned || (g.start === 'gamescope' ? '640×480, integer-scaled in gamescope' : TIERS[state.tier]);
   const hue = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
   const avatar = (name, cls = '') => `<span class="avatar ${cls}" style="--av:hsl(${hue(name)},42%,40%)">${esc((name || '?').slice(0, 1).toUpperCase())}</span>`;
@@ -967,10 +968,10 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
         ${list.length ? `<ul class="servers">${list.map(s => `
           <li class="server ${s.mine ? 'mine' : ''}"><div style="min-width:0">
             <div class="srv-name">${esc(s.name)}</div>
-            <div class="srv-meta">${esc(s.map)} · ${s.mine ? 'this seat' : `${s.ping} ms`}</div>
-            <div class="meter"><i style="width:${Math.round(s.n / s.max * 100)}%"></i></div></div>
-            <div class="srv-side"><span class="srv-count">${s.n}/${s.max}</span>
-            ${s.mine ? '<span class="srv-meta">Hosting</span>' : `<button class="btn glass sm" data-join="${esc(s.name)}" ${s.n >= s.max || run ? 'disabled' : ''}>Join</button>`}</div>
+            <div class="srv-meta">${[s.map, s.mine ? 'this seat' : s.ping == null ? s.host : `${s.ping} ms`].filter(Boolean).map(esc).join(' · ')}</div>
+            <div class="meter"><i style="width:${s.max ? Math.min(100, Math.round(s.n / s.max * 100)) : 0}%"></i></div></div>
+            <div class="srv-side"><span class="srv-count">${s.n}/${s.max || '?'}</span>
+            ${s.mine ? '<span class="srv-meta">Hosting</span>' : `<button class="btn glass sm" data-join="${esc(s.address || s.name)}" ${full(s) || run ? 'disabled' : ''}>Join</button>`}</div>
           </li>`).join('')}</ul>`
           : `<p class="side-empty">Nobody is playing this right now. Host a game and it shows up here on every seat.</p>`}
       </aside>`;
@@ -1420,7 +1421,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     if (el.dataset.fly) { toggleFly(el.dataset.fly, el); return; }
     if (el.dataset.filter) { setFilter(el.dataset.filter); return; }
     if (el.dataset.tier) { setTier(el.dataset.tier); return; }
-    if (el.dataset.join !== undefined) { const g = game(state.sel); const s = servers(g.id).find(x => x.name === el.dataset.join); if (s) launch(g, 'join', s); return; }
+    if (el.dataset.join !== undefined) { const g = game(state.sel); const s = servers(g.id).find(x => (x.address || x.name) === el.dataset.join); if (s) launch(g, 'join', s); return; }
     const g = game(state.sel);
     switch (el.dataset.action) {
       case 'play': launch(g, 'play'); break;
@@ -1563,6 +1564,40 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     } catch (err) { /* noise is decoration */ }
   }
 
+  /* On the LAN: the Rust core asks the gaming server and the LAN (about half a second)
+     and returns the running games per game id. It runs through every(), so it stops
+     while the launcher sleeps behind a game. The list replaces LAN, except that a game
+     this seat just started hosting stays until its server answers. Only what changed is
+     drawn again, and the focused tile or button keeps the focus. */
+  let lanBusy = false;
+  async function refreshLan() {
+    if (!LIVE || lanBusy) return;
+    lanBusy = true;
+    let next;
+    try { next = await invoke('lan_games'); } catch (err) { next = null; } finally { lanBusy = false; }
+    if (!next || typeof next !== 'object') return;
+    const r = state.running;
+    if (r && r.mode === 'host' && !(next[r.id] || []).some(s => s.mine)) {
+      const own = (LAN[r.id] || []).filter(s => s.mine);
+      if (own.length) next[r.id] = [...(next[r.id] || []), ...own];
+    }
+    const shelfKey = l => GAMES.map(g => (l[g.id] || []).length).join();
+    const heroKey = l => JSON.stringify(l[state.sel] || []);
+    const shelfChanged = shelfKey(next) !== shelfKey(LAN), heroChanged = heroKey(next) !== heroKey(LAN);
+    LAN = next;
+    if (!shelfChanged && !heroChanged) return;
+    const a = document.activeElement;
+    const tile = a && a.closest && a.closest('#shelf .tile'), btn = a && a.closest && a.closest('#hero-content [data-action],#hero-content [data-join]');
+    if (shelfChanged) renderShelf();
+    if (heroChanged) renderHero(false);
+    if (tile && !tile.isConnected) { const t = $(`#shelf .tile[data-id="${tile.dataset.id}"]`); if (t) t.focus({ preventScroll: true }); }
+    if (btn && !btn.isConnected) {
+      const sel = btn.dataset.action ? `[data-action="${btn.dataset.action}"]` : `[data-join="${CSS.escape(btn.dataset.join)}"]`;
+      const b = $(`#hero-content ${sel}`) || $(`#shelf .tile[data-id="${state.sel}"]`);
+      if (b) b.focus({ preventScroll: true });
+    }
+  }
+
   async function boot() {
     const b = await invoke('bootstrap');
     GAMES = b.games; LAN = {}; PEOPLE = []; HOSTS = b.hosts || [];
@@ -1574,6 +1609,7 @@ kbd { font: 600 11px/16px var(--font-text); min-width: 22px; height: 20px; paddi
     $('#wl-kicker').textContent = `${b.seat_name} · Nimtech Arcade`;
     $('#voice-text').textContent = b.voice != null ? `Voice · ${b.voice || 'Lobby'}` : 'Voice not set up';
     refreshMusic(); every(3000, refreshMusic);
+    refreshLan(); every(5000, refreshLan);
     const ev = window.__TAURI__.event;
     if (ev && ev.listen) ev.listen('game-ended', e => gameEnded(e.payload)).catch(() => {});
   }

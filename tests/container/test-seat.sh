@@ -88,6 +88,7 @@ grep -qx 'User=player' /etc/plasmalogin.conf || die "Plasma Login Manager auto-l
 grep -qx 'Relogin=false' /etc/plasmalogin.conf || die "Plasma Login Manager relogin"
 ok "Plasma Login Manager auto-login"
 grep -q 'server: "192.0.2.10"' /etc/arcade/arcade.yaml || die "launcher voice server: $(cat /etc/arcade/arcade.yaml)"
+grep -qx 'gameservers: "http://192.0.2.10:8790"' /etc/arcade/arcade.yaml || die "launcher game server list: $(cat /etc/arcade/arcade.yaml)"
 grep -qx '3440x1440@144' /etc/seat/display || die "seat display"
 grep -q 'arcade-app' /home/.golden/player/.config/autostart/arcade.desktop || die "launcher autostart"
 grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die "auto-suspend still on"
