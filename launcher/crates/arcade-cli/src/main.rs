@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 use arcade_core::manifest::{self, Manifest, Tier};
 use arcade_core::music::{self, Control};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{lan, nick, ptt, Config, Display, Seat};
+use arcade_core::{browse, lan, nick, ptt, Config, Display, Seat};
 use clap::{Args, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -56,6 +56,11 @@ enum Cmd {
     Nick { name: Option<String> },
     /// List the IP addresses of the seats and the server
     Ips {
+        #[arg(long)]
+        json: bool,
+    },
+    /// List the games running on the LAN, as the "On the LAN" tab shows them
+    Lan {
         #[arg(long)]
         json: bool,
     },
@@ -210,6 +215,27 @@ fn run() -> Result<ExitCode> {
                 for e in list {
                     let me = if e.this_seat { "  (this seat)" } else { "" };
                     println!("{:<16} {}{me}", e.address, e.name);
+                }
+            }
+        }
+        Cmd::Lan { json } => {
+            let games = browse::scan(&config);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&games)?);
+            } else if games.is_empty() {
+                println!("no games on the LAN");
+            } else {
+                for (id, list) in games {
+                    for g in list {
+                        let ping = g
+                            .ping_ms
+                            .map_or("server list".into(), |p| format!("{p} ms"));
+                        let me = if g.mine { "  (this seat)" } else { "" };
+                        println!(
+                            "{id:<8} {:<21} {:<24} {:<18} {}/{}  {ping}  {}{me}",
+                            g.address, g.name, g.map, g.players, g.max_players, g.host
+                        );
+                    }
                 }
             }
         }

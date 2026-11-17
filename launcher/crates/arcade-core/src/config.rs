@@ -17,6 +17,10 @@ pub struct Config {
     /// Every seat and the server on the gaming VLAN, for the IP addresses
     /// screen. Ansible fills it from the private inventory.
     pub hosts: Vec<Host>,
+    /// The gaming server's control service for the on-demand game servers,
+    /// for example `http://192.0.2.10:8790`. The "On the LAN" lists show its
+    /// running servers. Without it they show only LAN query answers.
+    pub gameservers: Option<String>,
     /// Hold a logind idle lock (systemd-inhibit) while a game runs, so the
     /// screen stays on and the idle reset waits even when the only input is
     /// a gamepad, which never reaches the compositor. On for the seats; off
@@ -50,6 +54,7 @@ impl Default for Config {
             proton: None,
             voice: None,
             hosts: Vec::new(),
+            gameservers: None,
             idle_inhibit: false,
         }
     }
@@ -88,6 +93,15 @@ mod tests {
         let c = Config::load(dir.path()).unwrap();
         assert!(c.voice.is_none());
         assert_eq!(c.games_dir, PathBuf::from("/usr/local/share/arcade/games"));
+    }
+
+    #[test]
+    fn gameservers_is_optional() {
+        let c: Config = serde_yaml::from_str("gameservers: http://192.0.2.10:8790").unwrap();
+        assert_eq!(c.gameservers.as_deref(), Some("http://192.0.2.10:8790"));
+        let none: Config = serde_yaml::from_str("idle_inhibit: true").unwrap();
+        assert!(none.gameservers.is_none());
+        assert!(serde_yaml::from_str::<Config>("gameserver: x").is_err());
     }
 
     #[test]

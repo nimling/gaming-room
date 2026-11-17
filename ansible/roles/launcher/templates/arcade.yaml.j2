@@ -10,6 +10,10 @@ voice:
   server: "{{ arcade_voice_server }}"
   channel: "{{ arcade_voice_channel }}"
 {% endif %}
+{% if arcade_gameservers_api %}
+# On-demand game servers, listed under "On the LAN".
+gameservers: {{ arcade_gameservers_api | to_json }}
+{% endif %}
 {% if arcade_hosts %}
 hosts:
 {% for h in arcade_hosts %}

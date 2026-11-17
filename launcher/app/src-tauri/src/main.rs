@@ -9,8 +9,9 @@
 use arcade_core::manifest::{self, Card, Manifest};
 use arcade_core::music::{self, Control, NowPlaying};
 use arcade_core::plan::{self, Mode, Plan, Request};
-use arcade_core::{lan, nick, ptt, Config, Seat};
+use arcade_core::{browse, lan, nick, ptt, Config, Seat};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -196,6 +197,15 @@ fn running(app: State<'_, Arcade>) -> Option<String> {
     None
 }
 
+/// Games running on the LAN, per game id, for "On the LAN". The screen asks
+/// every few seconds while it is awake, so nothing polls while a game or
+/// another window has the screen.
+// Async: one scan listens for half a second.
+#[tauri::command(async)]
+fn lan_games(app: State<'_, Arcade>) -> BTreeMap<String, Vec<browse::Game>> {
+    browse::scan(&app.config)
+}
+
 #[tauri::command]
 fn music_open() -> Result<(), String> {
     music::open().map_err(text)
@@ -251,6 +261,7 @@ fn main() {
             launch,
             quit,
             running,
+            lan_games,
             end_session,
             music_open,
             music_status,

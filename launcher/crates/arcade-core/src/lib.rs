@@ -2,6 +2,7 @@
 //! "play this game" into a launch plan: the settings files to write,
 //! the command to run and the steps the screen shows.
 
+pub mod browse;
 pub mod config;
 pub mod ini;
 pub mod lan;

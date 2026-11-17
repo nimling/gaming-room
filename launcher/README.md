@@ -29,6 +29,7 @@ arcade launch ut99 --join 192.0.2.20:7777     # start and join
 arcade launch ut99 --screenshot-after 20      # test mode: screenshot, then close
 arcade nick Kaptein                           # set the nickname
 arcade ips                                    # IP addresses of every seat and the server
+arcade lan                                    # games running on the LAN, as "On the LAN" shows them
 arcade ptt KeyB                               # push to talk on B (quit Mumble first)
 arcade music next                             # Spotify: open, play-pause, next, previous; none shows the song
 arcade end-session                            # reset the seat
@@ -41,6 +42,15 @@ The Music button opens Spotify: the official client from Flathub, installed by t
 ## Game details
 
 Clicking a game opens its details: what it is, why it is good in a LAN room (`why` and `highlights` in the manifest), how it runs on this seat, and Play, Host and Join. The Details button on the big banner opens the same view from the keyboard or a gamepad. Enter on a game still starts it at once.
+
+## On the LAN
+
+The "On the LAN" tab and each game's "On the LAN now" list show the games running on the gaming VLAN. Every 5 seconds, while the screen is awake, the core asks two sources at once:
+
+- The gaming server's control service (`gameservers` in `arcade.yaml`): its running on-demand servers.
+- The LAN, the way each game's own browser does it, by broadcast: UT99 (beacon `REPORTQUERY` on UDP 8777-8786, then GameSpy `\status\`), UT2004 (server-info query on 7778 and 10777-10786), Quake 3 and Jedi Academy (`getstatus` on 27960-27963 and 29070-29073). This finds games hosted on seats and the always-on UT99 server.
+
+A server both sources know is listed once. This seat's own game is marked as hosting. One scan listens for half a second; it does not run while a game or another window is in front.
 
 ## Staying light
 
@@ -60,7 +70,7 @@ A game must get the whole machine, so the launcher sleeps whenever it is not in 
 | `/etc/seat/tier` | `seat-tier` (Phase 1) | Settings per tier |
 | `/etc/seat/hardware.json` | `seat-tier` | Graphics card shown in the seat panel |
 | `/etc/seat/display` | Not yet; Phase 3 Ansible role | Screen size, for example `2560x1440@144`. Default 1920x1080 at 60 Hz |
-| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server`, `hosts` (name and address of every seat and the server, from the private inventory), `idle_inhibit` (hold a logind idle lock while a game runs, so gamepad-only play keeps the screen on) |
+| `/etc/arcade/arcade.yaml` | Phase 3 Ansible role | `games_dir`, pinned `proton` path, `voice.server`, `gameservers` (the gaming server's control service, `http://<server>:8790`, for the running game servers under On the LAN), `hosts` (name and address of every seat and the server, from the private inventory), `idle_inhibit` (hold a logind idle lock while a game runs, so gamepad-only play keeps the screen on) |
 | `~/.config/arcade/nickname` | The launcher | Wiped by the seat reset |
 | `~/.config/arcade/ptt` | The launcher | Push-to-talk key the player picked; none means side button or V. Wiped by the seat reset |
 
@@ -80,6 +90,6 @@ cd launcher && ARCADE_ROOT=tests/seat-root ARCADE_GAMES=../games ARCADE_WINDOWED
 ## Not done yet
 
 - Ansible role that installs the app, writes `/etc/arcade/arcade.yaml` and `/etc/seat/display`, and starts it at login.
-- LAN game list service on the server (the screen shows no LAN games until then).
+- LAN queries for the other games (OpenRA, Teeworlds, Xonotic and more); a Start button for stopped server presets.
 - Live voice status from Mumble (the screen starts Mumble and joins the channel).
 - Testing each manifest on the canary seat.
