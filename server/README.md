@@ -110,7 +110,7 @@ curl -X POST http://<server>:8790/api/servers/ut2004-instagib/stop  # stop
    ../tests/gates/server-services.sh <server-address>
    ```
 
-6. In UniFi, set the gaming VLAN's DHCP DNS server to the server's address.
+6. In UniFi, set the gaming VLAN's DHCP DNS server to the server's address. (untick Auto DNS Server; DNS Server 1 = the server; leave DNS Server 2 empty, or seats skip the cache at random). The server itself keeps the router as its DNS (`roles/server_pccafe`, netplan `use-dns: false`).
 7. At each seat, once: the bootstrap line in [`../bootstrap/seat.sh`](../bootstrap/seat.sh).
 
 ## Hardware minimum

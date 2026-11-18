@@ -278,6 +278,8 @@ if grep -qE '^ *parameters:' "$np"; then die "bridge parameters block netplan tr
 [[ $(stat -c '%a %U' "$np") == "600 root" ]] || die "bridge netplan file not root-only"
 grep -q 'interfaces: \[eth0\]' "$np" || die "NIC not in the bridge"
 grep -qE 'macaddress: "([0-9a-f]{2}:){5}[0-9a-f]{2}"' "$np" || die "bridge does not keep the NIC's MAC"
+grep -q 'use-dns: false' "$np" || die "server would use its own cache DNS from DHCP"
+grep -q 'addresses: \[192.0.2.1\]' "$np" || die "server does not keep the router as its DNS"
 grep -q 'ExecStart=-/usr/sbin/ip tuntap add dev tap-cafe mode tap user 0' "$tap" || die "tap unit"
 grep -q 'master br0 up' "$tap" || die "tap not on the bridge"
 ok "cafe VM compose file, bridge, tap, password and firewall script"
