@@ -8,6 +8,7 @@ import importlib.util
 import io
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -19,6 +20,7 @@ sc = importlib.util.module_from_spec(spec)
 loader.exec_module(sc)
 
 HAVE_RSYNC = shutil.which("rsync") is not None
+GNU_RSYNC = HAVE_RSYNC and "rsync  version 3" in subprocess.run(["rsync", "--version"], capture_output=True, text=True).stdout
 
 
 def acf(appid, buildid, state=4, installdir=None, name="Game", size=1000):
@@ -143,6 +145,22 @@ class ManifestTest(unittest.TestCase):
             f.write("steamwebhelper\n")
         self.assertTrue(sc.steam_running(proc))
         self.assertFalse(sc.steam_running(os.path.join(self.dir, "nope")))
+
+
+class RsyncErrorTest(unittest.TestCase):
+    def test_only_unreadable_files(self):
+        err = (
+            'rsync: [sender] send_files failed to open "/x/ServerBrowser.vdf": Permission denied (13)\n'
+            'rsync: [sender] opendir "/x/var" failed: Permission denied (13)\n'
+            "IO error encountered -- skipping file deletion\n"
+            "rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338)\n"
+        )
+        self.assertEqual(sc.unreadable_only(err), 2)
+
+    def test_other_errors_count(self):
+        err = 'rsync: [generator] failed to set permissions on "/d": Operation not permitted (1)\n'
+        self.assertIsNone(sc.unreadable_only(err))
+        self.assertIsNone(sc.unreadable_only(""))
 
 
 class DecisionTest(unittest.TestCase):
@@ -308,7 +326,7 @@ class FakeCollector(sc.Collector):
 
     def seat_rsync(self, seat, args, src, dst):
         rc, _, err = sc.run(["rsync"] + args + [os.path.join(self.roots[seat["name"]], src), dst])
-        return rc, sc.last_line(err)
+        return rc, err
 
 
 @unittest.skipUnless(HAVE_RSYNC, "needs rsync")
@@ -411,6 +429,23 @@ class CollectTest(unittest.TestCase):
         self.assertIn("changed during the copy", out)
         # The old manifest went first, so seats see no half copy.
         self.assertFalse(os.path.exists(os.path.join(self.dest, "appmanifest_550.acf")))
+
+    @unittest.skipIf(os.geteuid() == 0, "root reads every file")
+    @unittest.skipUnless(GNU_RSYNC, "messages are GNU rsync's (macOS ships openrsync)")
+    def test_unreadable_seat_files_are_left_out(self):
+        install(self.roots["seat-01"], 550, 10, files={"left4dead2.bin": "v10"}, installdir="Left 4 Dead 2")
+        private = os.path.join(self.roots["seat-01"], "common", "Left 4 Dead 2", "ServerBrowser.vdf")
+        with open(private, "w") as f:
+            f.write("player only")
+        os.chmod(private, 0)
+        try:
+            rc, out = self.collect({"seat-01": self.idle})
+        finally:
+            os.chmod(private, 0o600)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("1 unreadable seat files left out", out)
+        self.assertTrue(os.path.exists(os.path.join(self.dest, "appmanifest_550.acf")))
+        self.assertTrue(os.path.exists(os.path.join(self.dest, "common", "Left 4 Dead 2", "left4dead2.bin")))
 
     def test_failed_copy_is_reported(self):
         install(self.roots["seat-01"], 550, 10)

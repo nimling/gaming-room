@@ -190,6 +190,34 @@ def last_line(text):
     return lines[-1][:200] if lines else ""
 
 
+def first_lines(text, n=3):
+    """The first n non-empty lines, for a log line that names the cause."""
+    lines = [x.strip()[:200] for x in (text or "").strip().splitlines() if x.strip()]
+    return " | ".join(lines[:n])
+
+
+_UNREADABLE = re.compile(r'(send_files failed to open|opendir|open|failed to open).*Permission denied \(13\)')
+_SUMMARY = ("rsync error: some files/attrs were not transferred", "IO error encountered")
+
+
+def unreadable_only(err):
+    """Number of files rsync could not read, if that was its only problem
+    (exit 23); None if anything else went wrong. On a seat, the files the
+    cafe-sync account cannot read are per-player settings (mode 600) and
+    the Steam runtime's own state, never the game itself, which Steam
+    installs readable for all."""
+    count = 0
+    for line in (err or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _UNREADABLE.search(line):
+            count += 1
+        elif not line.startswith(_SUMMARY):
+            return None
+    return count or None
+
+
 # --- Busy checks -----------------------------------------------------------------
 
 
@@ -262,7 +290,7 @@ class Collector:
 
     def seat_rsync(self, seat, args, src, dst):
         rc, out, err = run(["rsync", "-e", " ".join(self._ssh())] + args + [self._remote(seat, src), dst])
-        return rc, last_line(err)
+        return rc, err
 
     def busy_addresses(self):
         """Seats someone is using, from the launcher's People list. None if
@@ -282,7 +310,7 @@ class Collector:
         os.makedirs(into, exist_ok=True)
         rc, err = self.seat_rsync(seat, ["-rt"] + manifest_filters(appids), "./", into + "/")
         if rc != 0:
-            seat["error"] = err or f"rsync exited with {rc}"
+            seat["error"] = last_line(err) or f"rsync exited with {rc}"
             return None
         return read_manifests(into, appids)
 
@@ -352,7 +380,8 @@ class Collector:
                 continue
             ok, why = self.copy(by_name[seat_name], appid, best, have)
             if ok:
-                log(f"{label(app)}: copied build {best.buildid} from {seat_name} ({was})")
+                skipped = f"; {self.skipped} unreadable seat files left out" if getattr(self, "skipped", 0) else ""
+                log(f"{label(app)}: copied build {best.buildid} from {seat_name} ({was}){skipped}")
             else:
                 failed += 1
                 log(f"{label(app)}: not copied from {seat_name}: {why}")
@@ -368,14 +397,21 @@ class Collector:
             os.unlink(manifest)
         target = os.path.join(self.dest, "common", m.installdir)
         os.makedirs(target, exist_ok=True)
+        # ug-s: seat folders are setgid (group games); the service may not
+        # set that bit (RestrictSUIDSGID), and the share needs none.
+        # --ignore-errors: still delete stale files when a few seat files
+        # were unreadable (see unreadable_only).
         rc, err = self.seat_rsync(
             seat,
-            ["-rlpt", "--delete", "--chmod=u+rwX,go+rX,go-w"],
+            ["-rlpt", "--delete", "--ignore-errors", "--chmod=ug-s,u+rwX,go+rX,go-w"],
             f"common/{m.installdir}/",
             target + "/",
         )
-        if rc != 0:
-            return False, f"rsync failed ({err or rc}); retried next night"
+        self.skipped = 0
+        if rc == 23 and unreadable_only(err):
+            self.skipped = unreadable_only(err)
+        elif rc != 0:
+            return False, f"rsync failed ({first_lines(err) or rc}); retried next night"
         # The seat may have changed while we copied.
         why = self.seat_free(seat)
         if why:
