@@ -1,0 +1,38 @@
+# World of Warcraft: Forever (Blizzard, November 2026) through Battle.net on
+# Proton. Each player signs in with their own Blizzard account; a WoW
+# subscription includes Forever. The game is copied once per seat from the
+# server's share to /games/battlenet/wow and patched there by Battle.net
+# (roles/games, tasks/battlenet.yml). Battle.net and every login live in the
+# player's home and go at End session; WoW's personal folders are links into
+# the home (wow-links). See docs/wow-forever.md.
+# Still to confirm on the canary: Battle.net finds WoW in the golden prefix,
+# patching through the Steam Runtime container, the folder name of Forever's
+# version folder, and its launch code for --game (then add it below, so
+# WoW starts right after sign-in). Not yet tested on a tier C seat.
+id: wow-forever
+name: "World of Warcraft: Forever"
+subtitle: The original Azeroth, retold, levels 1 to 60
+group: classic
+runtime: native
+engine: Battle.net on Proton
+path: /games/battlenet/wow
+players: { min: 1, max: 40 }
+launch:
+  command: ["battlenet-seat"]
+why: >-
+  Level a group of characters together across the room, then take on the
+  dungeons side by side. Needs your own Blizzard account with WoW game time.
+highlights:
+  - Your own Blizzard account; signed out at End session
+  - Nine dungeons, raids from 9 December
+  - Group up with the people next to you
+ingame:
+  - title: Sign in
+    text: Sign in to Battle.net with your own account, pick World of Warcraft Forever and press Play.
+  - title: You are signed out at the end
+    text: End session signs you out of Battle.net and deletes your WoW settings and addons on this seat.
+profiles:
+  A: { resolution: native, fps_cap: refresh }
+  B: { resolution: native, fps_cap: 144 }
+  C: { resolution: 1920x1080, fps_cap: 60 }
+art: { hue: 210, glow: 90, motif: contour }

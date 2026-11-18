@@ -1,0 +1,38 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# Keeps WoW's personal folders inside the player's home.
+#
+# WoW lives in /games, which survives the reset. Each version folder in it
+# (_retail_, _classic_, _forever_, ...) has folders with personal data: the
+# account name and settings (WTF), addons (Interface), chat and quest cache,
+# logs and screenshots. Each of those must be a link into the player's home,
+# so the reset wipes what is in them. This puts back every link that is
+# missing, points elsewhere, or was replaced by a real folder, and deletes
+# that folder with what is in it.
+#
+# Runs as root: from seat-reset after every reset (seat-reset.d), and from
+# Ansible after WoW is copied. Prints one line per link it fixes.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+wow=${SEAT_WOW_DIR:-}
+# No WoW on this seat; or a link where a folder should be, which this does
+# not follow.
+[[ -n $wow && -d $wow && ! -L $wow ]] || exit 0
+
+shopt -s nullglob
+for version in "$wow"/_*_; do
+    [[ -d $version && ! -L $version ]] || continue
+    for name in ${SEAT_WOW_PRIVATE:-}; do
+        target=$SEAT_HOME/.local/share/arcade/wow/${version##*/}/$name
+        link=$version/$name
+        if [[ -L $link && $(readlink -- "$link") == "$target" ]]; then
+            continue
+        fi
+        rm -rf --one-file-system -- "$link"
+        ln -s -- "$target" "$link"
+        echo "wow-links: $link -> $target"
+    done
+done

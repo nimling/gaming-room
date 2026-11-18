@@ -72,6 +72,13 @@ touch "$cafe/common/Other Game/other.bin"
 mkdir -p "/games/steam/steamapps/common/Local Only"
 appmanifest 4000003 5 "Local Only" >/games/steam/steamapps/appmanifest_4000003.acf
 echo keep >"/games/steam/steamapps/common/Local Only/keep.txt"
+# A WoW install as Battle.net leaves it, including the copier's own WTF,
+# which must never reach a seat.
+mkdir -p /srv/share/wow/Data/data /srv/share/wow/_forever_/WTF/Account/SOMEONE
+printf 'Branch!STRING:0|Version!STRING:0|Product!STRING:0\neu|1.0.0.1|wow_forever\n' >/srv/share/wow/.build.info
+echo "game data" >/srv/share/wow/Data/data/data.000
+touch /srv/share/wow/_forever_/Wow.exe
+echo 'SET accountName "SOMEONE@EXAMPLE.COM"' >/srv/share/wow/_forever_/WTF/Config.wtf
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -117,6 +124,18 @@ grep -qx 'AutoSuspendAction=0' /home/.golden/player/.config/powerdevilrc || die 
 grep -qx 'fullscreen=true' /home/.golden/player/.config/kwinrulesrc || die "launcher full-screen rule"
 [[ ! -e /home/.golden/player/.config/autostart/cachyos-hello.desktop ]] || die "CachyOS welcome app still starts"
 ok "launcher settings, autostart and no auto-suspend"
+
+step "WoW copied once from the share, personal folders linked into the home"
+[[ -f /games/battlenet/wow/Data/data/data.000 && -f /games/battlenet/wow/.build.info ]] || die "WoW not copied"
+[[ $(stat -c %U:%G /games/battlenet/wow/_forever_/Wow.exe) == player:games ]] || die "player cannot patch WoW"
+[[ $(readlink /games/battlenet/wow/_forever_/WTF) == /home/player/.local/share/arcade/wow/_forever_/WTF ]] || die "WTF not linked: $(ls -la /games/battlenet/wow/_forever_)"
+[[ ! -e /home/player/.local/share/arcade/wow/_forever_/WTF/Config.wtf ]] || die "the copier's WTF reached the seat"
+[[ -x /usr/local/bin/battlenet-seat ]] || die "battlenet-seat missing"
+# A patch by Battle.net must survive the next run.
+echo "patched" >/games/battlenet/wow/Data/data/data.000
+run_playbook >/dev/null
+[[ $(cat /games/battlenet/wow/Data/data/data.000) == patched ]] || die "a later run undid Battle.net's patch"
+ok "copied once, owned by the player, WTF linked, patches kept"
 
 step "Idle screens go dark and stay dark"
 pd=/home/.golden/player/.config/powerdevilrc
@@ -315,6 +334,21 @@ chown -R player:games /games/steam/steamapps
 if /usr/local/sbin/seat-token-check; then die "token check missed the fake logins"; fi
 ok "token check finds the fake logins"
 
+# WoW and Battle.net in the same session.
+runuser -u player -- mkdir -p /home/player/.local/share/arcade/wow/_forever_/WTF /home/player/.local/share/arcade/prefixes/battlenet
+runuser -u player -- bash -c 'echo "SET accountName \"SOMEONE@EXAMPLE.COM\"" > ~/.local/share/arcade/wow/_forever_/WTF/Config.wtf'
+runuser -u player -- bash -c 'printf "[Software\\\\Wine\\\\Credential Manager\\\\Generic: Battle.net] 1700000000\n" > ~/.local/share/arcade/prefixes/battlenet/user.reg'
+[[ -f /games/battlenet/wow/_forever_/WTF/Config.wtf ]] || die "WoW's WTF does not lead into the home"
+# Battle.net or WoW replaced a link with a real folder.
+rm /games/battlenet/wow/_forever_/Logs
+runuser -u player -- mkdir /games/battlenet/wow/_forever_/Logs
+runuser -u player -- touch /games/battlenet/wow/_forever_/Logs/chat.log
+out=$(/usr/local/sbin/seat-token-check || true)
+grep -q 'WTF/Config.wtf' <<<"$out" || die "token check missed the WoW account name: $out"
+grep -q 'battlenet/user.reg' <<<"$out" || die "token check missed the Battle.net credential: $out"
+if /usr/local/sbin/seat-token-check; then die "token check missed the fake logins"; fi
+ok "token check finds the WoW and Battle.net logins"
+
 step "Golden capture refuses a home with logins"
 if /usr/local/sbin/seat-golden-capture; then die "capture accepted a home with logins"; fi
 ok "capture refused"
@@ -333,7 +367,12 @@ runuser -u player -- touch /home/player/.local/share/Steam/steamapps/appmanifest
 /usr/local/sbin/seat-reset session
 [[ -d /games/steam/steamapps/common/SomeGame && -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game deleted by the reset"
 btrfs subvolume show /home/player >/dev/null || die "home is no longer a subvolume"
+[[ ! -e /home/player/.local/share/arcade/prefixes/battlenet/user.reg ]] || die "Battle.net login survived the reset"
+[[ ! -e /games/battlenet/wow/_forever_/WTF/Config.wtf ]] || die "WoW account name survived the reset"
+[[ -L /games/battlenet/wow/_forever_/Logs && ! -e /games/battlenet/wow/_forever_/Logs/chat.log ]] || die "real WoW Logs folder survived the reset"
+[[ -f /games/battlenet/wow/Data/data/data.000 ]] || die "WoW deleted by the reset"
 ok "home replaced; Steam games kept, Steam login and Proton prefixes gone"
+ok "Battle.net login and WoW personal folders gone; WoW kept"
 
 step "Gate: token leak"
 bash tests/gates/token-leak.sh

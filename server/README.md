@@ -10,7 +10,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | --- | --- | --- | --- |
 | Mumble | `server_mumble` | 64738 TCP and UDP | Ready |
 | Lancache and its DNS | `server_lancache` | 53 TCP and UDP, 80, 443 | Ready |
-| Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e |
+| Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e; WoW Forever copied in by hand ([docs/wow-forever.md](../docs/wow-forever.md)) |
 | Steam café library | `server_steam_cafe` | — (SSH out to the seats) | Tested in containers, not yet on the real room: the same Steam games on every seat; see below |
 | Wake-on-LAN | `server_wol` | — | Ready: `wake-seats`, `wake-seats seat-03` |
 | Firewall, Docker, sshd | `server_base` | 22 | Ready |

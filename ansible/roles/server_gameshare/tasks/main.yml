@@ -14,9 +14,9 @@
     owner: "{{ gameshare_owner }}"
     group: "{{ gameshare_owner }}"
     mode: "0755"
-  # Worms: bought folder copied in by hand (docs/worms.md).
+  # Worms and WoW: copied in by hand (docs/worms.md, docs/wow-forever.md).
   loop: >-
-    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms']
+    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms', gameshare_root ~ '/wow']
        + (gameshare_engine_games | map(attribute='name') | map('regex_replace', '^', gameshare_root ~ '/') | list) }}
 
 - name: Serve the game share read-only over rsync
@@ -153,6 +153,23 @@
     recurse: true
     mode: "u+rwX,go+rX"
   when: iw4x_base_game.stat.exists
+
+# --- World of Warcraft: Forever ---------------------------------------------
+# Copied in by hand from a Battle.net install (docs/wow-forever.md). Seats
+# copy it once and Battle.net patches it there.
+- name: WoW | look for the game files
+  ansible.builtin.stat:
+    path: "{{ gameshare_root }}/wow/.build.info"
+  register: wow_share_game
+
+# rsyncd runs as nobody, and files copied from Windows are not always
+# world-readable.
+- name: WoW | make the game files readable for the rsync daemon
+  ansible.builtin.file:
+    path: "{{ gameshare_root }}/wow"
+    recurse: true
+    mode: "u+rwX,go+rX"
+  when: wow_share_game.stat.exists
 
 - name: TrackMania Nations Forever
   ansible.builtin.include_tasks: tmnf.yml

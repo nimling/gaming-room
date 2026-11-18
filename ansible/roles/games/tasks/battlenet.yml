@@ -1,0 +1,104 @@
+---
+# --- World of Warcraft: Forever, through Battle.net ---------------------------
+# WoW lives in /games/battlenet/wow, outside the player's home, so it is
+# downloaded once per seat. A seat without WoW copies it from the share's
+# wow/ folder. After that Battle.net patches it in place as the player, and
+# the patches come through Lancache. So the copy runs only once: a later run
+# would undo Battle.net's patches with the share's older files.
+# Battle.net itself and every login live in the player's home (battlenet-seat).
+# WoW's personal folders are links into that home (wow-links). See
+# docs/wow-forever.md.
+- name: WoW | create the Battle.net games folder
+  ansible.builtin.file:
+    path: "{{ seat_battlenet_root }}"
+    state: directory
+    owner: root
+    group: "{{ seat_games_group }}"
+    mode: "0755"
+
+- name: WoW | check whether this seat has WoW
+  ansible.builtin.stat:
+    path: "{{ seat_wow_dir }}/.build.info"
+  register: wow_installed
+
+- name: WoW | check that the server has a finished install
+  ansible.builtin.command:
+    argv: [rsync, --list-only, "{{ seat_gameshare }}/wow/.build.info"]
+  register: wow_share
+  changed_when: false
+  failed_when: false
+  # A read-only listing; dry runs need its answer.
+  check_mode: false
+  when: seat_gameshare | length > 0 and not wow_installed.stat.exists
+
+- name: WoW | say why it was not copied
+  ansible.builtin.debug:
+    msg: >-
+      {{ seat_gameshare }}/wow is not ready (no .build.info, or the server is
+      unreachable). Leaving {{ seat_wow_dir }} as it is.
+  when: wow_share.rc is defined and wow_share.rc != 0
+
+# The player owns the copy, so Battle.net can patch it. The personal folders
+# never come from the server, even if the person who copied WoW there left
+# theirs in. .build.info comes last: a seat counts as having WoW once it is
+# there, so a copy that stopped halfway runs again.
+- name: WoW | copy it from the server, once (about 50 GB)
+  ansible.builtin.command:
+    argv: >-
+      {{ ['rsync', '-rltog', '--chown=' ~ seat_player_user ~ ':' ~ seat_games_group,
+          '--chmod=D2775,F664', '--exclude=/.build.info', '--itemize-changes']
+         + (seat_wow_private_dirs | map('regex_replace', '^(.*)$', '--exclude=/_*_/\1') | list)
+         + (['--dry-run'] if ansible_check_mode else [])
+         + [seat_gameshare ~ '/wow/', seat_wow_dir ~ '/'] }}
+  register: wow_copy
+  changed_when: wow_copy.stdout | length > 0
+  check_mode: false
+  when: wow_share.rc is defined and wow_share.rc == 0
+  # In a dry run on a new seat the folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: WoW | mark the copy as finished
+  ansible.builtin.command:
+    argv: >-
+      {{ ['rsync', '-tog', '--chown=' ~ seat_player_user ~ ':' ~ seat_games_group,
+          '--chmod=F664', '--itemize-changes']
+         + (['--dry-run'] if ansible_check_mode else [])
+         + [seat_gameshare ~ '/wow/.build.info', seat_wow_dir ~ '/.build.info'] }}
+  register: wow_mark
+  changed_when: wow_mark.stdout | length > 0
+  check_mode: false
+  when: wow_share.rc is defined and wow_share.rc == 0
+  # In a dry run on a new seat the folder does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: WoW | install the Battle.net start script
+  ansible.builtin.copy:
+    src: battlenet-seat
+    dest: /usr/local/bin/battlenet-seat
+    owner: root
+    group: root
+    mode: "0755"
+
+# seat-reset runs every program in this folder after it replaced the home.
+- name: WoW | create the reset hook folder
+  ansible.builtin.file:
+    path: /usr/local/libexec/seat-reset.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: WoW | install the hook that keeps personal folders in the home
+  ansible.builtin.copy:
+    src: wow-links
+    dest: /usr/local/libexec/seat-reset.d/wow-links
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: WoW | link the personal folders into the player's home
+  ansible.builtin.command: /usr/local/libexec/seat-reset.d/wow-links
+  register: wow_links
+  changed_when: wow_links.stdout | length > 0
+  # In a dry run the hook may not be installed yet.
+  when: not ansible_check_mode

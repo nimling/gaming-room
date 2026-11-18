@@ -1,6 +1,6 @@
 #!/bin/bash
 # Gate 1: logout leaves no login tokens.
-# Procedure on the seat: sign in to Steam, Spotify and a browser, press End session.
+# Procedure on the seat: sign in to Steam, Spotify, Battle.net and a browser, press End session.
 # Then run as root, for example from the server:
 #   ssh seat-01 sudo bash -s < tests/gates/token-leak.sh
 # Add --reset to trigger the reset from here instead of pressing End session:
@@ -40,6 +40,29 @@ if [[ -d $compatdata ]] && [[ -n $(find "$compatdata" -mindepth 1 -maxdepth 1 ! 
     fail=1
 else
     echo "PASS  no Proton prefixes from before the reset"
+fi
+
+# WoW's personal folders live in /games, which the reset keeps. Each must be
+# a link into the home (wow-links), never a real folder.
+wow=${SEAT_WOW_DIR:-}
+if [[ -n $wow && -d $wow ]]; then
+    shopt -s nullglob
+    wow_bad=0
+    for version in "$wow"/_*_; do
+        for name in ${SEAT_WOW_PRIVATE:-}; do
+            want=$SEAT_HOME/.local/share/arcade/wow/${version##*/}/$name
+            if [[ $(readlink -- "$version/$name" || true) != "$want" ]]; then
+                echo "FAIL  $version/$name is not a link to $want"
+                wow_bad=1
+            fi
+        done
+    done
+    shopt -u nullglob
+    if (( wow_bad )); then
+        fail=1
+    else
+        echo "PASS  WoW's personal folders in $wow link into the home"
+    fi
 fi
 
 exit "$fail"
