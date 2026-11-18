@@ -1,0 +1,135 @@
+---
+# --- Steam café library ---------------------------------------------------------
+# The same Steam games on every seat (server/README.md, "Steam café library").
+# The list is steam_cafe_apps in ansible/vars/steam_cafe.yml.
+# - The server reads this seat's library at night as cafe-sync: an account
+#   that can only log in from the server and only run cafe-sync-serve
+#   (a status line, or rrsync -ro of the Steam library).
+# - At each pull, this seat copies a listed app from the share when the
+#   share's copy is newer than its own (higher buildid), or when it lacks it.
+
+# Steam installs here too (roles/launcher); the copy needs it first.
+- name: Steam café | create the Steam library in /games
+  ansible.builtin.file:
+    path: "{{ seat_steam_library }}/steamapps"
+    state: directory
+    owner: "{{ seat_player_user }}"
+    group: "{{ seat_games_group }}"
+    mode: "2775"
+
+# The same script runs the nightly collect on the server.
+- name: Steam café | install the copy script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/steam-cafe"
+    dest: /usr/local/sbin/steam-cafe
+    owner: root
+    group: root
+    mode: "0755"
+
+# --- Read-only access for the server ----------------------------------------------
+- name: Steam café | create /usr/local/libexec
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Steam café | install the forced command for cafe-sync
+  ansible.builtin.copy:
+    src: cafe-sync-serve
+    dest: /usr/local/libexec/cafe-sync-serve
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Steam café | look for rrsync (in the rsync package)
+  ansible.builtin.stat:
+    path: /usr/bin/rrsync
+  register: steam_cafe_rrsync
+
+- name: Steam café | check that rrsync is there
+  ansible.builtin.assert:
+    that: steam_cafe_rrsync.stat.exists or ansible_check_mode
+    fail_msg: /usr/bin/rrsync is missing; cafe-sync-serve needs it for read-only copies.
+
+# Not in the games group: that group may write to the Steam library.
+- name: Steam café | create the cafe-sync account (read-only, key only)
+  ansible.builtin.user:
+    name: "{{ steam_cafe_user }}"
+    system: true
+    home: "/var/lib/{{ steam_cafe_user }}"
+    create_home: true
+    # sshd runs the forced command through the login shell.
+    shell: /bin/bash
+    password_lock: true
+  when: seat_steam_cafe_server | length > 0
+
+# The server publishes its public key on the read-only share; a public key is
+# not a secret. If the share does not answer, the key already there stays.
+- name: Steam café | read the server's key for cafe-sync from the share
+  ansible.builtin.command:
+    argv: [/usr/local/sbin/steam-cafe, key, --share, "{{ seat_gameshare }}/{{ steam_cafe_share_dir }}"]
+  register: steam_cafe_key
+  changed_when: false
+  failed_when: false
+  # A read-only fetch; dry runs need its answer.
+  check_mode: false
+  when: seat_steam_cafe_server | length > 0
+
+- name: Steam café | say why the server's key was not set
+  ansible.builtin.debug:
+    msg: "No cafe-sync key from the share yet ({{ steam_cafe_key.stderr | default('') | trim }}). Run server.yml first."
+  when: seat_steam_cafe_server | length > 0 and steam_cafe_key.rc | default(1) != 0
+
+- name: Steam café | let the server read the Steam library, nothing else
+  ansible.posix.authorized_key:
+    user: "{{ steam_cafe_user }}"
+    key: "{{ steam_cafe_key.stdout | trim }}"
+    key_options: 'from="{{ seat_steam_cafe_server }}",restrict,command="/usr/local/libexec/cafe-sync-serve"'
+    exclusive: true
+    state: present
+  when: seat_steam_cafe_server | length > 0 and steam_cafe_key.rc | default(1) == 0
+  # In a dry run of a fresh seat the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Steam café | look for ufw
+  ansible.builtin.stat:
+    path: /usr/bin/ufw
+  register: steam_cafe_ufw
+
+- name: Steam café | firewall, allow SSH from the gaming server
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    from_ip: "{{ seat_steam_cafe_server }}"
+  when: seat_steam_cafe_server | length > 0 and steam_cafe_ufw.stat.exists and not seat_in_container
+
+# --- Copy newer café games from the share -------------------------------------------
+# Skips everything while Steam runs or someone uses the session (the
+# launcher's session-used marker). Game files first, appmanifest last.
+# In a dry run the script only says what it would copy.
+- name: Steam café | copy newer café games from the server
+  ansible.builtin.command:
+    argv: >-
+      {{ ['/usr/local/sbin/steam-cafe', 'pull',
+          '--share', seat_gameshare ~ '/' ~ steam_cafe_share_dir ~ '/steamapps',
+          '--library', seat_steam_library ~ '/steamapps',
+          '--apps-json', steam_cafe_apps | to_json,
+          '--owner', seat_player_user, '--group', seat_games_group,
+          '--session-marker', '/home/' ~ seat_player_user ~ '/.cache/arcade/session-used']
+         + (['--dry-run'] if ansible_check_mode else []) }}
+  register: steam_cafe_pull
+  changed_when: steam_cafe_pull.stdout is search('^changed=[1-9]', multiline=true)
+  # 2: some apps were not copied (each says why); the next pull tries again.
+  failed_when: steam_cafe_pull.rc not in [0, 2]
+  check_mode: false
+  when: steam_cafe_apps | length > 0
+  # In a dry run of a fresh seat the script is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Steam café | what the copy did
+  ansible.builtin.debug:
+    msg: "{{ steam_cafe_pull.stdout_lines | default([]) }}"
+  when: steam_cafe_pull is not skipped

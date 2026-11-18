@@ -137,6 +137,8 @@ Only the central server must run Windows, but Valve's documentation does not say
 
 **If no-go:** Lancache plus personal accounts; DRM-free copies Nimtech owns for shared LAN classics, after checking each license.
 
+**Shared café library:** every seat gets the same café games, installed and ready, with no clicks per seat. Each night the server takes the newest complete copy of each listed app from any seat (highest `buildid`, fully installed) into its game share; seats copy an app from there at their pull when the server's copy is newer. No Steam login or steamcmd on the server; Steam checks the licence at launch. The server reads seats through a dedicated read-only account. Adding a game: install it on any seat and add one line to `ansible/vars/steam_cafe.yml`. See [server/README.md](../server/README.md#steam-café-library).
+
 ## Voice: Mumble
 
 Open source, no license or slot limits, client in the CachyOS repos, Opus codec, and `mumble://` links drop a seat straight into a channel.

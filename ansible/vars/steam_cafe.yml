@@ -1,0 +1,31 @@
+# The shared Steam café library (server/README.md, "Steam café library").
+# Read by both seat.yml and server.yml (vars_files), so the server and the
+# seats always work from the same list.
+#
+# Every night the server takes the newest complete copy of each app below
+# from any seat (highest buildid, StateFlags 4) into its game share. At their
+# next pull, seats copy an app from the share when the share's copy is newer
+# than their own, or when they do not have it. Apps not listed here are never
+# touched.
+#
+# To add a game: install it with Steam on any seat, then add one line here
+# with its appid (the number in steamapps/appmanifest_<appid>.acf, or in the
+# game's store URL). The name is only for the logs.
+steam_cafe_apps:
+  - { appid: 550, name: Left 4 Dead 2 }
+  - { appid: 410900, name: Forts }
+  - { appid: 304050, name: Trove }
+  - { appid: 945360, name: Among Us }
+  - { appid: 4244510, name: Pratfall }
+  # Tools Steam needs to run them (Proton and the Steam Linux Runtime).
+  - { appid: 1493710, name: Proton Experimental }
+  - { appid: 4183110, name: Steam Linux Runtime 4.0 }
+  - { appid: 1070560, name: Steam Linux Runtime 1.0 (scout) }
+  - { appid: 228980, name: Steamworks Common Redistributables }
+
+# The account that copies: on the server it runs the nightly collect with its
+# own SSH key; on each seat it may only read the Steam library (rrsync -ro).
+steam_cafe_user: cafe-sync
+# Folder in the game share: <share>/steam-cafe/steamapps, plus the server's
+# public key for cafe-sync in <share>/steam-cafe/cafe-sync.pub.
+steam_cafe_share_dir: steam-cafe

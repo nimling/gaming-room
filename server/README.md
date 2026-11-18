@@ -11,6 +11,7 @@ Status: Phase 2 prepared. The playbook passes in an Ubuntu container, and Mumble
 | Mumble | `server_mumble` | 64738 TCP and UDP | Ready |
 | Lancache and its DNS | `server_lancache` | 53 TCP and UDP, 80, 443 | Ready |
 | Game share (rsync, read-only) | `server_gameshare` | 873 TCP | Ready: MW2 with IW4x ([docs/iw4x.md](../docs/iw4x.md)); Unreal Tournament built from the free GOTY CD and OldUnreal 469e |
+| Steam café library | `server_steam_cafe` | — (SSH out to the seats) | Tested in containers, not yet on the real room: the same Steam games on every seat; see below |
 | Wake-on-LAN | `server_wol` | — | Ready: `wake-seats`, `wake-seats seat-03` |
 | Firewall, Docker, sshd | `server_base` | 22 | Ready |
 | Always-on game servers: UT99, UT2004, Quake 3, Jedi Academy | `server_gameservers` | 7777-7779 and 8777, 7800-7801, 27960, 29070 UDP; 7787 TCP (UT99 vote menu) | Ready: in-game voting for map and mode; see below |
@@ -34,7 +35,24 @@ All service ports bind to the server's LAN address only. Docker publishes ports 
 - Steam, Epic, Battle.net, Riot and other CDNs go through the cache (`USE_GENERIC_CACHE`).
 - The cache DNS answers those names with the server's address and passes the rest to the VLAN gateway.
 - **Seats must use the server as DNS.** Set it as the DNS server in the gaming VLAN's DHCP settings in UniFi.
-- Cache on `/srv/lancache/cache`, 1000 GB by default (`lancache_cache_size`).
+- Cache on `/srv/lancache/cache`, 250 GB by default (`lancache_cache_size`). The server has one 468 GB disk, shared with `/srv/games` and the Steam café library.
+- **The real server sets `lancache_cache_size` in `ansible/inventory.yml`.** Lower it there by hand to `250g` (or less) before the café library fills the disk. The cache keeps its files; it only stops growing and evicts the oldest.
+
+## Steam café library
+
+Every seat gets the same Steam café games, ready to play, without anyone clicking Install on ten PCs. No Steam login and no steamcmd on the server: Steam checks the licence on the seat when the game starts (café pool or the player's own account).
+
+- **The list:** `steam_cafe_apps` in [`ansible/vars/steam_cafe.yml`](../ansible/vars/steam_cafe.yml), read by both `server.yml` and `seat.yml`. Apps not on it are never touched.
+- **Collect, on the server, 02:00** (`steam-cafe-collect.timer`, before the seats' 03:30 pull). As `cafe-sync`, it reads each seat's appmanifests. Per app it takes the seat with the highest `buildid` and `StateFlags` 4 (fully installed). If that is newer than the server's copy, it copies `common/<installdir>/` with `rsync --delete`, then the appmanifest last, into `/srv/games/steam-cafe/steamapps`. One log line per app: `journalctl -u steam-cafe-collect`.
+- **Skipped seats:** a seat that does not answer, where Steam or a game runs, or that is in the launcher's People list. If no seat can be read, nothing changes.
+- **Distribute, on each seat, at every pull:** for each listed app where the share's `buildid` is higher than the seat's (or the seat lacks it), it copies the game files into `/games/steam/steamapps/common/` (owner `player`, group `games`), then the appmanifest. Skipped while Steam runs or a session is in use. Equal versions: nothing happens.
+- **Access:** `cafe-sync` on the server has its own SSH key (`/var/lib/cafe-sync/.ssh/id_ed25519`), made on the server; the private key never leaves it. The public key is on the share (`steam-cafe/cafe-sync.pub`). On each seat, `cafe-sync` accepts only that key, only from the server's address (`seat_steam_cafe_server`, default `arcade_voice_server`, must be an IP), with `restrict` and the forced command `cafe-sync-serve`: a status line, or `rrsync -ro` of the Steam library. It is not in the `games` group, so it cannot write there.
+- **A rebuilt seat** has a new SSH host key. The collect then skips it ("did not answer ... host key"). Remove the old key: `sudo -u cafe-sync ssh-keygen -R <seat-address> -f /var/lib/cafe-sync/.ssh/known_hosts`.
+- **Space:** a copy that would leave less than 20 GB free on the server (`steam_cafe_reserve_gib`) is left out.
+
+**Add a game:** install it with Steam on any seat. Add one line with its appid to `steam_cafe_apps` (the number in `steamapps/appmanifest_<appid>.acf`) in a pull request. After the merge, run `server.yml`. The next night the server takes it. Seats copy it at their pull once their branch has the change (canary: `main`; the rest: `stable`).
+
+Run it by hand: `sudo systemctl start steam-cafe-collect`, or `sudo -u cafe-sync steam-cafe collect --dry-run` to only see what it would copy.
 
 ## Game servers
 

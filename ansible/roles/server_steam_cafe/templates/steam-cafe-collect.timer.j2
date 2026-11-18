@@ -1,0 +1,10 @@
+# Managed by gaming-room Ansible (roles/server_steam_cafe).
+[Unit]
+Description=Steam café library: collect every night, before the seats pull
+
+[Timer]
+OnCalendar={{ steam_cafe_collect_calendar }}
+Persistent=false
+
+[Install]
+WantedBy=timers.target

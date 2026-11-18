@@ -5,8 +5,11 @@ on:
     paths:
       - "ansible/server.yml"
       - "ansible/roles/server_*/**"
+      - "ansible/files/**"
+      - "ansible/vars/**"
       - "bootstrap/**"
       - "tests/container/*server*"
+      - "tests/steamcafe/**"
       - "tests/gates/server-services.sh"
       - ".github/workflows/server-tests.yml"
   push:
@@ -14,6 +17,8 @@ on:
     paths:
       - "ansible/server.yml"
       - "ansible/roles/server_*/**"
+      - "ansible/files/**"
+      - "ansible/vars/**"
       - "bootstrap/**"
 
 permissions:

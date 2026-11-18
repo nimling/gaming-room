@@ -1,0 +1,25 @@
+# Managed by gaming-room Ansible (roles/server_steam_cafe).
+[Unit]
+Description=Steam café library: take the newest game copies from the seats
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ steam_cafe_user }}
+Group={{ steam_cafe_user }}
+ExecStart=/usr/local/sbin/steam-cafe collect --config /etc/steam-cafe/collect.json
+# Low priority: the server also runs voice and game servers.
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=4h
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# The library, and known_hosts with the seats' host keys.
+ReadWritePaths={{ steam_cafe_root }}/steamapps {{ steam_cafe_home }}

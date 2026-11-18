@@ -127,6 +127,10 @@
     label: "{{ shared_game.name }}"
   when: seat_gameshare | length > 0
 
+- name: Steam café library, the same Steam games on every seat
+  ansible.builtin.include_tasks: steam_cafe.yml
+  when: seat_gameshare | length > 0
+
 - name: Proton for Windows games
   ansible.builtin.include_tasks: proton.yml
 

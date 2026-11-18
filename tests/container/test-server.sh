@@ -55,6 +55,7 @@ all:
       hosts:
         seat-01:
           seat_mac: "00:00:5e:00:53:01"
+          seat_lan_address: 192.0.2.21
         seat-02:
 EOF
 run() { (cd ansible && ansible-playbook server.yml -i /tmp/inventory.yml "$@"); }
@@ -87,6 +88,42 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
+
+step "Steam café library"
+python3 -m unittest discover -s tests/steamcafe >/tmp/cafe-unit.log 2>&1 || { cat /tmp/cafe-unit.log; die "steam-cafe unit tests"; }
+ok "steam-cafe unit tests (version compare, StateFlags, busy seats, list filtering, copies)"
+id cafe-sync >/dev/null || die "no cafe-sync account"
+id -nG cafe-sync | tr ' ' '\n' | grep -qx sudo && die "cafe-sync may use sudo"
+[[ $(stat -c '%U %a' /var/lib/cafe-sync/.ssh/id_ed25519) == "cafe-sync 600" ]] || die "cafe-sync private key owner or mode"
+cmp -s /var/lib/cafe-sync/.ssh/id_ed25519.pub /srv/games/steam-cafe/cafe-sync.pub || die "public key not published on the share"
+[[ $(stat -c '%U %a' /srv/games/steam-cafe/cafe-sync.pub) == "root 644" ]] || die "published key owner or mode"
+[[ $(stat -c '%U %a' /srv/games/steam-cafe) == "root 755" ]] || die "cafe-sync could replace the published key"
+[[ $(stat -c '%U' /srv/games/steam-cafe/steamapps/common) == cafe-sync ]] || die "cafe-sync cannot fill the library"
+python3 - <<'PY' || die "collect settings"
+import json
+c = json.load(open("/etc/steam-cafe/collect.json"))
+assert c["seats"] == [{"name": "seat-01", "address": "192.0.2.21"}], c["seats"]
+assert c["dest"] == "/srv/games/steam-cafe/steamapps", c
+assert c["user"] == "cafe-sync" and c["ssh_key"] == "/var/lib/cafe-sync/.ssh/id_ed25519", c
+assert c["presence_url"] == "http://192.0.2.10:8790/api/presence", c
+ids = [a["appid"] for a in c["apps"]]
+assert 550 in ids and 228980 in ids and len(ids) == len(set(ids)), ids
+PY
+s=/etc/systemd/system/steam-cafe-collect.service
+grep -qx 'User=cafe-sync' "$s" || die "collect does not run as cafe-sync"
+grep -qx 'ExecStart=/usr/local/sbin/steam-cafe collect --config /etc/steam-cafe/collect.json' "$s" || die "collect command"
+grep -qx 'ReadWritePaths=/srv/games/steam-cafe/steamapps /var/lib/cafe-sync' "$s" || die "collect can write outside the library"
+grep -qx 'OnCalendar=\*-\*-\* 02:00' /etc/systemd/system/steam-cafe-collect.timer || die "collect not at 02:00 (before the seats' 03:30 pull)"
+# No seat answers in here (192.0.2.21 is a documentation address), and the
+# People list is not running: the run must say so and change nothing.
+out=$(timeout 120 runuser -u cafe-sync -- /usr/local/sbin/steam-cafe collect --config /etc/steam-cafe/collect.json 2>&1) \
+    || { echo "$out"; die "collect failed with no seats answering"; }
+echo "$out"
+grep -q '^people list not reachable' <<<"$out" || die "collect did not report the missing People list"
+grep -q '^seat-01: skipped, did not answer' <<<"$out" || die "collect did not report the silent seat"
+grep -q '^no seat could be read (of 1); the library stays as it is' <<<"$out" || die "collect did not stop cleanly"
+[[ -z $(ls -A /srv/games/steam-cafe/steamapps/common) ]] || die "collect wrote into the library"
+ok "account, key on the share, settings, timer; no seats answering is handled"
 
 step "TrackMania Nations Forever"
 [[ -x /usr/local/sbin/tmnf-build ]] || die "TrackMania unpack script missing"

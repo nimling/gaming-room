@@ -54,6 +54,24 @@ install -m 755 /dev/null /srv/share/ut2004/System/UT2004; touch /srv/share/ut200
 printf '[URL]\nMap=NvidiaLogo.ut2\n' >/srv/share/ut2004/System/Default.ini
 printf '[DefaultPlayer]\nName=Player\n' >/srv/share/ut2004/System/DefUser.ini
 echo "iso=test patch=3374" >/srv/share/ut2004/.ut2004-version
+# Steam café library: the server's public key and one finished app (on the
+# list, with a space in its folder name), plus one app that is not listed.
+ssh-keygen -q -t ed25519 -N '' -C cafe-sync@test -f /tmp/cafe_key
+cafe=/srv/share/steam-cafe/steamapps
+mkdir -p "$cafe/common/Fake Game/bin" "$cafe/common/Fake Game/data" "$cafe/common/Other Game"
+cp /tmp/cafe_key.pub /srv/share/steam-cafe/cafe-sync.pub
+appmanifest() { # appid buildid installdir
+    printf '"AppState"\n{\n\t"appid"\t\t"%s"\n\t"Universe"\t\t"1"\n\t"name"\t\t"%s"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"%s"\n\t"SizeOnDisk"\t\t"1000"\n\t"buildid"\t\t"%s"\n\t"LastOwner"\t\t"0"\n}\n' "$1" "$3" "$3" "$2"
+}
+appmanifest 4000001 200 "Fake Game" >"$cafe/appmanifest_4000001.acf"
+printf '#!/bin/sh\necho fake\n' >"$cafe/common/Fake Game/bin/fakegame"; chmod 755 "$cafe/common/Fake Game/bin/fakegame"
+echo "level data, build 200" >"$cafe/common/Fake Game/data/level.pak"
+appmanifest 4000002 9 "Other Game" >"$cafe/appmanifest_4000002.acf"
+touch "$cafe/common/Other Game/other.bin"
+# A Steam game installed on this seat that is not on the list.
+mkdir -p "/games/steam/steamapps/common/Local Only"
+appmanifest 4000003 5 "Local Only" >/games/steam/steamapps/appmanifest_4000003.acf
+echo keep >"/games/steam/steamapps/common/Local Only/keep.txt"
 printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
@@ -69,6 +87,10 @@ seat_orchestrator_source: ["192.0.2.10", "198.51.100.20"]
 arcade_voice_server: "192.0.2.10"
 seat_display: "3440x1440@144"
 seat_gameshare: rsync://127.0.0.1/games
+seat_steam_cafe_server: "127.0.0.1"
+steam_cafe_apps:
+  - { appid: 4000001, name: Fake Game }
+  - { appid: 4000004, name: Not On The Server }
 EOF
 # What bootstrap/seat.sh leaves behind; the default seat_temporary_sudoers removes it.
 echo 'installer ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/90-seat-bootstrap
@@ -80,7 +102,7 @@ run_playbook() {
 run_playbook
 ok "first run"
 allow=$(grep '^AllowUsers' /etc/ssh/sshd_config.d/10-gaming-room.conf)
-[[ $allow == "AllowUsers admin orchestrator@192.0.2.10 orchestrator@198.51.100.20" ]] || die "wrong $allow"
+[[ $allow == "AllowUsers admin orchestrator@192.0.2.10 orchestrator@198.51.100.20 cafe-sync@127.0.0.1" ]] || die "wrong $allow"
 [[ ! -e /etc/sudoers.d/90-seat-bootstrap ]] || die "temporary sudo rule left behind"
 [[ -e /etc/sudoers.d/10-orchestrator ]] || die "orchestrator sudo rule missing"
 ok "orchestrator sources and temporary sudo rule"
@@ -168,6 +190,24 @@ grep -qx 'Map=NvidiaLogo.ut2' /home/.golden/player/.ut2004/System/UT2004.ini || 
 grep -qx 'Name=Player' /home/.golden/player/.ut2004/System/User.ini || die "UT2004 user defaults not in the golden home"
 ok "mw2, ut99 and ut2004 mirrored; UT99 and UT2004 defaults seeded"
 
+step "Steam café library: the seat copies listed apps from the share"
+lib=/games/steam/steamapps
+[[ -x "$lib/common/Fake Game/bin/fakegame" ]] || die "café game not copied, or not executable"
+grep -qx 'level data, build 200' "$lib/common/Fake Game/data/level.pak" || die "café game data not copied"
+grep -q '"buildid"[[:space:]]*"200"' "$lib/appmanifest_4000001.acf" || die "café appmanifest not written"
+[[ $(stat -c '%U:%G' "$lib/appmanifest_4000001.acf" "$lib/common/Fake Game/data/level.pak" | sort -u) == player:games ]] || die "café files not owned by player:games"
+[[ ! -e $lib/appmanifest_4000002.acf && ! -e "$lib/common/Other Game" ]] || die "an app that is not on the list was copied"
+grep -qx keep "$lib/common/Local Only/keep.txt" && [[ -e $lib/appmanifest_4000003.acf ]] || die "a local app that is not on the list was touched"
+[[ -x /usr/local/sbin/steam-cafe && -x /usr/local/libexec/cafe-sync-serve && -x /usr/bin/rrsync ]] || die "café scripts or rrsync missing"
+ak=/var/lib/cafe-sync/.ssh/authorized_keys
+[[ $(cat "$ak") == "from=\"127.0.0.1\",restrict,command=\"/usr/local/libexec/cafe-sync-serve\" $(cat /tmp/cafe_key.pub)" ]] || die "cafe-sync key not restricted: $(cat "$ak")"
+id -nG cafe-sync | tr ' ' '\n' | grep -qx games && die "cafe-sync is in the games group (could write the library)"
+# For the second run: a lower build on the server, with other data, must
+# change nothing on the seat.
+appmanifest 4000001 150 "Fake Game" >"$cafe/appmanifest_4000001.acf"
+echo "older data, build 150 (different size)" >"$cafe/common/Fake Game/data/level.pak"
+ok "listed app copied (game files, then appmanifest); unlisted apps untouched; key limited to the server"
+
 step "Self-update"
 grep -q 'ansible-pull --clean ' /etc/systemd/system/seat-pull.service || die "seat-pull can get stuck on its shallow clone (no --clean)"
 ok "seat-pull resets its checkout to the branch"
@@ -195,6 +235,69 @@ second=$(run_playbook)
 echo "$second" | tail -n 4
 echo "$second" | grep -Eq "changed=0 +unreachable=0 +failed=0" || die "second run changed something"
 ok "idempotent"
+grep -qx 'level data, build 200' "$lib/common/Fake Game/data/level.pak" || die "a lower server build replaced the seat's copy"
+grep -q '"buildid"[[:space:]]*"200"' "$lib/appmanifest_4000001.acf" || die "a lower server build replaced the appmanifest"
+ok "a lower build on the server changes nothing"
+
+step "Steam café library: newer builds, busy seats, and the server's read-only access"
+pull_cafe() {
+    /usr/local/sbin/steam-cafe pull --share rsync://127.0.0.1/games/steam-cafe/steamapps --library "$lib" \
+        --apps 4000001,4000004 --owner player --group games --session-marker /home/player/.cache/arcade/session-used
+}
+appmanifest 4000001 300 "Fake Game" >"$cafe/appmanifest_4000001.acf"
+rm "$cafe/common/Fake Game/data/level.pak"; echo "build 300" >"$cafe/common/Fake Game/data/new.pak"
+# A process named steam stands in for a running Steam client.
+cp /usr/bin/sleep /tmp/steam; /tmp/steam 300 & fake_steam=$!
+out=$(pull_cafe); echo "$out"
+grep -q '^skipped: Steam is running' <<<"$out" || die "copied while Steam runs"
+[[ -e "$lib/common/Fake Game/data/level.pak" ]] || die "files changed while Steam runs"
+kill "$fake_steam"; wait "$fake_steam" 2>/dev/null || true
+out=$(pull_cafe); echo "$out"
+grep -q '^4000001: copied build 300 (was 200)' <<<"$out" || die "newer build not copied"
+[[ -e "$lib/common/Fake Game/data/new.pak" && ! -e "$lib/common/Fake Game/data/level.pak" ]] || die "newer build not mirrored (--delete)"
+grep -q '"buildid"[[:space:]]*"300"' "$lib/appmanifest_4000001.acf" || die "appmanifest not updated"
+grep -qx keep "$lib/common/Local Only/keep.txt" || die "unlisted local app touched"
+ok "newer build copied and mirrored; nothing copied while Steam runs"
+
+# The server's side, with this container as the seat: sshd, cafe-sync's
+# forced command and rrsync, and the real collect script over SSH.
+"$(command -v sshd)" -E /tmp/sshd.log
+ssh_cafe() {
+    ssh -i /tmp/cafe_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/tmp/cafe_known_hosts cafe-sync@127.0.0.1 "$@"
+}
+cafe_over_ssh() {
+    [[ $(ssh_cafe status) == "steam=stopped game=stopped" ]] || die "cafe-sync status: $(ssh_cafe status 2>&1)"
+    /tmp/steam 300 & fake_steam=$!
+    [[ $(ssh_cafe status) == "steam=running game=stopped" ]] || die "cafe-sync status misses a running Steam"
+    kill "$fake_steam"; wait "$fake_steam" 2>/dev/null || true
+    if ssh_cafe cat /etc/passwd >/dev/null 2>&1; then die "cafe-sync ran a command of its own"; fi
+    if rsync -e "ssh -i /tmp/cafe_key -o BatchMode=yes -o UserKnownHostsFile=/tmp/cafe_known_hosts" \
+        /etc/hostname cafe-sync@127.0.0.1:x >/dev/null 2>&1; then die "cafe-sync could write to the Steam library"; fi
+    [[ ! -e $lib/x ]] || die "cafe-sync wrote into the Steam library"
+    if rsync -e "ssh -i /tmp/cafe_key -o BatchMode=yes -o UserKnownHostsFile=/tmp/cafe_known_hosts" \
+        cafe-sync@127.0.0.1:../../../etc/hostname /tmp/escaped >/dev/null 2>&1; then die "cafe-sync read outside the Steam library"; fi
+    printf '%s\n' '{"apps": [{"appid": 4000001, "name": "Fake Game"}, {"appid": 4000003, "name": "Local Only"}],
+     "seats": [{"name": "seat-test", "address": "127.0.0.1"}],
+     "dest": "/tmp/cafe-server/steamapps", "user": "cafe-sync",
+     "ssh_key": "/tmp/cafe_key", "known_hosts": "/tmp/cafe_known_hosts",
+     "presence_url": "", "reserve_gib": 0}' >/tmp/cafe-collect.json
+    out=$(/usr/local/sbin/steam-cafe collect --config /tmp/cafe-collect.json) || { echo "$out"; die "collect over SSH failed"; }
+    echo "$out"
+    grep -q '^4000001 Fake Game: copied build 300 from seat-test (new on the server)' <<<"$out" || die "collect did not copy over SSH"
+    grep -q '^4000003 Local Only: copied build 5 from seat-test' <<<"$out" || die "collect did not copy the second app"
+    [[ -x "/tmp/cafe-server/steamapps/common/Fake Game/bin/fakegame" && -e /tmp/cafe-server/steamapps/appmanifest_4000001.acf ]] || die "collected copy incomplete"
+    out=$(/usr/local/sbin/steam-cafe collect --config /tmp/cafe-collect.json); echo "$out"
+    grep -q '^4000001 Fake Game: up to date (build 300)' <<<"$out" || die "collect copied an unchanged app again"
+    ok "status line, no shell, no writes, no escape; collect copies over SSH and then stays put"
+}
+# Under amd64 emulation (Apple Silicon) QEMU has no seccomp, so sshd drops
+# every connection. Native runners (CI) do the SSH part.
+if ! ssh_cafe status >/dev/null 2>&1 && grep -q 'PR_SET_SECCOMP' /tmp/sshd.log; then
+    echo "skip  SSH part: sshd's seccomp sandbox cannot run under emulation here"
+else
+    cafe_over_ssh
+fi
 
 step "Player home is a fresh btrfs snapshot"
 btrfs subvolume show /home/player >/dev/null || die "/home/player is not a subvolume"

@@ -2,8 +2,13 @@
 lancache_dns_image: lancachenet/lancache-dns:latest
 lancache_image: lancachenet/monolithic:latest
 # Cache on the big SSD. Keep the size about 10 % under the disk's free space.
+# The server has one 468 GB disk, shared with /srv/games: the classic games
+# and the Steam café library (about 30 GB now, more as games are added).
+# With 382 GB free (November 2026), 250g leaves about 130 GB for /srv/games
+# to grow into.
+# The real server sets this in its untracked inventory: lower it there too.
 lancache_cache_dir: /srv/lancache/cache
 lancache_logs_dir: /srv/lancache/logs
-lancache_cache_size: 1000g
+lancache_cache_size: 250g
 lancache_index_size: 500m
 lancache_max_age: 3650d
