@@ -30,7 +30,12 @@ ok "ansible-lint"
 step "Real btrfs /home on a loop device"
 truncate -s 1G /tmp/home.img
 mkfs.btrfs -q /tmp/home.img
-mount -o loop /tmp/home.img /home
+# The container's /dev is a copy made at start. When the host had no free
+# loop device then, the one the kernel adds now has no node here: make it.
+loopdev=$(losetup -f)
+[[ -b $loopdev ]] || mknod "$loopdev" b 7 "${loopdev#/dev/loop}"
+losetup "$loopdev" /tmp/home.img
+mount "$loopdev" /home
 ok "$(findmnt -no FSTYPE -T /home) on /home"
 
 step "A stand-in game share (rsync daemon)"
