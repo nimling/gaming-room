@@ -12,5 +12,12 @@ network:
       interfaces: [{{ pccafe_bridge_nic }}]
       macaddress: "{{ ansible_facts[pccafe_bridge_nic | replace('-', '_')].macaddress }}"
       dhcp4: true
+      # The gaming VLAN's DHCP hands out this server (Lancache's DNS) as the
+      # seats' DNS. The server itself keeps the router: its own lookups must
+      # not depend on a container that may be down.
+      dhcp4-overrides:
+        use-dns: false
+      nameservers:
+        addresses: [{{ server_upstream_dns }}]
       # No bridge parameters (stp, forward-delay): `netplan try` refuses to roll back custom
       # bridge parameters, and networkd's defaults (STP off) are what we want.
