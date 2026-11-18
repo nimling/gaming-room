@@ -1,0 +1,18 @@
+{# Managed by gaming-room Ansible (roles/server_steam_cafe). JSON has no comments. #}
+{% set seats = [] %}
+{% for host in groups['seats'] | default([]) %}
+{% set address = hostvars[host].seat_lan_address | default(hostvars[host].ansible_host | default('')) %}
+{% if address %}
+{% set _ = seats.append({'name': host, 'address': address}) %}
+{% endif %}
+{% endfor %}
+{{ {
+  'apps': steam_cafe_apps,
+  'seats': seats,
+  'dest': steam_cafe_root ~ '/steamapps',
+  'user': steam_cafe_user,
+  'ssh_key': steam_cafe_home ~ '/.ssh/id_ed25519',
+  'known_hosts': steam_cafe_home ~ '/.ssh/known_hosts',
+  'presence_url': steam_cafe_presence_url | trim,
+  'reserve_gib': steam_cafe_reserve_gib | int,
+} | to_nice_json(indent=2) }}

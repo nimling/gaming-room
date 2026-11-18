@@ -1,0 +1,28 @@
+---
+# Steam café library (server/README.md). The list of apps and the account
+# name are in ansible/vars/steam_cafe.yml, shared with the seats.
+
+# The library in the game share; seats copy from here over rsync.
+steam_cafe_root: "{{ gameshare_root }}/{{ steam_cafe_share_dir }}"
+steam_cafe_home: "/var/lib/{{ steam_cafe_user }}"
+
+# Nightly, before the seats' pull (seat_pull_calendar, 03:30 plus up to
+# 30 min random delay), so seats get tonight's copies. A first copy of all
+# apps (about 30 GB) takes some minutes on gigabit; later nights copy only
+# what changed. Not caught up after downtime: a late run could land in a
+# game night.
+steam_cafe_collect_calendar: "*-*-* 02:00"
+
+# Keep this much free on the server's disk; a copy that would go below it
+# is left out (Lancache and the other games share the disk).
+steam_cafe_reserve_gib: 20
+
+# The seats it reads are the inventory's seats group: each host's
+# seat_lan_address, else ansible_host (templates/collect.json.j2).
+
+# The launcher's People list (roles/server_gameservers). A seat listed there
+# is in use and is not read. Empty: only the Steam and game checks on the
+# seat itself.
+steam_cafe_presence_url: >-
+  {{ ('http://' ~ server_lan_ip ~ ':' ~ gameservers_api_port ~ '/api/presence')
+     if gameservers_enabled | default(false) | bool else '' }}

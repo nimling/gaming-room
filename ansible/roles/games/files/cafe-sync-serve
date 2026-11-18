@@ -1,0 +1,35 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# The only command the cafe-sync account may run (forced in its
+# authorized_keys, which also limit it to the gaming server's address).
+# The server's nightly steam-cafe collect uses it to read this seat's Steam
+# library:
+#   status                    one line: steam=running|stopped game=running|stopped
+#   rsync --server --sender   read-only copy of the Steam library, through rrsync -ro
+# Anything else is refused. Nothing here can write to the seat.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+case ${SSH_ORIGINAL_COMMAND:-} in
+    status)
+        steam=stopped
+        game=stopped
+        if pgrep -x steam >/dev/null || pgrep -x steamwebhelper >/dev/null; then
+            steam=running
+        fi
+        # A game started from the launcher or Steam runs from /games.
+        if pgrep -u "$SEAT_PLAYER" -f -- "$SEAT_GAMES_ROOT/" >/dev/null; then
+            game=running
+        fi
+        echo "steam=$steam game=$game"
+        ;;
+    "rsync --server --sender "*)
+        exec /usr/bin/rrsync -ro "$SEAT_STEAM_LIBRARY/steamapps"
+        ;;
+    *)
+        echo "cafe-sync-serve: refused" >&2
+        exit 1
+        ;;
+esac

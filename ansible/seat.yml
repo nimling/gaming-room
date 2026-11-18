@@ -5,6 +5,9 @@
 - name: Configure gaming seats
   hosts: "{{ target | default('seats') }}"
   become: true
+  # The Steam café app list, shared with server.yml.
+  vars_files:
+    - vars/steam_cafe.yml
 
   pre_tasks:
     - name: Load seat-local settings written by an earlier push run

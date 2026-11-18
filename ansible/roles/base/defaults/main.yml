@@ -141,6 +141,14 @@ seat_shared_games:
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false
 
+# Steam café library (roles/games, tasks/steam_cafe.yml). The list of apps is
+# in ansible/vars/steam_cafe.yml. The gaming server reads each seat's Steam
+# library at night as cafe-sync; this is the only address that account may
+# log in from. Must be an IP address (sshd matches from= and AllowUsers
+# against addresses). Empty: no cafe-sync login on this seat; the seat still
+# copies café games from the share.
+seat_steam_cafe_server: "{{ arcade_voice_server }}"
+
 # Proton for Windows games (roles/games). Pinned, so all seats match; to
 # update, change both values. The digest is on the GitHub release:
 #   gh api repos/GloriousEggroll/proton-ge-custom/releases/tags/<version> \

@@ -1,0 +1,106 @@
+---
+# Steam café library: every night, take the newest complete copy of each
+# listed Steam app from the seats into the game share, where the seats copy
+# it from at their pull (roles/games, tasks/steam_cafe.yml). No Steam login
+# and no steamcmd here: Steam checks licences on the seat at launch.
+- name: Steam café | install rsync, the SSH client and Python
+  ansible.builtin.apt:
+    name:
+      - openssh-client
+      - python3
+      - rsync
+    state: present
+
+# Its own key, made here; the private key never leaves the server. Seats let
+# this key run only a read-only rsync of their Steam library.
+- name: Steam café | create the cafe-sync account with its own SSH key
+  ansible.builtin.user:
+    name: "{{ steam_cafe_user }}"
+    system: true
+    home: "{{ steam_cafe_home }}"
+    create_home: true
+    shell: /usr/sbin/nologin
+    password_lock: true
+    generate_ssh_key: true
+    ssh_key_type: ed25519
+    ssh_key_comment: "{{ steam_cafe_user }}@gaming-server"
+
+# The share's rsync daemon runs as nobody: everything must be world-readable.
+- name: Steam café | create the library folder in the share
+  ansible.builtin.file:
+    path: "{{ steam_cafe_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Steam café | let cafe-sync fill the library
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ steam_cafe_user }}"
+    group: "{{ steam_cafe_user }}"
+    mode: "0755"
+  loop:
+    - "{{ steam_cafe_root }}/steamapps"
+    - "{{ steam_cafe_root }}/steamapps/common"
+  # In a dry run of a fresh server the account does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Seats read it from the share and allow it in cafe-sync's authorized_keys.
+- name: Steam café | publish the public key on the share
+  ansible.builtin.copy:
+    src: "{{ steam_cafe_home }}/.ssh/id_ed25519.pub"
+    dest: "{{ steam_cafe_root }}/cafe-sync.pub"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  # In a dry run of a fresh server the key does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The same script runs on the seats (pull).
+- name: Steam café | install the copy script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/steam-cafe"
+    dest: /usr/local/sbin/steam-cafe
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Steam café | create the settings folder
+  ansible.builtin.file:
+    path: /etc/steam-cafe
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Steam café | write the apps and seats to collect from
+  ansible.builtin.template:
+    src: collect.json.j2
+    dest: /etc/steam-cafe/collect.json
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Steam café | install the nightly collect
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - steam-cafe-collect.service
+    - steam-cafe-collect.timer
+
+- name: Steam café | turn on the nightly collect
+  ansible.builtin.systemd_service:
+    name: steam-cafe-collect.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not server_in_container
+  # In a dry run of a fresh server the unit file does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"

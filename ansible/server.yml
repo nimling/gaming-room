@@ -1,17 +1,21 @@
 ---
 # Configures the gaming server (Ubuntu Server LTS): Docker, firewall,
-# Mumble, Lancache, the game share and Wake-on-LAN. Run from a machine on the gaming VLAN:
+# Mumble, Lancache, the game share, the Steam café library and Wake-on-LAN. Run from a machine on the gaming VLAN:
 #   ansible-playbook server.yml --check --diff
 #   ansible-playbook server.yml
 - name: Configure the gaming server
   hosts: "{{ target | default('server') }}"
   become: true
+  # The Steam café app list, shared with seat.yml.
+  vars_files:
+    - vars/steam_cafe.yml
 
   roles:
     - server_base
     - server_mumble
     - server_lancache
     - server_gameshare
+    - server_steam_cafe
     - server_gameservers
     - server_wol
     - server_claude

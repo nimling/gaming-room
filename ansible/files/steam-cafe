@@ -1,0 +1,593 @@
+#!/usr/bin/env python3
+# Managed by gaming-room Ansible (ansible/files, used by roles/server_steam_cafe
+# and roles/games).
+"""The shared Steam cafe library: the same Steam games on every seat.
+
+  steam-cafe collect --config /etc/steam-cafe/collect.json [--dry-run]
+      On the gaming server, nightly, as cafe-sync. For each listed app, finds
+      the newest complete copy on the seats (highest buildid, StateFlags 4)
+      and copies it into the game share when it is newer than the server's.
+  steam-cafe pull --share URL --library DIR --apps 550,410900 [--dry-run] ...
+      On a seat, at each ansible-pull, as root. Copies an app from the share
+      when the share's copy is newer than the seat's, or the seat lacks it.
+  steam-cafe key --share URL
+      Prints the server's public key for cafe-sync, read from the share.
+
+Game files go first, the appmanifest last: Steam only sees a finished copy.
+Nothing here logs in to Steam; Steam checks the licence when a game starts.
+"""
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+FULLY_INSTALLED = 4  # StateFlags of a complete, up-to-date install
+STEAM_PROCESSES = ("steam", "steamwebhelper")
+GIB = 1024**3
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+# --- appmanifest_<appid>.acf (Valve KeyValues text) ------------------------------
+
+TOKEN_RE = re.compile(r'"((?:[^"\\]|\\.)*)"|([{}])|(//[^\n]*)|(\S+)')
+
+
+def parse_vdf(text):
+    """KeyValues text to nested dicts. Keys are lower-cased (Steam treats
+    them case-insensitively). Raises ValueError on broken input."""
+    root, stack, key = {}, [], None
+    node = root
+    for m in TOKEN_RE.finditer(text):
+        quoted, brace, comment, bare = m.groups()
+        if comment is not None:
+            continue
+        if brace == "{":
+            if key is None:
+                raise ValueError("block without a key")
+            child = {}
+            node[key] = child
+            stack.append(node)
+            node, key = child, None
+        elif brace == "}":
+            if not stack or key is not None:
+                raise ValueError("unbalanced braces")
+            node = stack.pop()
+        else:
+            word = quoted if quoted is not None else bare
+            word = re.sub(r"\\(.)", r"\1", word)
+            if key is None:
+                key = word.lower()
+            else:
+                node[key] = word
+                key = None
+    if stack or key is not None:
+        raise ValueError("truncated")
+    return root
+
+
+class Manifest:
+    def __init__(self, appid, buildid, state, installdir, name="", size=0, path=None):
+        self.appid, self.buildid, self.state = appid, buildid, state
+        self.installdir, self.name, self.size, self.path = installdir, name, size, path
+
+    def __repr__(self):
+        return f"Manifest({self.appid}, build {self.buildid}, state {self.state}, {self.installdir!r})"
+
+
+def read_manifest(path):
+    """The fields we use from an appmanifest, or None if it is unreadable."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            state = parse_vdf(f.read()).get("appstate")
+        return Manifest(
+            appid=int(state["appid"]),
+            buildid=int(state.get("buildid", "-1")),
+            state=int(state.get("stateflags", "0")),
+            installdir=state.get("installdir", ""),
+            name=state.get("name", ""),
+            size=int(state.get("sizeondisk", "0")),
+            path=path,
+        )
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def safe_installdir(name):
+    """One plain folder name under common/: never a path out of it."""
+    return (
+        isinstance(name, str)
+        and 0 < len(name) <= 255
+        and name not in (".", "..")
+        and "/" not in name
+        and "\\" not in name
+        and name.isprintable()
+    )
+
+
+def complete(m, appid):
+    """A finished copy of this app that is safe to copy."""
+    return (
+        m is not None
+        and m.appid == appid
+        and m.state == FULLY_INSTALLED
+        and m.buildid >= 0
+        and safe_installdir(m.installdir)
+    )
+
+
+def manifest_name(appid):
+    return f"appmanifest_{appid}.acf"
+
+
+def read_manifests(folder, appids):
+    """{appid: Manifest} for the listed apps found in folder."""
+    out = {}
+    for appid in appids:
+        m = read_manifest(os.path.join(folder, manifest_name(appid)))
+        if m is not None:
+            out[appid] = m
+    return out
+
+
+def build_of(m, appid):
+    """Build number of a complete copy; -1 if missing or unfinished."""
+    return m.buildid if complete(m, appid) else -1
+
+
+def label(app):
+    return f"{app['appid']} {app.get('name') or ''}".rstrip()
+
+
+def manifest_filters(appids):
+    """rsync filters that fetch only the listed apps' manifests."""
+    return [f"--include={manifest_name(a)}" for a in appids] + ["--exclude=*"]
+
+
+def free_bytes(path):
+    try:
+        return shutil.disk_usage(path).free
+    except OSError:
+        return 0
+
+
+def room_for(m, have, folder, reserve):
+    """Enough free space for this copy, keeping `reserve` bytes free."""
+    grow = max(m.size - (have.size if have else 0), 0)
+    return free_bytes(folder) - grow >= reserve
+
+
+def write_manifest(src, library, appid, owner=None, group=None):
+    """Put the appmanifest in place in one step (rename)."""
+    dest = os.path.join(library, manifest_name(appid))
+    tmp = os.path.join(library, "." + manifest_name(appid) + ".tmp")
+    shutil.copyfile(src, tmp)
+    os.chmod(tmp, 0o644)
+    if owner or group:
+        shutil.chown(tmp, owner, group)
+    os.replace(tmp, dest)
+
+
+def run(argv, timeout=None):
+    """Run a command; (returncode, stdout, stderr). Never raises."""
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        return p.returncode, p.stdout, p.stderr
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 255, "", str(e)
+
+
+def last_line(text):
+    lines = [x for x in (text or "").strip().splitlines() if x.strip()]
+    return lines[-1][:200] if lines else ""
+
+
+# --- Busy checks -----------------------------------------------------------------
+
+
+def steam_running(proc="/proc"):
+    """True if a Steam client process runs on this machine."""
+    try:
+        pids = [p for p in os.listdir(proc) if p.isdigit()]
+    except OSError:
+        return False
+    for pid in pids:
+        try:
+            with open(os.path.join(proc, pid, "comm"), encoding="utf-8", errors="replace") as f:
+                if f.read().strip() in STEAM_PROCESSES:
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def parse_status(text):
+    """`steam=stopped game=stopped` (from cafe-sync-serve) to a dict."""
+    out = {}
+    for word in (text or "").split():
+        k, sep, v = word.partition("=")
+        if sep:
+            out[k] = v
+    return out if "steam" in out else None
+
+
+# --- Collect (server) ------------------------------------------------------------
+
+
+class Collector:
+    """Copies the newest complete copy of each listed app from the seats into
+    the share. Seat access is in the seat_* methods, so tests can replace it."""
+
+    def __init__(self, config, dry_run=False):
+        self.config = config
+        self.apps = config["apps"]
+        self.appids = [int(a["appid"]) for a in self.apps]
+        self.dest = config["dest"]
+        self.dry_run = dry_run
+        self.reserve = int(config.get("reserve_gib", 20)) * GIB
+        self.tmp = None
+
+    # Access to a seat: ssh as cafe-sync, which the seat limits to
+    # cafe-sync-serve (status, or rrsync -ro of its Steam library).
+    def _ssh(self):
+        c = self.config
+        return [
+            "ssh", "-i", c["ssh_key"],
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=5",
+            "-o", "ServerAliveInterval=15",
+            "-o", "ServerAliveCountMax=4",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", f"UserKnownHostsFile={c['known_hosts']}",
+        ]
+
+    def _remote(self, seat, path):
+        return f"{self.config['user']}@{seat['address']}:{path}"
+
+    def seat_status(self, seat):
+        """{'steam': 'running'|'stopped', 'game': ...}, or None if no answer."""
+        rc, out, err = run(self._ssh() + [f"{self.config['user']}@{seat['address']}", "status"], timeout=30)
+        if rc != 0:
+            seat["error"] = last_line(err) or f"ssh exited with {rc}"
+            return None
+        return parse_status(out)
+
+    def seat_rsync(self, seat, args, src, dst):
+        rc, out, err = run(["rsync", "-e", " ".join(self._ssh())] + args + [self._remote(seat, src), dst])
+        return rc, last_line(err)
+
+    def busy_addresses(self):
+        """Seats someone is using, from the launcher's People list. None if
+        the list is not set up or did not answer."""
+        url = self.config.get("presence_url")
+        if not url:
+            return None
+        try:
+            with urllib.request.urlopen(url, timeout=5) as r:
+                people = json.load(r)
+            return {p["ip"] for p in people if isinstance(p, dict) and "ip" in p}
+        except (OSError, ValueError, TypeError) as e:
+            log(f"people list not reachable ({e}); checking Steam on each seat only")
+            return None
+
+    def fetch_manifests(self, seat, appids, into):
+        os.makedirs(into, exist_ok=True)
+        rc, err = self.seat_rsync(seat, ["-rt"] + manifest_filters(appids), "./", into + "/")
+        if rc != 0:
+            seat["error"] = err or f"rsync exited with {rc}"
+            return None
+        return read_manifests(into, appids)
+
+    def seat_free(self, seat):
+        """Why the seat cannot be read now, or None if it can."""
+        st = self.seat_status(seat)
+        if st is None:
+            return f"did not answer ({seat.get('error', 'no reply')})"
+        if st.get("steam") == "running":
+            return "Steam is running"
+        if st.get("game") == "running":
+            return "a game is running"
+        return None
+
+    def run(self):
+        os.makedirs(self.dest, exist_ok=True)
+        self.tmp = tempfile.mkdtemp(prefix="steam-cafe-")
+        try:
+            return self._run()
+        finally:
+            shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self):
+        seats = self.config.get("seats", [])
+        if not seats:
+            log("no seats in the list; nothing to collect")
+            return 0
+        busy = self.busy_addresses() or set()
+        found = {}  # seat name -> {appid: Manifest}
+        by_name = {}
+        for seat in seats:
+            name = seat["name"]
+            by_name[name] = seat
+            if seat["address"] in busy:
+                log(f"{name}: skipped, someone is using it (launcher)")
+                continue
+            why = self.seat_free(seat)
+            if why:
+                log(f"{name}: skipped, {why}")
+                continue
+            manifests = self.fetch_manifests(seat, self.appids, os.path.join(self.tmp, name))
+            if manifests is None:
+                log(f"{name}: skipped, could not read its Steam library ({seat.get('error')})")
+                continue
+            found[name] = manifests
+        if not found:
+            log(f"no seat could be read (of {len(seats)}); the library stays as it is")
+            return 0
+
+        server = read_manifests(self.dest, self.appids)
+        failed = 0
+        for app in self.apps:
+            appid = int(app["appid"])
+            have = server.get(appid)
+            seat_name, best = pick_newest(appid, found)
+            have_build = build_of(have, appid)
+            if best is None:
+                log(f"{label(app)}: no complete copy on the seats that answered"
+                    + (f"; keeping build {have_build}" if have_build >= 0 else ""))
+                continue
+            if best.buildid <= have_build:
+                log(f"{label(app)}: up to date (build {have_build})")
+                continue
+            was = f"server had {have_build}" if have_build >= 0 else "new on the server"
+            if self.dry_run:
+                log(f"{label(app)}: would copy build {best.buildid} from {seat_name} ({was})")
+                continue
+            ok, why = self.copy(by_name[seat_name], appid, best, have)
+            if ok:
+                log(f"{label(app)}: copied build {best.buildid} from {seat_name} ({was})")
+            else:
+                failed += 1
+                log(f"{label(app)}: not copied from {seat_name}: {why}")
+        return 1 if failed else 0
+
+    def copy(self, seat, appid, m, have):
+        if not room_for(m, have, self.dest, self.reserve):
+            return False, "not enough free space on the server"
+        # Seats only take an app whose manifest is there: take it away first,
+        # so a half-copied folder is never offered.
+        manifest = os.path.join(self.dest, manifest_name(appid))
+        if os.path.exists(manifest):
+            os.unlink(manifest)
+        target = os.path.join(self.dest, "common", m.installdir)
+        os.makedirs(target, exist_ok=True)
+        rc, err = self.seat_rsync(
+            seat,
+            ["-rlpt", "--delete", "--chmod=u+rwX,go+rX,go-w"],
+            f"common/{m.installdir}/",
+            target + "/",
+        )
+        if rc != 0:
+            return False, f"rsync failed ({err or rc}); retried next night"
+        # The seat may have changed while we copied.
+        why = self.seat_free(seat)
+        if why:
+            return False, f"{why} now; manifest left out, retried next night"
+        again = self.fetch_manifests(seat, [appid], os.path.join(self.tmp, seat["name"] + "-after"))
+        now = (again or {}).get(appid)
+        if not complete(now, appid) or now.buildid != m.buildid or now.installdir != m.installdir:
+            return False, "the seat's copy changed during the copy; retried next night"
+        write_manifest(now.path, self.dest, appid)
+        return True, ""
+
+
+def pick_newest(appid, found):
+    """(seat name, Manifest) with the highest buildid among complete copies;
+    the first seat wins a tie. (None, None) if no seat has one."""
+    best_seat, best = None, None
+    for seat_name, manifests in found.items():
+        m = manifests.get(appid)
+        if complete(m, appid) and (best is None or m.buildid > best.buildid):
+            best_seat, best = seat_name, m
+    return best_seat, best
+
+
+# --- Pull (seat) -----------------------------------------------------------------
+
+
+def plan_pull(appids, server, local):
+    """[(appid, Manifest from the share, the seat's Manifest or None)] for
+    apps to copy: the share's copy is complete and newer than the seat's, or
+    the seat has none (or an unfinished one). Unlisted apps never appear."""
+    todo = []
+    for appid in appids:
+        s = server.get(appid)
+        if complete(s, appid) and s.buildid > build_of(local.get(appid), appid):
+            todo.append((appid, s, local.get(appid)))
+    return todo
+
+
+class Puller:
+    def __init__(self, share, library, apps, owner=None, group=None, marker=None,
+                 dry_run=False, proc="/proc", reserve_gib=10):
+        self.share = share.rstrip("/")
+        self.library = library
+        self.apps = apps
+        self.appids = [int(a["appid"]) for a in apps]
+        self.names = {int(a["appid"]): a.get("name", "") for a in apps}
+        self.owner, self.group = owner, group
+        self.marker = marker
+        self.dry_run = dry_run
+        self.proc = proc
+        self.reserve = reserve_gib * GIB
+
+    def busy(self):
+        if steam_running(self.proc):
+            return "Steam is running"
+        if self.marker and os.path.exists(self.marker):
+            return "the player session is in use"
+        return None
+
+    def run(self):
+        """Exit code: 0 done (or nothing to do), 2 some apps not copied."""
+        why = self.busy()
+        if why:
+            log(f"skipped: {why}; the next pull tries again")
+            log("changed=0")
+            return 0
+        tmp = tempfile.mkdtemp(prefix="steam-cafe-")
+        try:
+            return self._run(tmp)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def _label(self, appid):
+        return label({"appid": appid, "name": self.names.get(appid)})
+
+    def _run(self, tmp):
+        rc, _, err = run(["rsync", "-rt"] + manifest_filters(self.appids) + [self.share + "/", tmp + "/"], timeout=120)
+        if rc != 0:
+            log(f"share not reachable or empty ({last_line(err) or rc}); nothing copied")
+            log("changed=0")
+            return 0
+        server = read_manifests(tmp, self.appids)
+        local = read_manifests(self.library, self.appids)
+        todo = plan_pull(self.appids, server, local)
+        changed = failed = 0
+        for appid in self.appids:
+            if appid not in [t[0] for t in todo]:
+                s = server.get(appid)
+                if complete(s, appid):
+                    log(f"{self._label(appid)}: up to date (build {build_of(local.get(appid), appid)})")
+                else:
+                    log(f"{self._label(appid)}: not on the server")
+        for appid, s, mine in todo:
+            was = f"was {build_of(mine, appid)}" if complete(mine, appid) else "new on this seat"
+            if self.dry_run:
+                log(f"{self._label(appid)}: would copy build {s.buildid} ({was})")
+                changed += 1
+                continue
+            why = self.busy()
+            if why:
+                log(f"{self._label(appid)}: not copied, {why}; the next pull tries again")
+                failed += 1
+                continue
+            ok, why = self.copy(appid, s, local.get(appid))
+            if ok:
+                changed += 1
+                log(f"{self._label(appid)}: copied build {s.buildid} ({was})")
+            else:
+                failed += 1
+                log(f"{self._label(appid)}: not copied: {why}")
+        log(f"changed={changed}")
+        return 2 if failed else 0
+
+    def _own(self, path):
+        if self.owner or self.group:
+            shutil.chown(path, self.owner, self.group)
+
+    def copy(self, appid, s, mine):
+        if not room_for(s, mine, self.library, self.reserve):
+            return False, "not enough free space"
+        common = os.path.join(self.library, "common")
+        if not os.path.isdir(common):
+            os.makedirs(common)
+            os.chmod(common, 0o2775)
+            self._own(common)
+        # Steam must not see an app half copied: without its manifest the app
+        # counts as not installed until the copy is complete.
+        manifest = os.path.join(self.library, manifest_name(appid))
+        if os.path.exists(manifest):
+            os.unlink(manifest)
+        target = os.path.join(common, s.installdir)
+        argv = ["rsync", "-rlpt", "--delete"]
+        if self.owner or self.group:
+            argv.append(f"--chown={self.owner or ''}:{self.group or ''}")
+        argv += [f"{self.share}/common/{s.installdir}/", target + "/"]
+        rc, _, err = run(argv)
+        if rc != 0:
+            return False, f"rsync failed ({last_line(err) or rc})"
+        if steam_running(self.proc):
+            return False, "Steam started during the copy; manifest left out until the next pull"
+        write_manifest(s.path, self.library, appid, self.owner, self.group)
+        return True, ""
+
+
+# --- Key (seat) ------------------------------------------------------------------
+
+KEY_RE = re.compile(r"^ssh-ed25519 [A-Za-z0-9+/=]+( [\w.@-]+)?$")
+
+
+def fetch_key(share):
+    tmp = tempfile.mkdtemp(prefix="steam-cafe-")
+    try:
+        rc, _, err = run(["rsync", share.rstrip("/") + "/cafe-sync.pub", tmp + "/"], timeout=60)
+        if rc != 0:
+            return None, last_line(err) or f"rsync exited with {rc}"
+        with open(os.path.join(tmp, "cafe-sync.pub"), encoding="ascii", errors="replace") as f:
+            key = f.read().strip()
+        if not KEY_RE.match(key):
+            return None, "not a single ssh-ed25519 public key"
+        return key, None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# --- Command line ----------------------------------------------------------------
+
+
+def parse_apps(text):
+    apps = []
+    for part in (text or "").split(","):
+        part = part.strip()
+        if part:
+            apps.append({"appid": int(part)})
+    return apps
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="steam-cafe", description=__doc__.split("\n")[0])
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("collect", help="server: take the newest copies from the seats")
+    c.add_argument("--config", default="/etc/steam-cafe/collect.json")
+    c.add_argument("--dry-run", action="store_true")
+    p = sub.add_parser("pull", help="seat: copy newer apps from the share")
+    p.add_argument("--share", required=True, help="rsync URL of the shared steamapps folder")
+    p.add_argument("--library", required=True, help="the seat's steamapps folder")
+    p.add_argument("--apps", help="comma-separated appids")
+    p.add_argument("--apps-json", help="JSON list of {appid, name}")
+    p.add_argument("--owner")
+    p.add_argument("--group")
+    p.add_argument("--session-marker", help="file that exists while a player session is in use")
+    p.add_argument("--dry-run", action="store_true")
+    k = sub.add_parser("key", help="seat: print the server's cafe-sync public key")
+    k.add_argument("--share", required=True, help="rsync URL of the steam-cafe folder")
+    args = ap.parse_args(argv)
+
+    if args.cmd == "collect":
+        with open(args.config, encoding="utf-8") as f:
+            config = json.load(f)
+        return Collector(config, dry_run=args.dry_run).run()
+    if args.cmd == "pull":
+        apps = json.loads(args.apps_json) if args.apps_json else parse_apps(args.apps)
+        return Puller(
+            args.share, args.library, apps, owner=args.owner, group=args.group,
+            marker=args.session_marker, dry_run=args.dry_run,
+        ).run()
+    key, why = fetch_key(args.share)
+    if key is None:
+        print(f"no key on the share: {why}", file=sys.stderr)
+        return 1
+    print(key)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
