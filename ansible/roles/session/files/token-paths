@@ -2,6 +2,8 @@
 # Where launchers and browsers keep logins, relative to the player's home.
 # Format: <glob>|<optional extended regex the file must match>
 # Add a line whenever a new launcher goes on the seats.
+# The gaming server uses this list too, before it publishes a Battle.net
+# prefix to the seats (battlenet-prefix-publish, roles/server_gameshare).
 
 # Steam
 .local/share/Steam/config/loginusers.vdf|"AccountName"

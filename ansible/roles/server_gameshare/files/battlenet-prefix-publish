@@ -1,0 +1,129 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/server_gameshare).
+# Publishes the canary's signed-out Battle.net prefix to the game share, so
+# every seat gets Battle.net from there (battlenet-prefix-pull, roles/games).
+#
+# How to use (docs/wow-forever.md, step 3):
+#   1. On the canary, set Battle.net up in the player's session, sign out,
+#      and capture the golden home (sudo seat-golden-capture).
+#   2. Right after that, on the server:  sudo battlenet-prefix-publish seat-01
+#
+# What it does:
+#   1. Copies the prefix from the canary's golden home into a private staging
+#      folder. It logs in as orchestrator with the server's Claude key: the
+#      path Ansible already uses.
+#   2. Refuses if the copy holds any login from the token list that golden
+#      capture and gate 1 use (seat-token-check, token-paths).
+#   3. Removes the share's version file, so seats stop taking the prefix,
+#      copies the prefix without logs, caches and crash dumps, and writes a
+#      new version file last.
+#   4. Writes the same version into the canary's golden home, so its next
+#      pull keeps what is there.
+#
+#   battlenet-prefix-publish SEAT
+# Settings (from /etc/default/battlenet-prefix-publish, written by Ansible):
+#   BATTLENET_PREFIX_SHARE    share folder, default /srv/games/battlenet/prefix
+#   BATTLENET_PUBLISH_SSH_AS  server account whose SSH key reaches the seats
+#   BATTLENET_PUBLISH_LOGIN   seat account with sudo and no password
+#   BATTLENET_PREFIX_SOURCE   copy from this folder instead of a seat (tests)
+set -euo pipefail
+
+# shellcheck source=/dev/null
+[[ -r /etc/default/battlenet-prefix-publish ]] && source /etc/default/battlenet-prefix-publish
+share=${BATTLENET_PREFIX_SHARE:-/srv/games/battlenet/prefix}
+ssh_as=${BATTLENET_PUBLISH_SSH_AS:-claude}
+login=${BATTLENET_PUBLISH_LOGIN:-orchestrator}
+golden_prefix=/home/.golden/player/.local/share/arcade/prefixes/battlenet
+marker=.prefix-version
+die() { echo "battlenet-prefix-publish: $*" >&2; exit 1; }
+
+# Per-session data Battle.net and Wine make again. Not secret (the token
+# check covers logins), but useless on another seat and copied at every reset.
+excludes=(
+    "/$marker*"
+    /pfx.lock
+    /drive_c/windows/temp/
+    /drive_c/users/*/Temp/
+    /drive_c/users/*/AppData/Local/Temp/
+    /drive_c/users/*/AppData/Local/CrashDumps/
+    /drive_c/users/*/AppData/Local/Battle.net/Logs/
+    /drive_c/users/*/AppData/Local/Battle.net/Cache/
+    /drive_c/users/*/AppData/Local/Battle.net/BrowserCaches/
+    "/drive_c/ProgramData/Battle.net/**/Logs/"
+    "/drive_c/ProgramData/Blizzard Entertainment/Battle.net/Cache/"
+    "*.dmp"
+)
+
+seat=${1:-}
+if [[ -n ${BATTLENET_PREFIX_SOURCE:-} ]]; then
+    source=${BATTLENET_PREFIX_SOURCE%/}/
+    from=$source
+    remote=()
+else
+    [[ $# -eq 1 && $seat =~ ^[A-Za-z0-9._-]+$ ]] || { echo "usage: sudo battlenet-prefix-publish SEAT" >&2; exit 2; }
+    source=$seat:$golden_prefix/
+    from=$seat
+    # rsync runs here as root; only ssh runs as the account with the key.
+    # /home/.golden is root-only on the seat, hence sudo there.
+    remote=(-e "runuser -u $ssh_as -- ssh -l $login -o BatchMode=yes" --rsync-path="sudo -n rsync")
+fi
+[[ $EUID -eq 0 ]] || die "run as root (sudo)"
+[[ -d $share ]] || die "$share does not exist; run server.yml first"
+
+# Outside the share: rsyncd must never serve a copy that may hold logins.
+stage=$(mktemp -d /var/tmp/battlenet-prefix.XXXXXX)
+trap 'rm -rf -- "$stage"' EXIT
+# Laid out like a home, so the token list's paths apply as they are.
+home=$stage/home
+copy=$home/.local/share/arcade/prefixes/battlenet
+mkdir -p -- "$copy"
+
+echo "battlenet-prefix-publish: copying the prefix from $from"
+# Links stay links: the prefix has dosdevices/z: -> /.
+rsync -rlpt "${remote[@]}" "$source" "$copy/" \
+    || die "could not copy $source (is Battle.net installed there, and does $login have sudo without a password?)"
+
+[[ -f "$copy/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" ]] \
+    || die "no Battle.net.exe in the prefix from $from; install it first (battlenet-seat --install)"
+if ! /usr/local/sbin/seat-token-check "$home"; then
+    die "refusing: the prefix from $from still holds logins (above). Sign out of Battle.net on the canary, capture again, and publish again."
+fi
+
+# Wine keeps the computer name in its registry and sets it again from the
+# seat's own hostname each time it starts. Shown so a person can see it.
+names=("$seat")
+if (( ${#remote[@]} )); then
+    names+=("$(runuser -u "$ssh_as" -- ssh -l "$login" -o BatchMode=yes "$seat" hostname 2>/dev/null || true)")
+fi
+for name in "${names[@]}"; do
+    [[ -n $name ]] || continue
+    while IFS= read -r reg; do
+        echo "note: ${reg#"$copy"/} names '$name'; Wine sets the seat's own name at each start"
+    done < <(grep -lIiF -- "$name" "$copy"/*.reg 2>/dev/null || true)
+done
+
+version="$(date -u +%Y%m%dT%H%M%SZ) from $from"
+rm -f -- "$share/$marker"
+exclude_args=()
+for pattern in "${excludes[@]}"; do
+    exclude_args+=("--exclude=$pattern")
+done
+# rsyncd runs as nobody: everything readable, nothing writable but by root.
+rsync -rlpt --delete --delete-excluded "${exclude_args[@]}" \
+    --chmod=u+rwX,go+rX,go-w "$copy/" "$share/"
+printf '%s\n' "$version" >"$share/$marker.new"
+chmod 0644 -- "$share/$marker.new"
+mv -f -- "$share/$marker.new" "$share/$marker"
+echo "battlenet-prefix-publish: published $version to $share ($(du -sh -- "$share" | cut -f1))"
+
+# The canary already has this prefix: give it the same version, so its next
+# pull does not replace its own copy with the published one.
+if (( ${#remote[@]} )); then
+    if rsync -tog "${remote[@]}" --chown=player:player --chmod=F644 \
+        "$share/$marker" "$seat:$golden_prefix/$marker"; then
+        echo "battlenet-prefix-publish: $seat's golden home now has the same version"
+    else
+        echo "battlenet-prefix-publish: could not mark $seat's golden home; its next pull replaces its prefix with the published one" >&2
+    fi
+fi
+echo "Seats get it at their next pull, then the next reset."

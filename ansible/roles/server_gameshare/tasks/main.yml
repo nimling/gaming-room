@@ -15,8 +15,10 @@
     group: "{{ gameshare_owner }}"
     mode: "0755"
   # Worms and WoW: copied in by hand (docs/worms.md, docs/wow-forever.md).
+  # battlenet/prefix: filled by battlenet-prefix-publish (below).
   loop: >-
-    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms', gameshare_root ~ '/wow']
+    {{ [gameshare_root, iw4x_dir, gameshare_root ~ '/worms', gameshare_root ~ '/wow',
+        gameshare_root ~ '/battlenet', battlenet_prefix_share]
        + (gameshare_engine_games | map(attribute='name') | map('regex_replace', '^', gameshare_root ~ '/') | list) }}
 
 - name: Serve the game share read-only over rsync
@@ -170,6 +172,50 @@
     recurse: true
     mode: "u+rwX,go+rX"
   when: wow_share_game.stat.exists
+
+# --- Battle.net, set up once on the canary ------------------------------------
+# A person sets Battle.net up on the canary, signs out and publishes the
+# prefix here (docs/wow-forever.md, step 3). Seats copy it into their golden
+# home. The publish refuses a prefix with logins, with the same check and
+# list as golden capture and gate 1, so both come from roles/session.
+- name: Battle.net | create the token list folder
+  ansible.builtin.file:
+    path: /usr/local/share/seat
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Battle.net | install the login token check and its list (from roles/session)
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../session/files/{{ item.name }}"
+    dest: "{{ item.dir }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: seat-token-check, dir: /usr/local/sbin, mode: "0755" }
+    - { name: token-paths, dir: /usr/local/share/seat, mode: "0644" }
+
+- name: Battle.net | install the publish script
+  ansible.builtin.copy:
+    src: battlenet-prefix-publish
+    dest: /usr/local/sbin/battlenet-prefix-publish
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Battle.net | tell the publish script where to copy and whose key to use
+  ansible.builtin.copy:
+    dest: /etc/default/battlenet-prefix-publish
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by gaming-room Ansible (roles/server_gameshare).
+      BATTLENET_PREFIX_SHARE={{ battlenet_prefix_share }}
+      BATTLENET_PUBLISH_SSH_AS={{ server_claude_user | default('claude') }}
+      BATTLENET_PUBLISH_LOGIN={{ battlenet_publish_login }}
 
 - name: TrackMania Nations Forever
   ansible.builtin.include_tasks: tmnf.yml

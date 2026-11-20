@@ -6,8 +6,9 @@
 # the patches come through Lancache. So the copy runs only once: a later run
 # would undo Battle.net's patches with the share's older files.
 # Battle.net itself and every login live in the player's home (battlenet-seat).
-# WoW's personal folders are links into that home (wow-links). See
-# docs/wow-forever.md.
+# The golden home gets Battle.net, signed out, from the share's
+# battlenet/prefix/ folder (battlenet-prefix-pull). WoW's personal folders are
+# links into that home (wow-links). See docs/wow-forever.md.
 - name: WoW | create the Battle.net games folder
   ansible.builtin.file:
     path: "{{ seat_battlenet_root }}"
@@ -71,13 +72,37 @@
   # In a dry run on a new seat the folder does not exist yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: WoW | install the Battle.net start script
+- name: WoW | install the Battle.net start script and prefix copy script
   ansible.builtin.copy:
-    src: battlenet-seat
-    dest: /usr/local/bin/battlenet-seat
+    src: "{{ item.name }}"
+    dest: "{{ item.dir }}/{{ item.name }}"
     owner: root
     group: root
     mode: "0755"
+  loop:
+    - { name: battlenet-seat, dir: /usr/local/bin }
+    - { name: battlenet-prefix-pull, dir: /usr/local/sbin }
+  register: battlenet_scripts
+
+# Battle.net, set up once on the canary and published to the share signed out
+# (battlenet-prefix-publish on the server). A different version replaces the
+# golden home's prefix in one rename; the live home gets it at the next reset.
+# Same version: nothing changes. No finished prefix on the share, or no golden
+# home yet (a new seat; roles/session makes it later in this run): nothing
+# changes either.
+- name: WoW | copy the signed-out Battle.net prefix into the golden home
+  ansible.builtin.command:
+    argv: >-
+      {{ ['/usr/local/sbin/battlenet-prefix-pull']
+         + (['--dry-run'] if ansible_check_mode else [])
+         + [seat_gameshare ~ '/battlenet/prefix'] }}
+  register: battlenet_prefix
+  changed_when: battlenet_prefix.stdout | length > 0
+  check_mode: false
+  # In a dry run the script must already be installed and current.
+  when: >-
+    seat_gameshare | length > 0
+    and not (ansible_check_mode and battlenet_scripts is changed)
 
 # seat-reset runs every program in this folder after it replaced the home.
 - name: WoW | create the reset hook folder

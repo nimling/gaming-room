@@ -25,7 +25,8 @@ cp -a /repo /work
 cd /work
 
 step "Lint"
-shellcheck bootstrap/seat.sh ansible/roles/server_gameshare/files/ut2004-build ansible/roles/server_gameshare/files/tmnf-build tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
+shellcheck bootstrap/seat.sh ansible/roles/server_gameshare/files/ut2004-build ansible/roles/server_gameshare/files/tmnf-build \
+    ansible/roles/server_gameshare/files/battlenet-prefix-publish ansible/roles/session/files/seat-token-check tests/gates/server-services.sh tests/container/test-server.sh tests/container/run-server.sh
 ok "shellcheck"
 yamllint ansible
 ok "yamllint"
@@ -88,6 +89,62 @@ grep -q 'address = 192.0.2.10' /etc/rsyncd.conf || die "rsync not bound to the L
 [[ $(stat -c %U /srv/games/mw2) == nimadmin ]] || die "game share not owned by the login user"
 [[ ! -e /srv/games/mw2/iw4x.dll ]] || die "IW4x installed without MW2"
 ok "read-only rsync share; IW4x waits for MW2"
+
+step "Battle.net prefix: publish from the canary"
+[[ -d /srv/games/battlenet/prefix ]] || die "share folder for the Battle.net prefix missing"
+[[ -x /usr/local/sbin/battlenet-prefix-publish && -x /usr/local/sbin/seat-token-check ]] || die "publish script or token check missing"
+cmp -s ansible/roles/session/files/token-paths /usr/local/share/seat/token-paths || die "server token list differs from the seats'"
+grep -qx 'BATTLENET_PREFIX_SHARE=/srv/games/battlenet/prefix' /etc/default/battlenet-prefix-publish || die "publish settings"
+grep -qx 'BATTLENET_PUBLISH_SSH_AS=claude' /etc/default/battlenet-prefix-publish || die "publish does not use the claude key"
+if /usr/local/sbin/battlenet-prefix-publish 'seat-01;x' >/dev/null 2>&1; then die "publish took a bad seat name"; fi
+# A fake prefix as Battle.net leaves it on the canary, signed out.
+src=/tmp/bnet-prefix
+u=$src/drive_c/users/steamuser
+mkdir -p "$src/drive_c/Program Files (x86)/Battle.net" "$src/dosdevices" "$u/AppData/Roaming/Battle.net" \
+    "$u/AppData/Local/Battle.net/Logs" "$u/AppData/Local/Battle.net/BrowserCaches/common/Network" "$u/Temp" \
+    "$src/drive_c/ProgramData/Battle.net/Agent/Agent.9000/Logs"
+echo exe >"$src/drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
+ln -s ../drive_c "$src/dosdevices/c:"; ln -s / "$src/dosdevices/z:"
+echo '{"Client": {"SavedAccountNames": ""}}' >"$u/AppData/Roaming/Battle.net/Battle.net.config"
+printf '[System\\\\CurrentControlSet\\\\Control\\\\ComputerName\\\\ComputerName]\n"ComputerName"="SEAT-01"\n' >"$src/system.reg"
+printf 'WINE REGISTRY Version 2\n' >"$src/user.reg"
+echo log >"$u/AppData/Local/Battle.net/Logs/battle.net.log"
+echo log >"$src/drive_c/ProgramData/Battle.net/Agent/Agent.9000/Logs/Agent.log"
+echo cookie >"$u/AppData/Local/Battle.net/BrowserCaches/common/Network/Cookies"
+echo tmp >"$u/Temp/x.tmp"; echo dump >"$src/drive_c/crash.dmp"
+echo stale >"$src/.prefix-version"
+chown -R 1000:1000 "$src"; chmod 700 "$src/drive_c"
+publish() { BATTLENET_PREFIX_SOURCE=$src /usr/local/sbin/battlenet-prefix-publish "$@"; }
+# A login left in the prefix ("Keep me logged in" goes to Credential Manager).
+printf '[Software\\\\Wine\\\\Credential Manager\\\\Generic: Battle.net] 1700000000\n' >>"$src/user.reg"
+echo "earlier" >/srv/games/battlenet/prefix/.prefix-version
+if out=$(publish 2>&1); then echo "$out"; die "published a prefix with a login"; fi
+echo "$out"
+grep -q 'token: .*/battlenet/user.reg' <<<"$out" || die "refusal does not name the login"
+[[ $(cat /srv/games/battlenet/prefix/.prefix-version) == earlier ]] || die "a refused publish touched the share"
+[[ -z $(find /srv/games/battlenet/prefix -mindepth 1 ! -name .prefix-version) ]] || die "a refused publish copied files to the share"
+[[ -z $(find /var/tmp -maxdepth 1 -name "battlenet-prefix.*") ]] || die "refused copy left behind in /var/tmp"
+ok "refuses a prefix with a login, and leaves the share and no copy behind"
+printf 'WINE REGISTRY Version 2\n' >"$src/user.reg"
+out=$(publish seat-01 2>&1) || { echo "$out"; die "publish of a clean prefix failed"; }
+echo "$out"
+p=/srv/games/battlenet/prefix
+grep -Eq '^[0-9]{8}T[0-9]{6}Z from /tmp/bnet-prefix/$' "$p/.prefix-version" || die "version file: $(cat "$p/.prefix-version")"
+[[ -f "$p/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" && -f $p/drive_c/users/steamuser/AppData/Roaming/Battle.net/Battle.net.config ]] || die "prefix not published"
+[[ $(readlink "$p/dosdevices/c:") == ../drive_c && $(readlink "$p/dosdevices/z:") == / ]] || die "drive links not kept as links"
+for gone in drive_c/users/steamuser/AppData/Local/Battle.net/Logs drive_c/users/steamuser/AppData/Local/Battle.net/BrowserCaches \
+    drive_c/users/steamuser/Temp drive_c/ProgramData/Battle.net/Agent/Agent.9000/Logs drive_c/crash.dmp; do
+    [[ ! -e $p/$gone ]] || die "$gone was published"
+done
+[[ -z $(find "$p" ! -perm -o=r) && -z $(find "$p" -type d ! -perm -o=x) ]] || die "rsyncd (nobody) cannot read everything"
+[[ -z $(find "$p" -perm /go=w ! -type l) && -z $(find "$p" ! -user root ! -path "$p") ]] || die "published files writable or not owned by root"
+grep -q "note: system.reg names 'seat-01'" <<<"$out" || die "publish did not point out the seat's name in the registry"
+first=$(cat "$p/.prefix-version")
+sleep 1
+rm -rf "$u/AppData/Roaming/Battle.net"
+publish >/dev/null
+[[ $(cat "$p/.prefix-version") != "$first" && ! -e $p/drive_c/users/steamuser/AppData/Roaming/Battle.net ]] || die "a new publish did not replace the old one"
+ok "publishes without logs, caches and dumps; links kept; readable for rsyncd; new version each time"
 
 step "Steam café library"
 python3 -m unittest discover -s tests/steamcafe >/tmp/cafe-unit.log 2>&1 || { cat /tmp/cafe-unit.log; die "steam-cafe unit tests"; }
@@ -291,6 +348,24 @@ visudo -cf /etc/sudoers.d/20-claude >/dev/null || die "claude sudo rule invalid"
 grep -q 'claude --remote-control' /etc/systemd/system/claude-orchestrator.service || die "Remote Control service"
 [[ $(git config --file /home/claude/.gitconfig user.email) == 34557052+nimsim@users.noreply.github.com ]] || die "claude git identity"
 ok "account, key, sudo, service and git identity"
+
+step "Battle.net prefix: publish over SSH, as from the real canary"
+# This container stands in for the canary too: orchestrator with sudo and
+# the claude key, and a golden home with the signed-out prefix.
+useradd -m orchestrator; usermod -p '*' orchestrator; useradd -U player
+echo 'orchestrator ALL=(ALL:ALL) NOPASSWD: ALL' >/etc/sudoers.d/10-orchestrator
+install -d -m 700 -o orchestrator /home/orchestrator/.ssh
+install -m 600 -o orchestrator /home/claude/.ssh/id_ed25519.pub /home/orchestrator/.ssh/authorized_keys
+gp=/home/.golden/player/.local/share/arcade/prefixes/battlenet
+install -d -m 700 /home/.golden; mkdir -p "$gp"; cp -a "$src/." "$gp/"; chown -R player:player /home/.golden/player
+/usr/sbin/sshd
+out=$(/usr/local/sbin/battlenet-prefix-publish localhost 2>&1) || { echo "$out"; die "publish over SSH failed"; }
+echo "$out"
+grep -Eq '^[0-9]{8}T[0-9]{6}Z from localhost$' /srv/games/battlenet/prefix/.prefix-version || die "version file after SSH publish"
+[[ $(readlink /srv/games/battlenet/prefix/dosdevices/z:) == / ]] || die "drive links not kept over SSH"
+cmp -s /srv/games/battlenet/prefix/.prefix-version "$gp/.prefix-version" || die "canary not given the published version"
+[[ $(stat -c %U:%G "$gp/.prefix-version") == player:player ]] || die "canary's version file not owned by player"
+ok "copies from the canary as orchestrator with the claude key; canary gets the same version"
 
 step "wake-seats"
 bash -n /usr/local/bin/wake-seats

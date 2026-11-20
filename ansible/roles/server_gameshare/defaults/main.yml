@@ -29,6 +29,14 @@ iw4x_client_url: "https://github.com/iw4x/iw4x-client/releases/download/{{ iw4x_
 iw4x_rawfiles_url: "https://github.com/iw4x/iw4x-rawfiles/releases/download/{{ iw4x_rawfiles_version }}/release.zip"
 iw4x_cache: /var/cache/iw4x
 
+# --- Battle.net, set up once on the canary ------------------------------------
+# The canary's signed-out Battle.net prefix (battlenet-prefix-publish); seats
+# copy it into their golden home (docs/wow-forever.md).
+battlenet_prefix_share: "{{ gameshare_root }}/battlenet/prefix"
+# The seat account the publish logs in as. It needs sudo without a password,
+# as Ansible's orchestrator has; the key is the server's Claude key.
+battlenet_publish_login: orchestrator
+
 # --- TrackMania Nations Forever ----------------------------------------------
 # Free from Nadeo. The server unpacks Nadeo's installer (files/tmnf-build);
 # seats run TmForever.exe through Proton.
