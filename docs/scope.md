@@ -96,6 +96,7 @@ The player's home is thrown away and recreated from a golden snapshot at every l
 | Installed Steam games | `/games/steam/steamapps/common` | Kept |
 | Shader cache | `/games/steam/steamapps/shadercache` | Kept |
 | Classic game files | `/games/classic` | Kept, read-only |
+| WoW game files | `/games/battlenet/wow` | Kept; its personal folders link into the home and are wiped |
 
 ## One launcher to bind them all
 
@@ -118,6 +119,7 @@ A thin launcher of our own on top of proven runners: the launcher owns the exper
 | Unreal Tournament (99) | OldUnreal 469e, native Linux | Dedicated server | Needs the original data files |
 | Unreal Tournament 2004 | Native Linux build or Proton, by testing | Dedicated server | Which runs better on our tiers |
 | Call of Duty: Modern Warfare 2 (2009) | IW4x through Proton; game files from the server's share ([runbook](iw4x.md)) | IW4x server on the gaming server, or `+connect` to a seat | One owned Steam copy per seat |
+| World of Warcraft: Forever | Battle.net through Proton; game files from the server's share, patched on each seat ([runbook](wow-forever.md)) | Blizzard's servers; each player's own account | Launch code, Tier C frame rate |
 | Steam games | Steam with Proton | Per game | Kernel-level anti-cheat is best effort |
 | DOS-era titles | DOSBox Staging; IPX over UDP | DOSBox IPX server | Which ones we want |
 

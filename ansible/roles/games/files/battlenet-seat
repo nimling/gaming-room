@@ -1,0 +1,115 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# Starts Battle.net with Proton, for World of Warcraft: Forever.
+#
+# Battle.net and its Wine prefix live in the player's home, so the reset
+# wipes every login it keeps: saved account names, browser cookies and the
+# "Keep me logged in" token. The golden home holds Battle.net installed and
+# signed out (docs/wow-forever.md).
+#
+# WoW itself lives in /games/battlenet/wow and survives the reset; Battle.net
+# patches it there. Its personal folders are links into the home (wow-links);
+# this script creates the folders they point to, so WoW can write into them.
+#
+#   battlenet-seat                   start Battle.net
+#   battlenet-seat --game CODE       start Battle.net and the game CODE after sign-in
+#   battlenet-seat --install         download and run Battle.net's installer
+#   battlenet-seat --check           check the install and say what is wrong
+set -euo pipefail
+
+# shellcheck source=/dev/null
+[[ -r /etc/seat/seat.conf ]] && source /etc/seat/seat.conf
+wow=${SEAT_WOW_DIR:-/games/battlenet/wow}
+private_dirs=${SEAT_WOW_PRIVATE:-WTF Cache Logs Errors Screenshots Interface}
+data=${XDG_DATA_HOME:-$HOME/.local/share}/arcade
+log=$data/battlenet.log
+setup_url=${BATTLENET_SETUP_URL:-https://www.battle.net/download/getInstallerForGame?os=win&gameProgram=BATTLENET_APP&version=Live}
+
+export WINEPREFIX=${WINEPREFIX:-$data/prefixes/battlenet}
+app_dir='C:\Program Files (x86)\Battle.net'
+app=$WINEPREFIX/drive_c/Program\ Files\ \(x86\)/Battle.net/${BATTLENET_EXE:-Battle.net.exe}
+
+mode=start game=""
+case ${1:-} in
+    --check) mode=check ;;
+    --install) mode=install ;;
+    --game)
+        [[ -n ${2:-} ]] || { echo "usage: battlenet-seat --game CODE" >&2; exit 2; }
+        game=$2 ;;
+    "") ;;
+    *) echo "usage: battlenet-seat [--game CODE | --install | --check]" >&2; exit 2 ;;
+esac
+
+problems=()
+command -v umu-run >/dev/null || problems+=("umu-run is not installed")
+proton=${PROTONPATH:-$(sed -n "s/^proton:[[:space:]]*//p" /etc/arcade/arcade.yaml 2>/dev/null | head -n 1 || true)}
+if [[ $proton == /* && ! -x $proton/proton ]]; then
+    problems+=("Proton is missing: no $proton/proton")
+fi
+if [[ $mode != install ]]; then
+    [[ -f $app ]] || problems+=("Battle.net is not installed in $WINEPREFIX; see docs/wow-forever.md")
+    [[ -f $wow/.build.info ]] || problems+=("WoW is missing: no .build.info in $wow")
+    [[ -w $wow ]] || problems+=("$wow is not writable, so Battle.net cannot patch WoW")
+    shopt -s nullglob
+    for version in "$wow"/_*_; do
+        for name in $private_dirs; do
+            want=$HOME/.local/share/arcade/wow/${version##*/}/$name
+            if [[ $(readlink -- "$version/$name" || true) != "$want" ]]; then
+                problems+=("$version/$name is not a link to $want; personal data would survive the reset")
+            fi
+        done
+    done
+    shopt -u nullglob
+fi
+
+if [[ $mode == check ]]; then
+    if ((${#problems[@]})); then
+        printf 'problem: %s\n' "${problems[@]}"
+        exit 1
+    fi
+    echo "ok: ready to play"
+    exit 0
+fi
+if ((${#problems[@]})); then
+    printf 'battlenet-seat: %s\n' "${problems[@]}" >&2
+    exit 1
+fi
+
+# The folders WoW's personal links point to. Gone after every reset.
+shopt -s nullglob
+for version in "$wow"/_*_; do
+    for name in $private_dirs; do
+        mkdir -p -- "$HOME/.local/share/arcade/wow/${version##*/}/$name"
+    done
+done
+shopt -u nullglob
+
+export GAMEID=${GAMEID:-0}
+export PROTONPATH=${proton:-GE-Proton}
+# The session normally sets these (/etc/environment.d/60-arcade-proton.conf).
+export UMU_FOLDERS_PATH=${UMU_FOLDERS_PATH:-/games/runtime/umu}
+# Proton runs inside the Steam Runtime container. It sees /games read-only;
+# Battle.net must write to the WoW folder to patch it.
+case ":${PRESSURE_VESSEL_FILESYSTEMS_RO:-}:" in
+    *:/games:*) ;;
+    *) export PRESSURE_VESSEL_FILESYSTEMS_RO=${PRESSURE_VESSEL_FILESYSTEMS_RO:+$PRESSURE_VESSEL_FILESYSTEMS_RO:}/games ;;
+esac
+export PRESSURE_VESSEL_FILESYSTEMS_RW=${PRESSURE_VESSEL_FILESYSTEMS_RW:+$PRESSURE_VESSEL_FILESYSTEMS_RW:}$wow
+mkdir -p "$WINEPREFIX"
+
+if [[ $mode == install ]]; then
+    setup=$data/Battle.net-Setup.exe
+    echo "battlenet-seat: $(date -Is) downloading the installer" >>"$log"
+    curl -fsSL -o "$setup" "$setup_url"
+    echo "battlenet-seat: $(date -Is) installing with $PROTONPATH" >>"$log"
+    cd "$data"
+    umu-run ./Battle.net-Setup.exe --lang=enUS "--installpath=$app_dir" >>"$log" 2>&1
+    rm -f -- "$setup"
+    exit 0
+fi
+
+args=()
+[[ -n $game ]] && args=("--exec=launch $game")
+cd "$data"
+echo "battlenet-seat: $(date -Is) starting with $PROTONPATH${game:+, game $game}" >>"$log"
+exec umu-run "$app" "${args[@]}" >>"$log" 2>&1

@@ -83,6 +83,14 @@ fi
 find /tmp /var/tmp /dev/shm -xdev -mindepth 1 -user "$SEAT_PLAYER" -delete 2>/dev/null || true
 rm -f -- "/var/spool/cron/$SEAT_PLAYER"
 
+# Hooks from other roles, for player data outside the home (for example
+# WoW's personal folders in /games: roles/games, wow-links). A failing hook
+# is logged; the reset goes on.
+for hook in /usr/local/libexec/seat-reset.d/*; do
+    [[ -f $hook && -x $hook ]] || continue
+    "$hook" || log "hook $hook failed"
+done
+
 date --iso-8601=seconds > /run/seat-last-reset
 
 if (( restart_dm )); then

@@ -137,6 +137,15 @@ seat_shared_games:
     dest: "{{ seat_classic_root }}/worms"
     required: [WA.exe]
     exclude: []
+# World of Warcraft: Forever through Battle.net (roles/games, tasks/battlenet.yml,
+# docs/wow-forever.md). A seat without WoW copies it once from the share's
+# wow/ folder; after that Battle.net patches it in place, through Lancache.
+seat_battlenet_root: "{{ seat_games_root }}/battlenet"
+seat_wow_dir: "{{ seat_battlenet_root }}/wow"
+# Folders in each WoW version folder (_retail_, _classic_, ...) that hold
+# personal data: account name, settings, addons, chat cache, logs and
+# screenshots. Each is a link into the player's home, so the reset wipes it.
+seat_wow_private_dirs: [WTF, Cache, Logs, Errors, Screenshots, Interface]
 # true: compare every file by content, not size and date. Slower; use it to
 # repair a game folder that looks fine but crashes.
 seat_gameshare_verify: false

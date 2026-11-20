@@ -13,6 +13,19 @@
 .config/legendary/user.json|
 .config/heroic/gog_store/auth.json|
 
+# Battle.net, in its Wine prefix (games/battlenet-seat): saved account
+# names, the web login cookie, and Windows credentials, where "Keep me
+# logged in" goes.
+.local/share/arcade/prefixes/battlenet/drive_c/users/*/AppData/Roaming/Battle.net/Battle.net.config|"SavedAccountNames"[[:space:]]*:[[:space:]]*"[^"]
+.local/share/arcade/prefixes/battlenet/drive_c/users/*/AppData/Local/Battle.net/BrowserCaches/*/Cookies|BA-tassadar
+.local/share/arcade/prefixes/battlenet/drive_c/users/*/AppData/Local/Battle.net/BrowserCaches/*/Network/Cookies|BA-tassadar
+.local/share/arcade/prefixes/*/user.reg|Credential Manager
+
+# World of Warcraft: account name and per-account data (WTF), linked into the
+# home from /games (wow-links)
+.local/share/arcade/wow/*/WTF/Config.wtf|accountName
+.local/share/arcade/wow/*/WTF/Account|
+
 # Discord
 .config/discord/Local Storage|
 
