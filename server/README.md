@@ -117,6 +117,17 @@ curl -X POST http://<server>:8790/api/servers/ut2004-instagib/stop  # stop
 
 CPU with VT-x or AMD-V, 16 GB RAM, 1–2 TB SSD, wired gigabit (2.5 GbE preferred).
 
+## Shared login account
+
+The server has one shared account for automation, such as an MCP server: `orchestrator`.
+
+- It is in the `sudo` group, with sudo and no password (`/etc/sudoers.d/orchestrator`).
+- Login is by SSH key only. The password is locked.
+- Morten has the private key. Ask him for access, or give him the public key of a new client and he adds it to `~orchestrator/.ssh/authorized_keys`.
+- The private key is not in this repo. Keep copies only in Bitwarden Secrets Manager.
+- A person made the account by hand on the server. It is not in Ansible yet.
+- A temporary `admin` account with a password was used for the setup. It is deleted.
+
 ## Claude Code on the server
 
 Claude runs here as the orchestrator. People talk to it from the Claude app or claude.ai through Remote Control, from anywhere, without VPN. The server only makes outbound HTTPS connections.
