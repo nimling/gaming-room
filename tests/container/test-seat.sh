@@ -84,7 +84,18 @@ printf 'Branch!STRING:0|Version!STRING:0|Product!STRING:0\neu|1.0.0.1|wow_foreve
 echo "game data" >/srv/share/wow/Data/data/data.000
 touch /srv/share/wow/_forever_/Wow.exe
 echo 'SET accountName "SOMEONE@EXAMPLE.COM"' >/srv/share/wow/_forever_/WTF/Config.wtf
-printf 'uid = nobody\ngid = nobody\nuse chroot = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
+# Battle.net as battlenet-prefix-publish leaves it on the share: signed out,
+# with Wine's drive links, and the version file written last.
+bp=/srv/share/battlenet/prefix
+mkdir -p "$bp/drive_c/Program Files (x86)/Battle.net" "$bp/dosdevices" "$bp/drive_c/users/steamuser/AppData/Roaming/Battle.net"
+echo "build 1" >"$bp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
+echo '{"Client": {"SavedAccountNames": ""}}' >"$bp/drive_c/users/steamuser/AppData/Roaming/Battle.net/Battle.net.config"
+ln -s ../drive_c "$bp/dosdevices/c:"; ln -s / "$bp/dosdevices/z:"
+printf 'WINE REGISTRY Version 2\n' >"$bp/user.reg"
+echo "only in version 1" >"$bp/drive_c/old.txt"
+echo "20261120T100000Z from seat-01" >"$bp/.prefix-version"
+# The real share runs chrooted, which keeps links as they are; say so here.
+printf 'uid = nobody\ngid = nobody\nuse chroot = no\nmunge symlinks = no\n[games]\n    path = /srv/share\n    read only = yes\n' >/tmp/rsyncd.conf
 rsync --daemon --config=/tmp/rsyncd.conf
 ok "rsync://127.0.0.1/games"
 
@@ -263,6 +274,53 @@ grep -qx 'level data, build 200' "$lib/common/Fake Game/data/level.pak" || die "
 grep -q '"buildid"[[:space:]]*"200"' "$lib/appmanifest_4000001.acf" || die "a lower server build replaced the appmanifest"
 ok "a lower build on the server changes nothing"
 
+step "Battle.net prefix: the golden home gets the published one"
+gp=/home/.golden/player/.local/share/arcade/prefixes/battlenet
+bnet_pull() { /usr/local/sbin/battlenet-prefix-pull "$@"; }
+share_prefix=rsync://127.0.0.1/games/battlenet/prefix
+grep -qx 'build 1' "$gp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" || die "prefix not in the golden home"
+cmp -s "$bp/.prefix-version" "$gp/.prefix-version" || die "golden home does not record the version it has"
+[[ -z $(find "$gp" ! -user player -o ! -group player) ]] || die "golden prefix not owned by player: $(find "$gp" ! -user player | head -3)"
+[[ $(readlink "$gp/dosdevices/c:") == ../drive_c && $(readlink "$gp/dosdevices/z:") == / ]] || die "drive links not kept as links"
+[[ ! -e /home/player/.local/share/arcade/prefixes/battlenet/drive_c ]] || die "the live home was touched before a reset"
+[[ -z $(bnet_pull "$share_prefix") ]] || die "the same version was copied again"
+ok "copied into the golden home, owned by player, links kept, live home untouched; same version changes nothing"
+[[ -z $(bnet_pull rsync://127.0.0.1/games/battlenet/nothing-here 2>/dev/null) ]] || die "copied without a prefix on the share"
+cmp -s "$bp/.prefix-version" "$gp/.prefix-version" || die "no prefix on the share changed the golden home"
+ok "no prefix on the share: no change"
+# A new version, half copied: the version file is not there yet.
+rm "$bp/.prefix-version" "$bp/drive_c/old.txt"
+echo "build 2" >"$bp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe"
+[[ -z $(bnet_pull "$share_prefix" 2>/dev/null) ]] || die "took a half-copied prefix"
+grep -qx 'build 1' "$gp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" && [[ -e $gp/drive_c/old.txt ]] || die "a half-copied prefix changed the golden home"
+ok "half-copied prefix (no version file) not taken"
+echo "20261120T110000Z from seat-01" >"$bp/.prefix-version"
+grep -q '^battlenet-prefix-pull: would install 20261120T110000Z' <<<"$(bnet_pull --dry-run "$share_prefix")" || die "dry run does not say what it would do"
+grep -qx 'build 1' "$gp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" || die "dry run changed the golden home"
+grep -q '^battlenet-prefix-pull: installed 20261120T110000Z' <<<"$(bnet_pull "$share_prefix")" || die "new version not installed"
+grep -qx 'build 2' "$gp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" || die "new version not in the golden home"
+[[ ! -e $gp/drive_c/old.txt ]] || die "a file the new version dropped is still there"
+cmp -s "$bp/.prefix-version" "$gp/.prefix-version" || die "new version not recorded"
+[[ ! -e $gp/../.battlenet-prefix.new ]] || die "staging folder left in the golden home"
+[[ -z $(find "$gp" ! -user player) ]] || die "new version not owned by player"
+ok "dry run changes nothing; a new version replaces the old one"
+mv /home/.golden/player /home/.golden/player.bak
+[[ -z $(bnet_pull --dry-run "$share_prefix" 2>/dev/null) && -z $(bnet_pull "$share_prefix" 2>/dev/null) ]] || die "copied without a golden home"
+[[ ! -e /home/.golden/player ]] || die "made a golden home (roles/session must make it)"
+ok "no golden home yet (new seat): no change"
+# The real seats are ext4: the golden home is a plain folder that seat-reset
+# copies, so the copy and the old prefix must stay outside it.
+install -d -m 700 -o player -g player /home/.golden/player
+grep -q '^battlenet-prefix-pull: installed' <<<"$(bnet_pull "$share_prefix")" || die "no copy into a plain-folder golden home"
+grep -qx 'build 2' "$gp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" || die "plain-folder golden home did not get the prefix"
+[[ -z $(find /home/.golden/player -name '.battlenet-prefix.new') && ! -e /home/.golden/.battlenet-prefix.new ]] || die "staging folder left behind"
+echo "build 3" >"$bp/drive_c/Program Files (x86)/Battle.net/Battle.net.exe"; echo "20261120T120000Z from seat-01" >"$bp/.prefix-version"
+grep -q '^battlenet-prefix-pull: installed 20261120T120000Z' <<<"$(bnet_pull "$share_prefix")" || die "no update in a plain-folder golden home"
+[[ ! -e /home/.golden/.battlenet-prefix.new ]] || die "old prefix left next to the golden home"
+rm -rf /home/.golden/player
+mv /home/.golden/player.bak /home/.golden/player
+ok "plain-folder golden home (ext4 seats): copied and replaced outside it"
+
 step "Steam café library: newer builds, busy seats, and the server's read-only access"
 pull_cafe() {
     /usr/local/sbin/steam-cafe pull --share rsync://127.0.0.1/games/steam-cafe/steamapps --library "$lib" \
@@ -372,7 +430,8 @@ runuser -u player -- touch /home/player/.local/share/Steam/steamapps/appmanifest
 /usr/local/sbin/seat-reset session
 [[ -d /games/steam/steamapps/common/SomeGame && -e /games/steam/steamapps/appmanifest_12345.acf ]] || die "Steam game deleted by the reset"
 btrfs subvolume show /home/player >/dev/null || die "home is no longer a subvolume"
-[[ ! -e /home/player/.local/share/arcade/prefixes/battlenet/user.reg ]] || die "Battle.net login survived the reset"
+grep -q 'Credential Manager' /home/player/.local/share/arcade/prefixes/battlenet/user.reg && die "Battle.net login survived the reset"
+grep -qx 'build 2' "/home/player/.local/share/arcade/prefixes/battlenet/drive_c/Program Files (x86)/Battle.net/Battle.net.exe" || die "the reset did not bring in the golden home's Battle.net"
 [[ ! -e /games/battlenet/wow/_forever_/WTF/Config.wtf ]] || die "WoW account name survived the reset"
 [[ -L /games/battlenet/wow/_forever_/Logs && ! -e /games/battlenet/wow/_forever_/Logs/chat.log ]] || die "real WoW Logs folder survived the reset"
 [[ -f /games/battlenet/wow/Data/data/data.000 ]] || die "WoW deleted by the reset"

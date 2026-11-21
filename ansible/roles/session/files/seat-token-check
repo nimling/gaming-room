@@ -3,12 +3,18 @@
 # Looks for login tokens in a home folder. Prints each one found.
 # Exit 0 = clean, 1 = tokens found.
 #   seat-token-check [home]   (default: the player's home)
+# Also installed on the gaming server, where battlenet-prefix-publish checks
+# a Battle.net prefix with it before the seats get it (roles/server_gameshare).
 set -uo pipefail
 
 # shellcheck source=/dev/null
-source /etc/seat/seat.conf
+[[ -r /etc/seat/seat.conf ]] && source /etc/seat/seat.conf
 
-home=${1:-$SEAT_HOME}
+home=${1:-${SEAT_HOME:-}}
+if [[ -z $home ]]; then
+    echo "usage: seat-token-check HOME (no /etc/seat/seat.conf here)" >&2
+    exit 2
+fi
 list=${SEAT_TOKEN_PATHS:-/usr/local/share/seat/token-paths}
 found=0
 shopt -s nullglob dotglob

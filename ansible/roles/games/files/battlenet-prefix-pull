@@ -1,0 +1,114 @@
+#!/bin/bash
+# Managed by gaming-room Ansible (roles/games).
+# Puts the signed-out Battle.net prefix from the gaming server into the
+# golden home, so every seat has Battle.net without setting it up by hand.
+#
+# A person sets Battle.net up once on the canary and publishes its prefix to
+# the share (battlenet-prefix-publish on the server, docs/wow-forever.md).
+# The share's .prefix-version is written last, so a prefix without it is
+# not finished. This copies a finished prefix when its version differs from
+# the one in the golden home:
+#   1. into a staging folder on the golden home's filesystem,
+#   2. only if the share's version did not change during the copy,
+#   3. then swaps it in with one rename, with the version file inside.
+# The live home is left alone; the next reset brings the new prefix in.
+# A reset while this runs gets the old prefix. Only a reset that copies the
+# golden home (not btrfs) in the very instant of the rename can see a mix;
+# the next reset puts that right.
+#
+#   battlenet-prefix-pull SHARE             copy if the share has a newer prefix
+#   battlenet-prefix-pull --dry-run SHARE   only say what it would do
+# SHARE is an rsync URL, for example rsync://gaming-server/games/battlenet/prefix.
+# Prints one line on stdout when it changed (or would change) something.
+# Runs as root, from Ansible (tasks/battlenet.yml).
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/seat/seat.conf
+
+dry_run=0
+if [[ ${1:-} == --dry-run ]]; then
+    dry_run=1
+    shift
+fi
+if [[ $# -ne 1 ]]; then
+    echo "usage: battlenet-prefix-pull [--dry-run] SHARE" >&2
+    exit 2
+fi
+share=${1%/}
+say() { echo "battlenet-prefix-pull: $*" >&2; }
+
+# The golden home comes from roles/session, which runs after this on a new
+# seat. The next pull fills it.
+if [[ ! -d $SEAT_GOLDEN ]]; then
+    say "no golden home at $SEAT_GOLDEN yet; nothing to do"
+    exit 0
+fi
+prefixes=$SEAT_GOLDEN/.local/share/arcade/prefixes
+prefix=$prefixes/battlenet
+marker=.prefix-version
+# Not btrfs (the golden home is a plain folder): seat-reset copies the golden
+# home with cp, which fails on files that appear or vanish under it. So the
+# copy, and the old prefix it replaces, stay outside the golden home. On
+# btrfs the golden home is its own subvolume, a rename cannot leave it, and
+# seat-reset takes a snapshot, which a copy in progress does not disturb.
+if [[ $(stat -c %d -- "$SEAT_GOLDEN") == "$(stat -c %d -- "${SEAT_GOLDEN%/*}")" ]]; then
+    staging=${SEAT_GOLDEN%/*}/.battlenet-prefix.new
+else
+    staging=$prefixes/.battlenet-prefix.new
+fi
+
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+
+# rsync cannot print a file, so fetch the version into a temp folder.
+fetch_version() {
+    rm -f -- "$tmp/$1"
+    rsync -q "$share/$marker" "$tmp/$1" 2>/dev/null
+}
+
+if ! fetch_version before; then
+    say "$share has no finished prefix ($marker missing, or the server is unreachable)"
+    exit 0
+fi
+if [[ -f $prefix/$marker ]] && cmp -s "$tmp/before" "$prefix/$marker"; then
+    exit 0
+fi
+version=$(head -n 1 "$tmp/before")
+if (( dry_run )); then
+    echo "battlenet-prefix-pull: would install $version in $prefix"
+    exit 0
+fi
+
+# Folders up to the prefix, owned by the player like the rest of the home.
+dir=$SEAT_GOLDEN
+for part in .local share arcade prefixes; do
+    dir=$dir/$part
+    [[ -d $dir ]] || install -d -m 0755 -o "$SEAT_PLAYER" -g "$SEAT_PLAYER" -- "$dir"
+done
+
+# Unchanged files are hard links to the current prefix, so only what changed
+# comes over the network.
+link_dest=()
+[[ -d $prefix ]] && link_dest=("--link-dest=$prefix")
+# A copy that stopped halfway never stays in the golden home.
+trap 'rm -rf -- "$tmp"; rm -rf --one-file-system -- "$staging"' EXIT
+rm -rf --one-file-system -- "$staging"
+rsync -rlptog --delete --exclude="/$marker*" \
+    --chown="$SEAT_PLAYER:$SEAT_PLAYER" --chmod=go-w \
+    "${link_dest[@]}" "$share/" "$staging/"
+
+# A publish that started during the copy changes or removes the version.
+if ! fetch_version after || ! cmp -s "$tmp/before" "$tmp/after"; then
+    say "the share changed during the copy; trying again at the next pull"
+    exit 0
+fi
+install -m 0644 -o "$SEAT_PLAYER" -g "$SEAT_PLAYER" -- "$tmp/before" "$staging/$marker"
+
+if [[ -d $prefix ]]; then
+    # The old prefix ends up in the staging folder; the trap deletes it.
+    mv --exchange --no-target-directory -- "$staging" "$prefix"
+else
+    mv --no-target-directory -- "$staging" "$prefix"
+fi
+echo "battlenet-prefix-pull: installed $version in $prefix"
